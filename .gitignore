@@ -1,0 +1,5 @@
+# 伺服器執行時產生的檔案（紀錄檔裡有連線裝置的 IP，不要上傳）
+server.log
+server.log.1
+server.pid
+__pycache__/

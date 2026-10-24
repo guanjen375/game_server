@@ -1,0 +1,1711 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>經典拱豬 Gong Zhu - 網頁撲克牌遊戲</title>
+    <!-- 引入 Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 引入 Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&display=swap" rel="stylesheet">
+    <style>
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        :root {
+            /* 畫面可見高度：手機瀏覽器的網址列與工具列會蓋住 100vh 的底部，支援時改用 100dvh */
+            --app-h: 100vh;
+        }
+        @supports (height: 100dvh) {
+            :root { --app-h: 100dvh; }
+        }
+        body {
+            font-family: 'Noto Sans TC', sans-serif;
+            background-color: #072b18;
+            height: var(--app-h);
+            overflow: hidden;
+            touch-action: manipulation;
+        }
+        /* 彈窗最大高度同樣以可見高度為準 */
+        .modal-h-88 { max-height: 88vh; max-height: 88dvh; }
+        .modal-h-90 { max-height: 90vh; max-height: 90dvh; }
+        /* 手機橫放時畫面太矮，放不下整個遊戲：提示轉成直向 */
+        .rotate-hint { display: none; }
+        @media (orientation: landscape) and (max-height: 500px) and (pointer: coarse) {
+            .rotate-hint { display: flex; }
+        }
+
+        /* 經典綠色絨布牌桌背景 */
+        .felt-table {
+            background: radial-gradient(circle at 50% 45%, #196c3e 0%, #0e4b28 60%, #072915 100%);
+            box-shadow: inset 0 0 80px rgba(0, 0, 0, 0.75);
+            position: relative;
+        }
+        .felt-table::before {
+            content: "";
+            position: absolute;
+            inset: 12px;
+            border: 2px solid rgba(251, 191, 36, 0.18);
+            border-radius: 24px;
+            pointer-events: none;
+        }
+
+        /* 撲克牌基礎樣式 */
+        .playing-card {
+            width: 72px;
+            height: 104px;
+            background: linear-gradient(145deg, #ffffff 0%, #f4f4f6 100%);
+            border-radius: 9px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.38), inset 0 0 0 1px rgba(0,0,0,0.12);
+            position: relative;
+            transition: transform 0.22s cubic-bezier(0.2, 0.8, 0.2, 1),
+                        box-shadow 0.22s ease,
+                        opacity 0.22s ease,
+                        filter 0.22s ease;
+            cursor: pointer;
+            flex-shrink: 0;
+        }
+
+        @media (max-width: 640px) {
+            .playing-card {
+                width: 56px;
+                height: 82px;
+                border-radius: 7px;
+            }
+        }
+
+        /* 玩家手牌重疊排列 */
+        .hand-card-wrapper {
+            margin-left: -22px;
+            transition: margin 0.2s ease, transform 0.2s ease;
+        }
+        .hand-card-wrapper:first-child {
+            margin-left: 0;
+        }
+        @media (max-width: 640px) {
+            /* 手機上疊得更緊（每張露出 22px，角落點數花色仍看得到），13 張不用左右捲動 */
+            .hand-card-wrapper {
+                margin-left: -34px;
+            }
+        }
+
+        /* 可出牌高亮狀態 */
+        .card-playable {
+            transform: translateY(-12px);
+            box-shadow: 0 8px 18px rgba(0, 0, 0, 0.45), 0 0 0 2px #fbbf24;
+        }
+        .card-playable:hover {
+            transform: translateY(-26px) scale(1.06);
+            box-shadow: 0 14px 24px rgba(0, 0, 0, 0.55), 0 0 12px rgba(251, 191, 36, 0.9);
+            z-index: 40 !important;
+        }
+
+        /* 提示建議出牌閃爍 */
+        .card-hint {
+            animation: hintPulse 1s infinite alternate;
+        }
+        @keyframes hintPulse {
+            0% { box-shadow: 0 8px 18px rgba(0,0,0,0.5), 0 0 0 3px #38bdf8; }
+            100% { box-shadow: 0 14px 26px rgba(56,189,248,0.7), 0 0 0 5px #38bdf8; transform: translateY(-24px); }
+        }
+
+        /* 不可出牌防呆半透明狀態 */
+        .card-disabled {
+            opacity: 0.45;
+            filter: grayscale(35%) brightness(0.82);
+            cursor: not-allowed;
+            transform: translateY(4px);
+        }
+
+        /* 非玩家回合時的手牌狀態 */
+        .card-waiting {
+            transform: translateY(0px);
+            cursor: default;
+        }
+        .card-waiting:hover {
+            transform: translateY(-6px);
+        }
+
+        /* 迷你計分牌（亮牌區） */
+        .mini-score-card {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 1px 5px;
+            border-radius: 4px;
+            background: #ffffff;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.4);
+            font-size: 11px;
+            font-weight: 800;
+            line-height: 1.2;
+            border: 1px solid rgba(0,0,0,0.15);
+            animation: popIn 0.25s cubic-bezier(0.18, 0.89, 0.32, 1.28);
+        }
+
+        @keyframes popIn {
+            0% { transform: scale(0.3); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        /* 出牌到中央的動畫 */
+        .trick-card-enter-south {
+            animation: flyFromSouth 0.26s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+        }
+        .trick-card-enter-north {
+            animation: flyFromNorth 0.26s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+        }
+        .trick-card-enter-west {
+            animation: flyFromWest 0.26s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+        }
+        .trick-card-enter-east {
+            animation: flyFromEast 0.26s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+        }
+
+        @keyframes flyFromSouth {
+            0% { transform: translateY(90px) scale(0.85); opacity: 0.2; }
+            100% { transform: translateY(0) rotate(-2deg) scale(1); opacity: 1; }
+        }
+        @keyframes flyFromNorth {
+            0% { transform: translateY(-90px) scale(0.85); opacity: 0.2; }
+            100% { transform: translateY(0) rotate(3deg) scale(1); opacity: 1; }
+        }
+        @keyframes flyFromWest {
+            0% { transform: translateX(-90px) scale(0.85); opacity: 0.2; }
+            100% { transform: translateX(0) rotate(-4deg) scale(1); opacity: 1; }
+        }
+        @keyframes flyFromEast {
+            0% { transform: translateX(90px) scale(0.85); opacity: 0.2; }
+            100% { transform: translateX(0) rotate(4deg) scale(1); opacity: 1; }
+        }
+
+        /* 收墩贏家動畫 */
+        .collect-to-south { transform: translate(0, 160px) scale(0.3) !important; opacity: 0 !important; transition: all 0.42s ease-in !important; }
+        .collect-to-north { transform: translate(0, -160px) scale(0.3) !important; opacity: 0 !important; transition: all 0.42s ease-in !important; }
+        .collect-to-west  { transform: translate(-200px, 0) scale(0.3) !important; opacity: 0 !important; transition: all 0.42s ease-in !important; }
+        .collect-to-east  { transform: translate(200px, 0) scale(0.3) !important; opacity: 0 !important; transition: all 0.42s ease-in !important; }
+
+        /* 輪到該玩家的呼吸光環 */
+        .active-turn-ring {
+            box-shadow: 0 0 0 2px #fbbf24, 0 0 18px rgba(251, 191, 36, 0.65);
+            animation: turnGlow 1.3s infinite alternate;
+        }
+        @keyframes turnGlow {
+            0% { box-shadow: 0 0 0 2px #fbbf24, 0 0 10px rgba(251, 191, 36, 0.4); }
+            100% { box-shadow: 0 0 0 3px #fde047, 0 0 22px rgba(251, 191, 36, 0.85); }
+        }
+
+        /* 浮動特效文字 */
+        .floating-banner {
+            animation: floatUpFade 1.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+        @keyframes floatUpFade {
+            0% { transform: translate(-50%, 10px) scale(0.7); opacity: 0; }
+            20% { transform: translate(-50%, -8px) scale(1.08); opacity: 1; }
+            80% { transform: translate(-50%, -22px) scale(1); opacity: 1; }
+            100% { transform: translate(-50%, -38px) scale(0.95); opacity: 0; }
+        }
+
+        /* 自訂捲軸 */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(251, 191, 36, 0.5);
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body class="w-screen flex flex-col justify-between felt-table text-white select-none">
+
+    <!-- 頂部導覽與資訊列（手機上縮成兩行：圖示與按鈕一行、狀態一行） -->
+    <header class="w-full px-3 sm:px-6 py-1.5 sm:py-2 bg-black/45 backdrop-blur-md border-b border-white/10 flex flex-wrap items-center justify-between gap-x-2 gap-y-1.5 sm:gap-2 z-30">
+        <div class="flex items-center gap-2 sm:gap-3">
+            <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center shadow-md text-xl">
+                🐷
+            </div>
+            <div>
+                <h1 class="text-base sm:text-lg font-black tracking-wide text-amber-300 flex items-center gap-2">
+                    <span class="hidden sm:inline">經典拱豬</span>
+                    <span id="roundBadge" class="text-xs font-bold px-2 py-0.5 rounded-full bg-emerald-800/90 text-emerald-200 border border-emerald-500/40">
+                        第 1 局
+                    </span>
+                </h1>
+                <p class="text-[11px] text-emerald-200/80 hidden sm:block">♠Q 豬(-100) · ♦J 羊(+100) · ♣10 變壓器(×2/+50) · ♥ 全紅(+200/全桌豬羊變色) · 🌟16張全吃大滿貫(+800)</p>
+            </div>
+        </div>
+
+        <!-- 中央狀態提示條 -->
+        <div class="order-3 sm:order-none mx-auto sm:mx-0 flex items-center gap-2 bg-emerald-950/80 border border-emerald-600/40 px-3 py-1 rounded-full shadow-inner">
+            <span class="text-xs text-emerald-300 font-medium">目前墩數：</span>
+            <span id="trickCounter" class="text-xs sm:text-sm font-extrabold text-amber-300">1 / 13</span>
+            <span class="text-white/20">|</span>
+            <span class="text-xs text-emerald-300 font-medium">首出花色：</span>
+            <span id="leadSuitIndicator" class="text-xs sm:text-sm font-extrabold text-white">等待出牌</span>
+        </div>
+
+        <!-- 右側功能按鈕列 -->
+        <div class="order-2 sm:order-none flex items-center gap-1 sm:gap-2">
+            <button id="btnHint" onclick="game.showHint()" class="px-2 sm:px-2.5 py-1.5 rounded-lg bg-sky-600/80 hover:bg-sky-500 active:scale-95 text-xs font-bold transition flex items-center gap-1 shadow">
+                <span>💡</span><span class="hidden md:inline">出牌提示</span>
+            </button>
+            <button id="btnSound" onclick="game.toggleSound()" class="px-2 sm:px-2.5 py-1.5 rounded-lg bg-emerald-800/80 hover:bg-emerald-700 active:scale-95 text-xs font-bold transition flex items-center gap-1 border border-emerald-600/40">
+                <span id="soundIcon">🔊</span><span class="hidden md:inline">音效</span>
+            </button>
+            <button onclick="game.openScoreModal(false)" class="px-2 sm:px-2.5 py-1.5 rounded-lg bg-emerald-800/80 hover:bg-emerald-700 active:scale-95 text-xs font-bold transition flex items-center gap-1 border border-emerald-600/40">
+                <span>📊</span><span class="hidden sm:inline">計分板</span>
+            </button>
+            <button onclick="game.openRulesModal()" class="px-2 sm:px-2.5 py-1.5 rounded-lg bg-amber-500/90 hover:bg-amber-400 text-slate-950 active:scale-95 text-xs font-black transition flex items-center gap-1 shadow">
+                <span>📖</span><span class="hidden sm:inline">規則說明</span>
+            </button>
+            <button onclick="game.confirmRestartMatch()" class="px-2 sm:px-2.5 py-1.5 rounded-lg bg-rose-600/85 hover:bg-rose-500 active:scale-95 text-xs font-bold transition flex items-center gap-1 shadow">
+                <span>🔄</span><span class="hidden sm:inline">重新開始</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- 牌桌主要遊戲區 -->
+    <main class="relative flex-1 min-h-0 w-full max-w-7xl mx-auto flex flex-col justify-between p-2 sm:p-4 overflow-hidden">
+
+        <!-- 上方 AI：北家（小美） -->
+        <div class="w-full flex justify-center z-20">
+            <div id="panel-north" class="bg-slate-900/75 backdrop-blur-md border border-white/15 rounded-2xl px-3.5 py-1.5 sm:py-2 w-full sm:w-96 flex flex-wrap items-center gap-x-3 sm:block transition-all duration-300">
+                <div class="flex items-center justify-between gap-3 sm:gap-2">
+                    <div class="flex items-center gap-2">
+                        <div class="w-8 h-8 rounded-full bg-pink-500/30 border border-pink-400 flex items-center justify-center text-base">👩</div>
+                        <div>
+                            <div class="flex items-center gap-1.5">
+                                <span class="font-bold text-xs sm:text-sm text-white">北家 · 小美</span>
+                                <span id="turn-badge-north" class="hidden text-[10px] px-1.5 py-0.5 rounded bg-amber-400 text-slate-950 font-black">思考中</span>
+                            </div>
+                            <div class="text-[11px] text-emerald-300">
+                                手牌 <span id="count-north" class="font-bold text-amber-300">13</span> 張
+                            </div>
+                        </div>
+                    </div>
+                    <div class="text-right">
+                        <div class="text-[11px] text-slate-300">累計總分：<span id="total-north" class="font-black text-sm text-amber-300">0</span></div>
+                        <div class="text-[10px] text-slate-400">本局暫計：<span id="live-north" class="font-bold text-white">0</span></div>
+                    </div>
+                </div>
+                <!-- 北家已吃到的計分牌（亮牌區） -->
+                <div class="flex-1 min-w-0 justify-end sm:justify-start sm:mt-1.5 sm:pt-1.5 sm:border-t border-white/10 min-h-[26px] flex flex-wrap items-center gap-1" id="captured-north">
+                    <span class="text-[11px] text-white/35 italic">尚無計分牌</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- 中間層：左方 AI + 中央出牌桌面 + 右方 AI -->
+        <div class="flex-1 min-h-0 w-full flex items-center justify-between relative my-1">
+
+            <!-- 左方 AI：西家（阿財）；手機上面板變窄、不顯示頭像，讓中間放得下出牌區 -->
+            <div id="panel-west" class="bg-slate-900/75 backdrop-blur-md border border-white/15 rounded-2xl p-2 sm:p-3 w-[84px] sm:w-52 max-h-full overflow-y-auto overscroll-contain shrink-0 z-20 transition-all duration-300">
+                <div class="flex items-center gap-2">
+                    <div class="w-8 h-8 rounded-full bg-indigo-500/30 border border-indigo-400 hidden sm:flex items-center justify-center text-base shrink-0">🧔</div>
+                    <div class="min-w-0">
+                        <div class="font-bold text-[11px] sm:text-sm text-white truncate">西家 · 阿財</div>
+                        <div class="text-[11px] text-emerald-300">手牌 <span id="count-west" class="font-bold text-amber-300">13</span> 張</div>
+                    </div>
+                </div>
+                <div class="mt-1.5 flex flex-col items-start sm:flex-row sm:justify-between sm:items-center text-[11px] bg-black/30 px-1.5 sm:px-2 py-1 rounded-lg">
+                    <span class="text-slate-300">累計 <strong id="total-west" class="text-amber-300">0</strong></span>
+                    <span class="text-slate-400">本局 <strong id="live-west" class="text-white">0</strong></span>
+                </div>
+                <div id="turn-badge-west" class="hidden mt-1 text-center text-[10px] py-0.5 rounded bg-amber-400 text-slate-950 font-black">思考出牌中...</div>
+                <!-- 西家亮牌區 -->
+                <div class="mt-1.5 pt-1.5 border-t border-white/10 min-h-[30px] flex flex-wrap items-center gap-1" id="captured-west">
+                    <span class="text-[11px] text-white/35 italic">尚無計分牌</span>
+                </div>
+            </div>
+
+            <!-- 中央出牌競技區 (Trick Area) -->
+            <div class="relative flex-1 min-w-0 h-full flex items-center justify-center">
+                <!-- 桌面中央裝飾環（手機上縮成剛好放得下四張出牌的大小） -->
+                <div class="w-full max-w-[188px] h-[180px] sm:max-w-none sm:w-72 sm:h-72 rounded-full border border-emerald-400/15 bg-emerald-950/25 flex items-center justify-center relative shadow-inner">
+                    <div class="text-center pointer-events-none opacity-20">
+                        <div class="text-xl sm:text-4xl font-black tracking-widest text-emerald-200">GONG ZHU</div>
+                        <div class="text-xs font-bold text-emerald-300 mt-1">有花跟花 · 無花墊牌</div>
+                    </div>
+
+                    <!-- 四個方位的出牌插槽 -->
+                    <!-- 北家出牌位置 -->
+                    <div id="trick-slot-north" class="absolute top-1 sm:top-4 left-1/2 -translate-x-1/2 w-[56px] h-[82px] sm:w-[72px] sm:h-[104px] flex items-center justify-center z-10"></div>
+                    <!-- 南家(玩家)出牌位置 -->
+                    <div id="trick-slot-south" class="absolute bottom-1 sm:bottom-4 left-1/2 -translate-x-1/2 w-[56px] h-[82px] sm:w-[72px] sm:h-[104px] flex items-center justify-center z-20"></div>
+                    <!-- 西家出牌位置 -->
+                    <div id="trick-slot-west" class="absolute left-1 sm:left-7 top-1/2 -translate-y-1/2 w-[56px] h-[82px] sm:w-[72px] sm:h-[104px] flex items-center justify-center z-10"></div>
+                    <!-- 東家出牌位置 -->
+                    <div id="trick-slot-east" class="absolute right-1 sm:right-7 top-1/2 -translate-y-1/2 w-[56px] h-[82px] sm:w-[72px] sm:h-[104px] flex items-center justify-center z-10"></div>
+
+                    <!-- 中央動態提示橫幅（吃豬、吃羊、收墩訊息） -->
+                    <div id="centerToastContainer" class="absolute inset-0 pointer-events-none z-30"></div>
+                </div>
+            </div>
+
+            <!-- 右方 AI：東家（老王）；手機上面板變窄、不顯示頭像 -->
+            <div id="panel-east" class="bg-slate-900/75 backdrop-blur-md border border-white/15 rounded-2xl p-2 sm:p-3 w-[84px] sm:w-52 max-h-full overflow-y-auto overscroll-contain shrink-0 z-20 transition-all duration-300">
+                <div class="flex items-center gap-2">
+                    <div class="w-8 h-8 rounded-full bg-amber-500/30 border border-amber-400 hidden sm:flex items-center justify-center text-base shrink-0">👴</div>
+                    <div class="min-w-0">
+                        <div class="font-bold text-[11px] sm:text-sm text-white truncate">東家 · 老王</div>
+                        <div class="text-[11px] text-emerald-300">手牌 <span id="count-east" class="font-bold text-amber-300">13</span> 張</div>
+                    </div>
+                </div>
+                <div class="mt-1.5 flex flex-col items-start sm:flex-row sm:justify-between sm:items-center text-[11px] bg-black/30 px-1.5 sm:px-2 py-1 rounded-lg">
+                    <span class="text-slate-300">累計 <strong id="total-east" class="text-amber-300">0</strong></span>
+                    <span class="text-slate-400">本局 <strong id="live-east" class="text-white">0</strong></span>
+                </div>
+                <div id="turn-badge-east" class="hidden mt-1 text-center text-[10px] py-0.5 rounded bg-amber-400 text-slate-950 font-black">思考出牌中...</div>
+                <!-- 東家亮牌區 -->
+                <div class="mt-1.5 pt-1.5 border-t border-white/10 min-h-[30px] flex flex-wrap items-center gap-1" id="captured-east">
+                    <span class="text-[11px] text-white/35 italic">尚無計分牌</span>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- 下方：真人玩家區（南家） -->
+        <div class="w-full flex flex-col items-center z-20">
+            <!-- 玩家狀態與亮牌列 -->
+            <div id="panel-south" class="relative w-full max-w-3xl bg-slate-900/80 backdrop-blur-md border border-white/15 rounded-2xl px-3.5 py-1.5 sm:py-2 mb-1 sm:mb-2 transition-all duration-300">
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                    <div class="flex items-center gap-2.5">
+                        <div class="w-8 h-8 rounded-full bg-emerald-500/30 border border-emerald-400 flex items-center justify-center text-base">😎</div>
+                        <div>
+                            <div class="flex items-center gap-2">
+                                <span class="font-black text-sm text-white">南家 · 您（玩家）</span>
+                                <!-- 手機上浮在面板右上角，出現時不會把面板撐高 -->
+                                <span id="playerTurnPrompt" class="hidden absolute -top-3 right-3 sm:static z-10 shadow text-xs px-2 py-0.5 rounded-full bg-amber-400 text-slate-950 font-black animate-bounce">
+                                    請選擇一張發亮手牌出牌！
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 玩家已吃計分牌（亮牌區） -->
+                    <div class="flex-1 flex items-center justify-center min-w-[160px] px-2">
+                        <div class="flex flex-wrap items-center gap-1" id="captured-south">
+                            <span class="text-xs text-white/35 italic">尚無計分牌</span>
+                        </div>
+                    </div>
+
+                    <!-- 玩家分數統計 -->
+                    <div class="flex items-center gap-3 text-right">
+                        <div class="bg-black/35 px-2.5 py-1 rounded-lg border border-white/10">
+                            <span class="text-[11px] text-slate-400">本局暫計：</span>
+                            <span id="live-south" class="text-xs sm:text-sm font-black text-white">0</span>
+                        </div>
+                        <div class="bg-amber-500/20 px-2.5 py-1 rounded-lg border border-amber-400/30">
+                            <span class="text-[11px] text-amber-200">累計總分：</span>
+                            <span id="total-south" class="text-sm sm:text-base font-black text-amber-300">0</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 玩家手牌容器 -->
+            <div class="w-full flex justify-center items-end min-h-[110px] sm:min-h-[132px] pt-6 pb-1 px-2 overflow-x-auto">
+                <div id="playerHandContainer" class="flex items-center justify-center">
+                    <!-- JS 動態渲染手牌 -->
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- 手機橫放時的提示（只在高度很矮的觸控螢幕顯示） -->
+    <div class="rotate-hint fixed inset-0 z-[100] flex-col items-center justify-center gap-2 bg-[#072b18] text-center px-6">
+        <div class="text-5xl">📱</div>
+        <div class="text-lg font-black text-amber-300">請把手機轉成直向</div>
+        <div class="text-xs text-emerald-200/80">橫向畫面太矮，放不下整個遊戲畫面</div>
+    </div>
+
+    <!-- 彈窗 1：規則說明 Modal -->
+    <div id="rulesModal" class="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
+        <div class="bg-slate-900 border border-emerald-500/40 rounded-3xl max-w-2xl w-full modal-h-88 flex flex-col shadow-2xl overflow-hidden">
+            <div class="px-6 py-4 bg-gradient-to-r from-emerald-900 to-slate-900 border-b border-white/10 flex items-center justify-between">
+                <h2 class="text-lg sm:text-xl font-black text-amber-300 flex items-center gap-2">
+                    <span>📖</span> 經典拱豬（Gong Zhu）規則說明
+                </h2>
+                <button onclick="game.closeRulesModal()" class="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white font-bold">✕</button>
+            </div>
+            <div class="p-6 overflow-y-auto space-y-5 text-sm text-slate-200 leading-relaxed">
+                <div>
+                    <h3 class="text-amber-400 font-black text-base mb-1.5">一、基本玩法與出牌規則</h3>
+                    <ul class="list-disc pl-5 space-y-1 text-slate-300">
+                        <li>使用一副標準 52 張撲克牌（無鬼牌），4 位玩家每人發 13 張牌。</li>
+                        <li><strong>首墩領出：</strong>每局第 1 墩由持有 <strong>梅花 2 (♣2)</strong> 的玩家先出牌並打出 ♣2；之後每一墩由上一墩的贏家先出牌。</li>
+                        <li><strong>跟牌與墊牌：</strong>跟牌玩家必須打出與「首張牌」相同花色的牌（有該花色必出）；若手中完全沒有該花色，則可打出任意其他花色的牌（墊牌，不會贏得該墩）。</li>
+                        <li><strong>勝負判定：</strong>同一墩中，符合「首張牌花色」且點數最大者贏得該墩（點數大小：<strong>A &gt; K &gt; Q &gt; J &gt; 10 &gt; 9 &gt; 8 &gt; 7 &gt; 6 &gt; 5 &gt; 4 &gt; 3 &gt; 2</strong>），並收下該墩中所有的計分牌。</li>
+                    </ul>
+                </div>
+
+                <div>
+                    <h3 class="text-amber-400 font-black text-base mb-2">二、經典拱豬計分表</h3>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                        <div class="bg-rose-950/50 border border-rose-500/40 rounded-xl p-3 flex items-start gap-3">
+                            <div class="text-2xl">🐷</div>
+                            <div>
+                                <div class="font-black text-rose-300">豬（黑桃 Q · ♠Q）</div>
+                                <div class="text-xs text-slate-300 mt-0.5">平時吃到扣 <strong class="text-rose-400">-100 分</strong>；只要<strong>任一玩家收全紅（13張紅心）</strong>，豬就變為 <strong class="text-emerald-400">+100 分</strong>，不論由哪位玩家吃到！</div>
+                            </div>
+                        </div>
+                        <div class="bg-emerald-950/50 border border-emerald-500/40 rounded-xl p-3 flex items-start gap-3">
+                            <div class="text-2xl">🐑</div>
+                            <div>
+                                <div class="font-black text-emerald-300">羊（方塊 J · ♦J）</div>
+                                <div class="text-xs text-slate-300 mt-0.5">平時吃到加 <strong class="text-emerald-400">+100 分</strong>；只要<strong>任一玩家收全紅（13張紅心）</strong>，羊就變為 <strong class="text-rose-400">-100 分</strong>，不論由哪位玩家吃到。16 張全吃另按大滿貫特殊獎勵計分。</div>
+                            </div>
+                        </div>
+                        <div class="bg-amber-950/50 border border-amber-500/40 rounded-xl p-3 flex items-start gap-3">
+                            <div class="text-2xl">⚡</div>
+                            <div>
+                                <div class="font-black text-amber-300">變壓器（梅花 10 · ♣10）</div>
+                                <div class="text-xs text-slate-300 mt-0.5">使該局總得分 <strong>加倍 (×2)</strong>！若單獨只吃到 ♣10 而無其他計分牌，則得 <strong class="text-emerald-400">+50 分</strong>。</div>
+                            </div>
+                        </div>
+                        <div class="bg-pink-950/50 border border-pink-500/40 rounded-xl p-3 flex items-start gap-3">
+                            <div class="text-2xl">❤️</div>
+                            <div>
+                                <div class="font-black text-pink-300">紅心牌（♥A ~ ♥2 共 13 張）</div>
+                                <div class="text-xs text-slate-300 mt-0.5">
+                                    ♥A(-50)、♥K(-40)、♥Q(-30)、♥J(-20)、♥10~♥5(各-10)、♥4~♥2(0分)。<br>
+                                    🔥 <strong>收全紅：</strong>收齊全部 13 張紅心由 -200 轉為 <strong class="text-emerald-400">+200 分</strong>！
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 新增：豬羊變色與 16 張全吃大滿貫說明 -->
+                    <div class="mt-3 bg-gradient-to-r from-amber-950/70 via-emerald-950/60 to-amber-950/70 border border-amber-400/50 rounded-xl p-3.5">
+                        <div class="font-black text-amber-300 text-sm flex items-center gap-1.5 mb-1">
+                            <span>🌟</span> 豬羊變色 ＆ 16 張全吃大滿貫
+                        </div>
+                        <ul class="list-disc pl-5 text-xs text-slate-200 space-y-1">
+                            <li><strong>收全紅，全桌豬羊變色：</strong>當任一玩家收齊全部 13 張紅心（+200）時，這一局的<strong>黑桃 Q（豬）由 -100 變為 +100 分</strong>，<strong>方塊 J（羊）由 +100 變為 -100 分</strong>，不論豬羊由哪位玩家吃到！例如一家全紅配羊與變壓器為 (200 - 100) × 2 = +200 分，另一家單吃豬則為 +100 分。</li>
+                            <li><strong>16 張全吃大滿貫：</strong>單一玩家獨攬全部 16 張計分牌（13張紅心 + ♠Q + ♦J + ♣10）時：<br>
+                                <span class="text-amber-300 font-bold">特殊獎勵：</span>直接獲得 <strong>+800 分</strong>，取代一般變色與變壓器算式（亦可切換超級大滿貫模式，直接獎勵 <strong>+1000 分</strong>）。
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- 計分流派設定 -->
+                <div class="bg-slate-800/90 border border-amber-400/30 rounded-xl p-3.5">
+                    <label for="ruleModeSelectRules" class="block text-xs font-black text-amber-300 mb-1.5">
+                        ⚙️ 選擇全紅／全吃計分流派（切換後立即套用並重算所有局數）：
+                    </label>
+                    <select id="ruleModeSelectRules" onchange="game.setScoringRuleMode(this.value)" class="w-full bg-slate-950 border border-white/20 rounded-lg px-3 py-2 text-xs sm:text-sm font-bold text-white focus:outline-none focus:border-amber-400">
+                        <option value="classic">經典豬羊變色（有人收全紅時全桌豬+100、羊-100，16張全吃特獎 +800 分）【預設】</option>
+                        <option value="strict_swap">嚴格豬羊對調（有人收全紅時全桌豬+100、羊-100，16張全吃特獎 +800 分）</option>
+                        <option value="super_slam">超級大滿貫模式（有人收全紅時全桌豬+100、羊-100，16張全吃特獎 +1000 分）</option>
+                    </select>
+                </div>
+
+                <div class="bg-slate-800/80 border border-white/10 rounded-xl p-3.5 text-xs text-slate-300">
+                    💡 <strong>貼心防呆設計：</strong>輪到您出牌時，系統會自動將可出的合法手牌向上抬起並亮起金框；不合規則的手牌則會半透明鎖定，避免誤出。點擊上方「出牌提示」還可獲得策略建議！
+                </div>
+            </div>
+            <div class="px-6 py-3.5 bg-slate-950 border-t border-white/10 flex justify-end">
+                <button onclick="game.closeRulesModal()" class="px-6 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-sm transition">
+                    我知道了，回到牌局
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 彈窗 2：每局結算 / 計分板 Modal -->
+    <div id="scoreModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
+        <div class="bg-slate-900 border border-amber-400/40 rounded-3xl max-w-3xl w-full modal-h-90 flex flex-col shadow-2xl overflow-hidden">
+            <div class="px-6 py-4 bg-gradient-to-r from-amber-900/60 via-slate-900 to-emerald-900/60 border-b border-white/10 flex items-center justify-between">
+                <div>
+                    <h2 id="scoreModalTitle" class="text-lg sm:text-xl font-black text-amber-300 flex items-center gap-2">
+                        🏆 本局結算計分板
+                    </h2>
+                    <p id="scoreModalSubtitle" class="text-xs text-slate-300 mt-0.5">各家捕獲計分牌與得分明細</p>
+                </div>
+                <button id="scoreModalCloseBtn" onclick="game.closeScoreModal()" class="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white font-bold">✕</button>
+            </div>
+
+            <div class="p-4 sm:p-6 overflow-y-auto space-y-4">
+                <!-- 計分流派快速切換列 -->
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 bg-slate-950/80 border border-amber-400/30 rounded-xl px-3.5 py-2.5">
+                    <span class="text-xs font-black text-amber-300 whitespace-nowrap flex items-center gap-1.5">
+                        <span>⚙️</span> 計分流派設定：
+                    </span>
+                    <select id="ruleModeSelectScoreboard" onchange="game.setScoringRuleMode(this.value)" class="flex-1 bg-slate-900 border border-white/20 rounded-lg px-2.5 py-1.5 text-xs font-bold text-white focus:outline-none focus:border-amber-400">
+                        <option value="classic">經典豬羊變色（有人收全紅時全桌豬+100、羊-100，16張全吃特獎 +800 分）</option>
+                        <option value="strict_swap">嚴格豬羊對調（有人收全紅時全桌豬+100、羊-100，16張全吃特獎 +800 分）</option>
+                        <option value="super_slam">超級大滿貫模式（有人收全紅時全桌豬+100、羊-100，16張全吃特獎 +1000 分）</option>
+                    </select>
+                </div>
+
+                <!-- 本局四家結算明細表 -->
+                <div class="overflow-x-auto rounded-2xl border border-white/10 bg-slate-950/60">
+                    <table class="w-full text-left border-collapse text-xs sm:text-sm">
+                        <thead>
+                            <tr class="bg-slate-800/90 text-slate-300 border-b border-white/10">
+                                <th class="py-2.5 px-3 font-bold">玩家</th>
+                                <th class="py-2.5 px-3 font-bold">已吃計分牌（亮牌）</th>
+                                <th class="py-2.5 px-3 font-bold text-right">本局算式</th>
+                                <th class="py-2.5 px-3 font-bold text-right">本局得分</th>
+                                <th class="py-2.5 px-3 font-bold text-right">累計總分</th>
+                            </tr>
+                        </thead>
+                        <tbody id="scoreTableBody" class="divide-y divide-white/10">
+                            <!-- JS 動態填入 -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- 歷史局數紀錄 -->
+                <div class="bg-slate-950/50 rounded-2xl p-3.5 border border-white/10">
+                    <div class="text-xs font-bold text-amber-300 mb-2 flex items-center justify-between">
+                        <span>📜 歷局得分紀錄</span>
+                        <span id="historyCountText" class="text-slate-400">已完成 0 局</span>
+                    </div>
+                    <div id="roundHistoryContainer" class="max-h-36 overflow-y-auto text-xs text-slate-300 space-y-1">
+                        <div class="text-slate-500 italic py-2 text-center">尚無歷史結算紀錄</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="px-6 py-3.5 bg-slate-950 border-t border-white/10 flex flex-wrap items-center justify-between gap-2">
+                <button onclick="game.confirmRestartMatch()" class="px-4 py-2 rounded-xl bg-rose-600/80 hover:bg-rose-500 text-white font-bold text-xs sm:text-sm transition">
+                    🔄 重置總分重新開始
+                </button>
+                <div class="flex items-center gap-2">
+                    <button id="btnCloseScoreboardOnly" onclick="game.closeScoreModal()" class="px-5 py-2 rounded-xl bg-slate-700 hover:bg-slate-600 text-white font-bold text-xs sm:text-sm transition">
+                        關閉視窗
+                    </button>
+                    <button id="btnNextRound" onclick="game.startNextRound()" class="px-6 py-2 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 font-black text-xs sm:text-sm shadow-lg transition">
+                        ▶️ 開始下一局
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 彈窗 3：確認重新開始 Modal（取代原生 confirm） -->
+    <div id="confirmModal" class="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
+        <div class="bg-slate-900 border border-rose-500/40 rounded-2xl max-w-sm w-full p-5 shadow-2xl text-center">
+            <div class="w-12 h-12 rounded-full bg-rose-500/20 border border-rose-400/40 text-2xl flex items-center justify-center mx-auto mb-3">
+                🔄
+            </div>
+            <h3 class="text-lg font-black text-white mb-1">確定要重新開始嗎？</h3>
+            <p class="text-xs text-slate-300 mb-5">這將會清空目前所有玩家的累計總分與歷史局數，並重新發牌開始第 1 局。</p>
+            <div class="flex items-center justify-center gap-3">
+                <button onclick="game.closeConfirmModal()" class="flex-1 py-2 rounded-xl bg-slate-700 hover:bg-slate-600 text-xs font-bold text-white transition">
+                    取消
+                </button>
+                <button onclick="game.resetFullMatch()" class="flex-1 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-xs font-black text-white shadow transition">
+                    確定重置
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        /**
+         * Web Audio API 合成音效系統（無須外部音檔，確保單檔離線/線上皆可順暢發聲）
+         */
+        class SoundManager {
+            constructor() {
+                this.enabled = true;
+                this.ctx = null;
+            }
+
+            init() {
+                if (!this.ctx) {
+                    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+                    if (AudioCtx) this.ctx = new AudioCtx();
+                }
+                if (this.ctx && this.ctx.state === 'suspended') {
+                    this.ctx.resume();
+                }
+            }
+
+            playTone(freq, type = 'sine', duration = 0.1, delay = 0, vol = 0.12) {
+                if (!this.enabled) return;
+                try {
+                    this.init();
+                    if (!this.ctx) return;
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = type;
+                    osc.frequency.setValueAtTime(freq, this.ctx.currentTime + delay);
+                    gain.gain.setValueAtTime(vol, this.ctx.currentTime + delay);
+                    gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + delay + duration);
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start(this.ctx.currentTime + delay);
+                    osc.stop(this.ctx.currentTime + delay + duration);
+                } catch (e) {}
+            }
+
+            playCard() {
+                this.playTone(360, 'triangle', 0.06, 0, 0.12);
+                this.playTone(520, 'sine', 0.04, 0.02, 0.08);
+            }
+
+            playPig() {
+                // 吃到黑桃 Q 豬的低沉警示音效
+                this.playTone(170, 'sawtooth', 0.18, 0, 0.16);
+                this.playTone(135, 'sawtooth', 0.28, 0.15, 0.18);
+            }
+
+            playSheep() {
+                // 吃到方塊 J 羊的清脆加分音效
+                this.playTone(587.33, 'triangle', 0.12, 0, 0.14);
+                this.playTone(880, 'triangle', 0.22, 0.1, 0.15);
+            }
+
+            playTransformer() {
+                // 吃到梅花 10 變壓器的電流音效
+                this.playTone(440, 'square', 0.08, 0, 0.1);
+                this.playTone(660, 'square', 0.08, 0.07, 0.1);
+                this.playTone(880, 'square', 0.14, 0.14, 0.12);
+            }
+
+            playRoundEnd() {
+                const notes = [523.25, 659.25, 783.99, 1046.5];
+                notes.forEach((n, idx) => this.playTone(n, 'triangle', 0.18, idx * 0.09, 0.14));
+            }
+
+            playGrandSlam() {
+                // 收全紅或 16 張全吃大滿貫的慶祝號角音效
+                const notes = [523.25, 659.25, 783.99, 1046.5, 1318.5, 1567.98];
+                notes.forEach((n, idx) => this.playTone(n, 'triangle', 0.22, idx * 0.08, 0.18));
+            }
+        }
+
+        /**
+         * 拱豬主遊戲控制器
+         */
+        class GongZhuGame {
+            constructor() {
+                this.sound = new SoundManager();
+
+                // 各流派收全紅皆為豬+100/羊-100；全吃特獎：'classic' / 'strict_swap' +800，'super_slam' +1000
+                this.scoringRuleMode = 'classic';
+
+                // 花色定義与手牌排序權重（黑桃 > 紅心 > 梅花 > 方塊）
+                this.SUITS = {
+                    S: { code: 'S', symbol: '♠', name: '黑桃', color: 'text-slate-900', order: 1 },
+                    H: { code: 'H', symbol: '♥', name: '紅心', color: 'text-rose-600', order: 2 },
+                    C: { code: 'C', symbol: '♣', name: '梅花', color: 'text-slate-900', order: 3 },
+                    D: { code: 'D', symbol: '♦', name: '方塊', color: 'text-rose-600', order: 4 }
+                };
+
+                // 點數定義（2 最小 = 2，A 最大 = 14）
+                this.RANKS = [
+                    { rank: 2, label: '2' },
+                    { rank: 3, label: '3' },
+                    { rank: 4, label: '4' },
+                    { rank: 5, label: '5' },
+                    { rank: 6, label: '6' },
+                    { rank: 7, label: '7' },
+                    { rank: 8, label: '8' },
+                    { rank: 9, label: '9' },
+                    { rank: 10, label: '10' },
+                    { rank: 11, label: 'J' },
+                    { rank: 12, label: 'Q' },
+                    { rank: 13, label: 'K' },
+                    { rank: 14, label: 'A' }
+                ];
+
+                // 四家座位設定（順時針或逆時針出牌：南 -> 東 -> 北 -> 西）
+                this.SEAT_ORDER = ['south', 'east', 'north', 'west'];
+                this.PLAYERS = {
+                    south: { id: 'south', name: '您（南家）', isAI: false, hand: [], captured: [], totalScore: 0 },
+                    east:  { id: 'east',  name: '東家·老王', isAI: true,  hand: [], captured: [], totalScore: 0 },
+                    north: { id: 'north', name: '北家·小美', isAI: true,  hand: [], captured: [], totalScore: 0 },
+                    west:  { id: 'west',  name: '西家·阿財', isAI: true,  hand: [], captured: [], totalScore: 0 }
+                };
+
+                this.roundNumber = 1;
+                this.trickNumber = 1;
+                this.currentTurn = 'south';
+                this.leadSuit = null;
+                this.currentTrick = []; // [{ seat, card }]
+                this.isProcessingTrick = false;
+                this.roundHistory = [];
+                this.hintCardId = null;
+            }
+
+            /**
+             * 初始化並啟動第一局
+             */
+            init() {
+                this.startRound();
+            }
+
+            /**
+             * 建立標準 52 張撲克牌並洗牌
+             */
+            createShuffledDeck() {
+                const deck = [];
+                for (const suitKey of Object.keys(this.SUITS)) {
+                    for (const r of this.RANKS) {
+                        const id = `${suitKey}${r.rank}`;
+                        deck.push({
+                            id,
+                            suit: suitKey,
+                            rank: r.rank,
+                            label: r.label,
+                            isScoring: this.checkIsScoringCard(suitKey, r.rank)
+                        });
+                    }
+                }
+                // Fisher-Yates 洗牌演算法
+                for (let i = deck.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [deck[i], deck[j]] = [deck[j], deck[i]];
+                }
+                return deck;
+            }
+
+            /**
+             * 判斷是否為拱豬計分牌（亮牌區顯示對象：♠Q、♦J、♣10 以及所有紅心 ♥2~♥A）
+             */
+            checkIsScoringCard(suit, rank) {
+                if (suit === 'S' && rank === 12) return true; // 豬 ♠Q
+                if (suit === 'D' && rank === 11) return true; // 羊 ♦J
+                if (suit === 'C' && rank === 10) return true; // 變壓器 ♣10
+                if (suit === 'H') return true;                // 所有紅心 ♥
+                return false;
+            }
+
+            /**
+             * 取得單張紅心的原始分數
+             */
+            getHeartPoint(rank) {
+                if (rank === 14) return -50; // ♥A
+                if (rank === 13) return -40; // ♥K
+                if (rank === 12) return -30; // ♥Q
+                if (rank === 11) return -20; // ♥J
+                if (rank >= 5 && rank <= 10) return -10; // ♥10 ~ ♥5
+                return 0; // ♥4 ~ ♥2 (0分，但算入收全紅張數)
+            }
+
+            /**
+             * 切換計分流派並即時重算所有歷史局數與目前面板分數
+             */
+            setScoringRuleMode(mode) {
+                this.scoringRuleMode = mode;
+
+                // 同步兩個下拉選單的值
+                const selRules = document.getElementById('ruleModeSelectRules');
+                const selScore = document.getElementById('ruleModeSelectScoreboard');
+                if (selRules) selRules.value = mode;
+                if (selScore) selScore.value = mode;
+
+                // 重新計算所有歷史局數與各家累計總分
+                for (const seat of this.SEAT_ORDER) {
+                    this.PLAYERS[seat].totalScore = 0;
+                }
+
+                for (const hist of this.roundHistory) {
+                    const roundScores = this.calculateRoundScores(hist.capturedBySeat || {});
+                    for (const seat of this.SEAT_ORDER) {
+                        const calc = roundScores[seat];
+                        hist.scores[seat] = calc.score;
+                        this.PLAYERS[seat].totalScore += calc.score;
+                    }
+                }
+
+                this.renderAllPlayers();
+
+                // 若計分板視窗開啟中，立即刷新表格與歷史明細
+                const scoreModal = document.getElementById('scoreModal');
+                if (scoreModal && !scoreModal.classList.contains('hidden')) {
+                    const isEndOfRound = (this.PLAYERS.south.hand.length === 0 && this.currentTrick.length === 0);
+                    this.openScoreModal(isEndOfRound);
+                }
+            }
+
+            /**
+             * 先檢查四家是否有人收全紅，再將同一局的豬羊變色套用到所有玩家。
+             * 歷史局數必須傳入該局快照，避免受到目前牌局影響。
+             */
+            hasAllHeartsOnTable(capturedBySeat = null) {
+                return this.SEAT_ORDER.some(seat => {
+                    const cards = capturedBySeat === null ? this.PLAYERS[seat].captured : (capturedBySeat[seat] || []);
+                    return cards.filter(card => card.suit === 'H').length === 13;
+                });
+            }
+
+            calculateRoundScores(capturedBySeat = null) {
+                const captures = capturedBySeat ?? Object.fromEntries(
+                    this.SEAT_ORDER.map(seat => [seat, this.PLAYERS[seat].captured])
+                );
+                const roundHasAllHearts = this.hasAllHeartsOnTable(captures);
+                return Object.fromEntries(this.SEAT_ORDER.map(seat => [
+                    seat, this.calculatePlayerScore(captures[seat] || [], roundHasAllHearts)
+                ]));
+            }
+
+            /**
+             * 計算某玩家得分；有人收全紅時，豬羊不論在誰手上都變色。
+             */
+            calculatePlayerScore(capturedCards, roundHasAllHearts = false) {
+                if (!capturedCards || capturedCards.length === 0) {
+                    return {
+                        score: 0,
+                        formula: '無計分牌 (0)',
+                        shootMoon: false,
+                        isGrandSlam: false
+                    };
+                }
+
+                let hasPig = false;
+                let hasSheep = false;
+                let hasTransformer = false;
+                const hearts = [];
+
+                for (const c of capturedCards) {
+                    if (c.suit === 'S' && c.rank === 12) hasPig = true;
+                    else if (c.suit === 'D' && c.rank === 11) hasSheep = true;
+                    else if (c.suit === 'C' && c.rank === 10) hasTransformer = true;
+                    else if (c.suit === 'H') hearts.push(c);
+                }
+
+                const isAllHearts = (hearts.length === 13);
+                const isGrandSlam = (isAllHearts && hasPig && hasSheep && hasTransformer);
+                const pigSheepChanged = isAllHearts || roundHasAllHearts;
+
+                // 檢查是否單獨只吃到 ♣10 而無其他任何計分牌
+                if (hasTransformer && !hasPig && !hasSheep && hearts.length === 0) {
+                    return {
+                        score: 50,
+                        formula: '單吃變壓器 ♣10 (+50)',
+                        shootMoon: false,
+                        isGrandSlam: false
+                    };
+                }
+
+                // 16 張計分牌全吃採固定特殊獎勵，取代一般豬羊變色與變壓器計算
+                if (isGrandSlam) {
+                    const isSuperSlam = this.scoringRuleMode === 'super_slam';
+                    const bonus = isSuperSlam ? 1000 : 800;
+                    return {
+                        score: bonus,
+                        formula: `${isSuperSlam ? '👑16張全吃超級大滿貫' : '🌟16張全吃大滿貫'}！(特殊獎勵 +${bonus})`,
+                        shootMoon: true,
+                        isGrandSlam: true
+                    };
+                }
+
+                let baseScore = 0;
+                const parts = [];
+
+                // 紅心由持有人計分；收全紅 +200，否則依各張牌計分。
+                if (isAllHearts) {
+                    baseScore += 200;
+                    parts.push('收全紅(+200)');
+                } else if (hearts.length > 0) {
+                    const heartSum = hearts.reduce((acc, c) => acc + this.getHeartPoint(c.rank), 0);
+                    baseScore += heartSum;
+                    parts.push(`紅心×${hearts.length}(${heartSum})`);
+                }
+
+                // 全桌任一玩家收全紅，即使豬羊被其他玩家吃到也一併變色。
+                if (hasPig) {
+                    baseScore += pigSheepChanged ? 100 : -100;
+                    parts.push(pigSheepChanged ? '豬變色(+100)' : '豬(-100)');
+                }
+                if (hasSheep) {
+                    baseScore += pigSheepChanged ? -100 : 100;
+                    parts.push(pigSheepChanged ? '羊變色(-100)' : '羊(+100)');
+                }
+
+                // 變壓器 ♣10 加倍計算
+                let finalScore = baseScore;
+                if (hasTransformer) {
+                    finalScore = baseScore * 2;
+                    const baseFormula = parts.length > 0 ? parts.join(' ') : '0';
+                    const prefix = isAllHearts ? '🔥全紅變色！' : (pigSheepChanged && (hasPig || hasSheep) ? '🔥全桌豬羊變色！' : '');
+                    return {
+                        score: finalScore,
+                        formula: `${prefix}(${baseFormula}) × 2 [變壓器]`,
+                        shootMoon: isAllHearts,
+                        isGrandSlam
+                    };
+                }
+
+                const prefix = (pigSheepChanged && (hasPig || hasSheep)) ? '🔥全桌豬羊變色！' : '';
+                return {
+                    score: finalScore,
+                    formula: parts.length > 0 ? `${prefix}${parts.join(' ')}` : '無計分牌 (0)',
+                    shootMoon: isAllHearts,
+                    isGrandSlam: false
+                };
+            }
+
+            /**
+             * 手牌依花色與點數大小自動排序（同花色由 A 到 2 排列）
+             */
+            sortCards(cards) {
+                return cards.sort((a, b) => {
+                    const suitDiff = this.SUITS[a.suit].order - this.SUITS[b.suit].order;
+                    if (suitDiff !== 0) return suitDiff;
+                    return b.rank - a.rank;
+                });
+            }
+
+            /**
+             * 開始新的一局
+             */
+            startRound() {
+                const deck = this.createShuffledDeck();
+                this.trickNumber = 1;
+                this.leadSuit = null;
+                this.currentTrick = [];
+                this.isProcessingTrick = false;
+                this.hintCardId = null;
+
+                // 清空桌面出牌區
+                for (const seat of this.SEAT_ORDER) {
+                    document.getElementById(`trick-slot-${seat}`).innerHTML = '';
+                }
+
+                // 發牌（每人 13 張）並找出持有梅花 2 (♣2) 的首出玩家
+                let club2Holder = 'south';
+                this.SEAT_ORDER.forEach((seat, idx) => {
+                    const p = this.PLAYERS[seat];
+                    p.hand = this.sortCards(deck.slice(idx * 13, (idx + 1) * 13));
+                    p.captured = [];
+                    if (p.hand.some(c => c.id === 'C2')) {
+                        club2Holder = seat;
+                    }
+                });
+
+                this.currentTurn = club2Holder;
+                this.updateHeaderInfo();
+                this.renderAllPlayers();
+
+                const holderName = this.PLAYERS[club2Holder].name;
+                this.showCenterBanner(`🃏 第 ${this.roundNumber} 局開始！由持有 ♣2 的【${holderName}】先出牌`, 'bg-amber-400 text-slate-950');
+
+                if (this.PLAYERS[this.currentTurn].isAI) {
+                    setTimeout(() => this.executeAITurn(), 950);
+                }
+            }
+
+            /**
+             * 取得某位玩家在當前狀態下的所有合法可出牌 ID 集合
+             */
+            getLegalCards(seat) {
+                const hand = this.PLAYERS[seat].hand;
+                if (hand.length === 0) return [];
+
+                // 第一墩且為首出玩家：若有梅花 2 (♣2) 則優先出 ♣2
+                if (this.trickNumber === 1 && this.currentTrick.length === 0) {
+                    const club2 = hand.find(c => c.id === 'C2');
+                    if (club2) return [club2];
+                }
+
+                // 若為該墩首出玩家，可出任意手牌
+                if (!this.leadSuit || this.currentTrick.length === 0) {
+                    return [...hand];
+                }
+
+                // 跟牌玩家：有首出花色必出該花色
+                const sameSuitCards = hand.filter(c => c.suit === this.leadSuit);
+                if (sameSuitCards.length > 0) {
+                    return sameSuitCards;
+                }
+
+                // 無首出花色：可墊任意花色的牌
+                return [...hand];
+            }
+
+            /**
+             * 玩家點擊手牌出牌
+             */
+            onPlayerCardClick(cardId) {
+                if (this.isProcessingTrick || this.currentTurn !== 'south') return;
+
+                const legalCards = this.getLegalCards('south');
+                const isLegal = legalCards.some(c => c.id === cardId);
+                if (!isLegal) return;
+
+                this.hintCardId = null;
+                this.playCardFromSeat('south', cardId);
+            }
+
+            /**
+             * 執行指定座位的出牌動作
+             */
+            playCardFromSeat(seat, cardId) {
+                const player = this.PLAYERS[seat];
+                const cardIdx = player.hand.findIndex(c => c.id === cardId);
+                if (cardIdx === -1) return;
+
+                const [card] = player.hand.splice(cardIdx, 1);
+
+                // 若是該墩第一張牌，設定本墩首出花色
+                if (this.currentTrick.length === 0) {
+                    this.leadSuit = card.suit;
+                }
+
+                this.currentTrick.push({ seat, card });
+                this.sound.playCard();
+
+                // 特殊牌出場音效
+                if (card.id === 'S12') this.sound.playPig();
+                else if (card.id === 'D11') this.sound.playSheep();
+                else if (card.id === 'C10') this.sound.playTransformer();
+
+                // 渲染出牌到桌面中央對應位置
+                this.renderTrickCard(seat, card);
+                this.updateHeaderInfo();
+                this.renderAllPlayers();
+
+                // 檢查本墩是否已滿 4 張牌
+                if (this.currentTrick.length === 4) {
+                    this.isProcessingTrick = true;
+                    setTimeout(() => this.resolveTrick(), 950);
+                } else {
+                    // 輪到下一位玩家
+                    const currentIdx = this.SEAT_ORDER.indexOf(seat);
+                    this.currentTurn = this.SEAT_ORDER[(currentIdx + 1) % 4];
+                    this.renderAllPlayers();
+
+                    if (this.PLAYERS[this.currentTurn].isAI) {
+                        setTimeout(() => this.executeAITurn(), 550);
+                    }
+                }
+            }
+
+            /**
+             * 電腦 AI 智慧出牌決策邏輯
+             */
+            chooseBestCardForAI(seat) {
+                const legalCards = this.getLegalCards(seat);
+                if (legalCards.length === 1) return legalCards[0];
+
+                // 情況 A：AI 是本墩首出玩家
+                if (this.currentTrick.length === 0) {
+                    // 避免主動領出黑桃 A/K 或大紅心，優先出梅花、小方塊或安全小牌
+                    const safeLeads = legalCards.filter(c => {
+                        if (c.suit === 'S' && c.rank >= 12) return false; // 不主動出 ♠Q/K/A
+                        if (c.suit === 'H' && c.rank >= 10) return false; // 不主動出大紅心
+                        return true;
+                    });
+                    const pool = safeLeads.length > 0 ? safeLeads : legalCards;
+                    // 選點數偏小的安全牌領出
+                    pool.sort((a, b) => a.rank - b.rank);
+                    return pool[0];
+                }
+
+                // 判斷目前桌面上領先的牌與計分風險
+                const leadSuit = this.leadSuit;
+                const highestInLeadSuit = Math.max(
+                    ...this.currentTrick.filter(t => t.card.suit === leadSuit).map(t => t.card.rank)
+                );
+                const trickHasPig = this.currentTrick.some(t => t.card.id === 'S12');
+                const trickHasSheep = this.currentTrick.some(t => t.card.id === 'D11');
+                const trickHeartsPenalty = this.currentTrick
+                    .filter(t => t.card.suit === 'H')
+                    .reduce((sum, t) => sum + this.getHeartPoint(t.card.rank), 0);
+
+                const isFollowingSuit = legalCards[0].suit === leadSuit;
+
+                // 情況 B：AI 有首出花色（必須跟花色）
+                if (isFollowingSuit) {
+                    const lowerCards = legalCards.filter(c => c.rank < highestInLeadSuit).sort((a, b) => b.rank - a.rank);
+                    const higherCards = legalCards.filter(c => c.rank > highestInLeadSuit).sort((a, b) => a.rank - b.rank);
+
+                    // 若桌面有方塊 J (羊 +100) 且無豬，嘗試用大牌吃下來
+                    if (trickHasSheep && !trickHasPig && higherCards.length > 0) {
+                        return higherCards[higherCards.length - 1];
+                    }
+
+                    // 若是黑桃局，且桌面還沒出 ♠Q，自己手上有 ♠Q 且能安全送出嗎？(只有在有人已經出了 ♠K 或 ♠A 時直接灌豬！)
+                    const pigCard = legalCards.find(c => c.id === 'S12');
+                    if (pigCard && highestInLeadSuit > 12) {
+                        return pigCard; // 直接拱豬給出 K 或 A 的人！
+                    }
+
+                    // 防守「收全紅 / 全吃大滿貫」：若場上有其他玩家已吃超過 8 張紅心且其他人都是 0 張紅心，AI 嘗試搶下 1 張小紅心破全紅
+                    const trickHasHearts = this.currentTrick.some(t => t.card.suit === 'H');
+                    if (trickHasHearts && !trickHasPig && higherCards.length > 0) {
+                        const someoneNearMoon = this.SEAT_ORDER.some(s => s !== seat && this.PLAYERS[s].captured.filter(c => c.suit === 'H').length >= 8);
+                        const othersHaveHeart = this.SEAT_ORDER.filter(s => this.PLAYERS[s].captured.some(c => c.suit === 'H')).length > 1;
+                        if (someoneNearMoon && !othersHaveHeart && trickHeartsPenalty >= -20) {
+                            return higherCards[0];
+                        }
+                    }
+
+                    // 若有比目前最大牌還小的牌，優先打出最大的安全牌（閃避吃墩）
+                    if (lowerCards.length > 0) {
+                        // 但別在還沒人出 K/A 時把 ♠Q 當小牌打出
+                        const nonPigLow = lowerCards.filter(c => c.id !== 'S12');
+                        if (nonPigLow.length > 0) return nonPigLow[0];
+                        return lowerCards[0];
+                    }
+
+                    // 若全都是比桌面大的牌（被迫壓牌）：
+                    // 若是最後一家（第4家）且桌面無負分，可出最大牌順手脫手高危大牌（但避開自吃 ♠Q）
+                    const nonPigHigh = higherCards.filter(c => c.id !== 'S12');
+                    const pool = nonPigHigh.length > 0 ? nonPigHigh : higherCards;
+                    if (this.currentTrick.length === 3 && !trickHasPig && trickHeartsPenalty === 0) {
+                        return pool[pool.length - 1];
+                    }
+                    // 否則出最小的大牌
+                    return pool[0];
+                }
+
+                // 情況 C：AI 無首出花色（墊牌良機！不會贏得本墩）
+                // 優先順序：1. 墊掉黑桃 Q (豬) -> 2. 墊掉大紅心 (♥A, ♥K, ♥Q, ♥J) -> 3. 墊掉黑桃 A/K -> 4. 墊掉點數最大的危險牌
+                const pig = legalCards.find(c => c.id === 'S12');
+                if (pig) return pig;
+
+                const highHearts = legalCards
+                    .filter(c => c.suit === 'H' && c.rank >= 11)
+                    .sort((a, b) => b.rank - a.rank);
+                if (highHearts.length > 0) return highHearts[0];
+
+                const dangerousSpades = legalCards
+                    .filter(c => c.suit === 'S' && c.rank >= 13)
+                    .sort((a, b) => b.rank - a.rank);
+                if (dangerousSpades.length > 0) return dangerousSpades[0];
+
+                // 避免把方塊 J (羊) 墊給別人，挑選其餘點數最大的牌墊掉
+                const nonSheep = legalCards.filter(c => c.id !== 'D11');
+                const dumpPool = nonSheep.length > 0 ? nonSheep : legalCards;
+                dumpPool.sort((a, b) => b.rank - a.rank);
+                return dumpPool[0];
+            }
+
+            /**
+             * 執行 AI 出牌回合
+             */
+            executeAITurn() {
+                if (this.isProcessingTrick) return;
+                const seat = this.currentTurn;
+                if (!this.PLAYERS[seat].isAI) return;
+
+                const chosenCard = this.chooseBestCardForAI(seat);
+                if (chosenCard) {
+                    this.playCardFromSeat(seat, chosenCard.id);
+                }
+            }
+
+            /**
+             * 顯示玩家的出牌提示
+             */
+            showHint() {
+                if (this.currentTurn !== 'south' || this.isProcessingTrick) {
+                    this.showCenterBanner('⏳ 請等待輪到您的出牌回合再使用提示', 'bg-slate-800 text-amber-300');
+                    return;
+                }
+                const bestCard = this.chooseBestCardForAI('south');
+                if (bestCard) {
+                    this.hintCardId = bestCard.id;
+                    this.renderPlayerHand();
+                    const suitInfo = this.SUITS[bestCard.suit];
+                    this.showCenterBanner(`💡 建議出牌：${suitInfo.symbol}${bestCard.label}`, 'bg-sky-500 text-slate-950');
+                }
+            }
+
+            /**
+             * 結算本墩贏家與收下計分牌
+             */
+            resolveTrick() {
+                // 找出符合首出花色且點數最大的贏家
+                let winningEntry = this.currentTrick[0];
+                for (const entry of this.currentTrick) {
+                    if (entry.card.suit === this.leadSuit && entry.card.rank > winningEntry.card.rank) {
+                        winningEntry = entry;
+                    }
+                }
+
+                const winnerSeat = winningEntry.seat;
+                const winnerPlayer = this.PLAYERS[winnerSeat];
+
+                // 標示贏家出的那張牌
+                const winnerSlot = document.getElementById(`trick-slot-${winnerSeat}`);
+                if (winnerSlot && winnerSlot.firstElementChild) {
+                    winnerSlot.firstElementChild.classList.add('ring-4', 'ring-amber-400', 'scale-105');
+                }
+
+                // 收集本墩中的所有計分牌
+                const scoringInTrick = this.currentTrick
+                    .map(e => e.card)
+                    .filter(c => c.isScoring);
+
+                if (scoringInTrick.length > 0) {
+                    winnerPlayer.captured.push(...scoringInTrick);
+                    // 排序已吃計分牌方便檢視
+                    this.sortCards(winnerPlayer.captured);
+                }
+
+                // 顯示本墩特殊事件提示
+                const hasPig = scoringInTrick.some(c => c.id === 'S12');
+                const hasSheep = scoringInTrick.some(c => c.id === 'D11');
+                const hasTrans = scoringInTrick.some(c => c.id === 'C10');
+                const pigSheepChanged = this.hasAllHeartsOnTable();
+
+                if (hasPig) {
+                    this.showCenterBanner(`🐷 ${pigSheepChanged ? '豬變色！' : '哎呀！'}【${winnerPlayer.name}】吃到豬 (♠Q ${pigSheepChanged ? '+100' : '-100'})！`, pigSheepChanged ? 'bg-emerald-500 text-slate-950' : 'bg-rose-600 text-white');
+                } else if (hasSheep) {
+                    this.showCenterBanner(`🐑 ${pigSheepChanged ? '羊變色！' : '恭喜！'}【${winnerPlayer.name}】吃到羊 (♦J ${pigSheepChanged ? '-100' : '+100'})！`, pigSheepChanged ? 'bg-rose-600 text-white' : 'bg-emerald-500 text-slate-950');
+                } else if (hasTrans) {
+                    this.showCenterBanner(`⚡ 【${winnerPlayer.name}】收下變壓器 (♣10 ×2)！`, 'bg-amber-400 text-slate-950');
+                }
+
+                // 播放收牌往贏家方向飛行的動畫
+                setTimeout(() => {
+                    for (const seat of this.SEAT_ORDER) {
+                        const slot = document.getElementById(`trick-slot-${seat}`);
+                        if (slot && slot.firstElementChild) {
+                            slot.firstElementChild.classList.add(`collect-to-${winnerSeat}`);
+                        }
+                    }
+                }, 420);
+
+                // 清空桌面並進入下一墩或本局結算
+                setTimeout(() => {
+                    for (const seat of this.SEAT_ORDER) {
+                        document.getElementById(`trick-slot-${seat}`).innerHTML = '';
+                    }
+                    this.currentTrick = [];
+                    this.leadSuit = null;
+                    this.isProcessingTrick = false;
+
+                    if (this.trickNumber >= 13) {
+                        this.finishRound();
+                    } else {
+                        this.trickNumber++;
+                        this.currentTurn = winnerSeat;
+                        this.updateHeaderInfo();
+                        this.renderAllPlayers();
+
+                        if (this.PLAYERS[this.currentTurn].isAI) {
+                            setTimeout(() => this.executeAITurn(), 450);
+                        }
+                    }
+                }, 900);
+            }
+
+            /**
+             * 第 13 墩結束，進行本局結算並彈出計分板
+             */
+            finishRound() {
+                let anyGrandSlamOrMoon = false;
+                const roundScores = this.calculateRoundScores();
+                const roundSummary = {
+                    round: this.roundNumber,
+                    scores: {},
+                    capturedBySeat: {}
+                };
+
+                for (const seat of this.SEAT_ORDER) {
+                    const p = this.PLAYERS[seat];
+                    // 保存本局已吃計分牌快照，供切換計分流派時動態重算
+                    roundSummary.capturedBySeat[seat] = p.captured.map(c => ({ ...c }));
+                    const result = roundScores[seat];
+                    p.totalScore += result.score;
+                    roundSummary.scores[seat] = result.score;
+
+                    if (result.isGrandSlam) {
+                        anyGrandSlamOrMoon = true;
+                        this.showCenterBanner(`🌟 狂賀！【${p.name}】達成 16 張全吃豬羊變色大滿貫 (+${result.score})！`, 'bg-amber-400 text-slate-950');
+                    } else if (result.shootMoon) {
+                        anyGrandSlamOrMoon = true;
+                        this.showCenterBanner(`🔥 厲害！【${p.name}】達成收全紅豬羊變色 (+${result.score})！`, 'bg-emerald-400 text-slate-950');
+                    }
+                }
+
+                if (anyGrandSlamOrMoon) {
+                    this.sound.playGrandSlam();
+                } else {
+                    this.sound.playRoundEnd();
+                }
+
+                this.roundHistory.unshift(roundSummary);
+                this.renderAllPlayers();
+                this.openScoreModal(true);
+            }
+
+            /**
+             * 產生單張撲克牌的 HTML 結構
+             */
+            createCardElement(card, options = {}) {
+                const { isPlayable = false, isDisabled = false, isHint = false, isTrick = false, seat = '' } = options;
+                const suitInfo = this.SUITS[card.suit];
+
+                // 特殊計分牌角標
+                let specialBadge = '';
+                let cardBgTint = '';
+                const pigSheepChanged = this.hasAllHeartsOnTable();
+                if (card.id === 'S12') {
+                    specialBadge = `<span class="px-1 py-0.2 rounded ${pigSheepChanged ? 'bg-emerald-600' : 'bg-rose-600'} text-white text-[9px] font-black shadow">🐷豬${pigSheepChanged ? '+100' : '-100'}</span>`;
+                    cardBgTint = pigSheepChanged ? 'ring-2 ring-emerald-500/50' : 'ring-2 ring-rose-500/50';
+                } else if (card.id === 'D11') {
+                    specialBadge = `<span class="px-1 py-0.2 rounded ${pigSheepChanged ? 'bg-rose-600' : 'bg-emerald-600'} text-white text-[9px] font-black shadow">🐑羊${pigSheepChanged ? '-100' : '+100'}</span>`;
+                    cardBgTint = pigSheepChanged ? 'ring-2 ring-rose-500/50' : 'ring-2 ring-emerald-500/50';
+                } else if (card.id === 'C10') {
+                    specialBadge = `<span class="px-1 py-0.2 rounded bg-amber-500 text-slate-950 text-[9px] font-black shadow">⚡變×2</span>`;
+                    cardBgTint = 'ring-2 ring-amber-500/50';
+                } else if (card.id === 'C2' && this.trickNumber === 1 && this.currentTrick.length === 0) {
+                    specialBadge = `<span class="px-1 py-0.2 rounded bg-sky-600 text-white text-[9px] font-black shadow">首出</span>`;
+                } else if (card.suit === 'H') {
+                    const hPt = this.getHeartPoint(card.rank);
+                    if (hPt < 0) {
+                        specialBadge = `<span class="text-[9px] font-extrabold text-rose-600">${hPt}</span>`;
+                    }
+                }
+
+                let stateClass = 'card-waiting';
+                if (isPlayable) stateClass = 'card-playable';
+                else if (isDisabled) stateClass = 'card-disabled';
+                if (isHint) stateClass += ' card-hint';
+                if (isTrick && seat) stateClass = `trick-card-enter-${seat}`;
+
+                const div = document.createElement('div');
+                div.className = `playing-card ${stateClass} ${cardBgTint} flex flex-col justify-between p-1.5 select-none`;
+                div.innerHTML = `
+                    <div class="flex items-start justify-between leading-none">
+                        <div class="flex flex-col items-center ${suitInfo.color}">
+                            <span class="text-xs sm:text-sm font-black tracking-tighter">${card.label}</span>
+                            <span class="text-xs sm:text-sm leading-none">${suitInfo.symbol}</span>
+                        </div>
+                        <div>${specialBadge}</div>
+                    </div>
+                    <div class="text-center text-2xl sm:text-3xl leading-none ${suitInfo.color} opacity-90">
+                        ${card.id === 'S12' ? '🐷' : card.id === 'D11' ? '🐑' : card.id === 'C10' ? '⚡' : suitInfo.symbol}
+                    </div>
+                    <div class="flex items-end justify-end leading-none rotate-180 ${suitInfo.color}">
+                        <span class="text-[11px] font-bold">${card.label}${suitInfo.symbol}</span>
+                    </div>
+                `;
+                return div;
+            }
+
+            /**
+             * 渲染桌面中央打出的單張牌
+             */
+            renderTrickCard(seat, card) {
+                const slot = document.getElementById(`trick-slot-${seat}`);
+                if (!slot) return;
+                slot.innerHTML = '';
+                const cardEl = this.createCardElement(card, { isTrick: true, seat });
+                slot.appendChild(cardEl);
+            }
+
+            /**
+             * 更新頂部狀態列資訊
+             */
+            updateHeaderInfo() {
+                document.getElementById('roundBadge').textContent = `第 ${this.roundNumber} 局`;
+                document.getElementById('trickCounter').textContent = `${this.trickNumber} / 13`;
+
+                const leadEl = document.getElementById('leadSuitIndicator');
+                if (!this.leadSuit) {
+                    leadEl.innerHTML = `<span class="text-slate-300">等待首出</span>`;
+                } else {
+                    const s = this.SUITS[this.leadSuit];
+                    const colorClass = (this.leadSuit === 'H' || this.leadSuit === 'D') ? 'text-rose-400' : 'text-amber-300';
+                    leadEl.innerHTML = `<span class="${colorClass}">${s.symbol} ${s.name}</span>`;
+                }
+            }
+
+            /**
+             * 渲染所有四家面板（剩餘手牌數、亮牌區、即時分數、回合光環）
+             */
+            renderAllPlayers() {
+                const roundScores = this.calculateRoundScores();
+                for (const seat of this.SEAT_ORDER) {
+                    const p = this.PLAYERS[seat];
+                    const panel = document.getElementById(`panel-${seat}`);
+                    const isTurn = (this.currentTurn === seat && !this.isProcessingTrick);
+
+                    // 回合高亮外框
+                    if (isTurn) {
+                        panel.classList.add('active-turn-ring');
+                    } else {
+                        panel.classList.remove('active-turn-ring');
+                    }
+
+                    // AI 手牌數量與思考標籤
+                    if (p.isAI) {
+                        document.getElementById(`count-${seat}`).textContent = p.hand.length;
+                        const badge = document.getElementById(`turn-badge-${seat}`);
+                        if (badge) badge.classList.toggle('hidden', !isTurn);
+                    } else {
+                        const promptEl = document.getElementById('playerTurnPrompt');
+                        promptEl.classList.toggle('hidden', !isTurn);
+                    }
+
+                    // 更新本局暫計與累計總分
+                    const calc = roundScores[seat];
+                    const liveEl = document.getElementById(`live-${seat}`);
+                    liveEl.textContent = calc.score > 0 ? `+${calc.score}` : `${calc.score}`;
+                    liveEl.className = `font-black text-xs sm:text-sm ${
+                        calc.score > 0 ? 'text-emerald-400' : calc.score < 0 ? 'text-rose-400' : 'text-white'
+                    }`;
+
+                    const totalEl = document.getElementById(`total-${seat}`);
+                    totalEl.textContent = p.totalScore > 0 ? `+${p.totalScore}` : `${p.totalScore}`;
+                    totalEl.className = `font-black ${
+                        p.totalScore > 0 ? 'text-emerald-300' : p.totalScore < 0 ? 'text-rose-400' : 'text-amber-300'
+                    }`;
+
+                    // 渲染已吃到的計分牌（亮牌區）
+                    this.renderCapturedCards(seat, p.captured);
+                }
+
+                // 渲染下方真人玩家手牌
+                this.renderPlayerHand();
+            }
+
+            /**
+             * 渲染某位玩家已吃到的計分牌（亮牌區）
+             */
+            renderCapturedCards(seat, captured) {
+                const container = document.getElementById(`captured-${seat}`);
+                if (!container) return;
+
+                if (captured.length === 0) {
+                    container.innerHTML = `<span class="text-[11px] text-white/35 italic">尚無計分牌</span>`;
+                    return;
+                }
+
+                container.innerHTML = captured.map(c => {
+                    const s = this.SUITS[c.suit];
+                    let extraTag = '';
+                    let borderClass = 'border-slate-300';
+                    if (c.id === 'S12') { extraTag = '🐷'; borderClass = 'border-rose-500 bg-rose-50'; }
+                    else if (c.id === 'D11') { extraTag = '🐑'; borderClass = 'border-emerald-500 bg-emerald-50'; }
+                    else if (c.id === 'C10') { extraTag = '⚡'; borderClass = 'border-amber-500 bg-amber-50'; }
+
+                    return `<span class="mini-score-card ${s.color} ${borderClass}" title="${s.name}${c.label}">
+                        ${extraTag}${s.symbol}${c.label}
+                    </span>`;
+                }).join('');
+            }
+
+            /**
+             * 渲染真人玩家手牌（自動高亮合法手牌、半透明鎖定不合法手牌）
+             */
+            renderPlayerHand() {
+                const container = document.getElementById('playerHandContainer');
+                container.innerHTML = '';
+
+                const hand = this.PLAYERS.south.hand;
+                const isPlayerTurn = (this.currentTurn === 'south' && !this.isProcessingTrick);
+                const legalCards = isPlayerTurn ? this.getLegalCards('south') : [];
+                const legalIds = new Set(legalCards.map(c => c.id));
+
+                hand.forEach((card, idx) => {
+                    const isPlayable = isPlayerTurn && legalIds.has(card.id);
+                    const isDisabled = isPlayerTurn && !legalIds.has(card.id);
+                    const isHint = (this.hintCardId === card.id);
+
+                    const wrapper = document.createElement('div');
+                    wrapper.className = 'hand-card-wrapper';
+                    wrapper.style.zIndex = idx + 1;
+
+                    const cardEl = this.createCardElement(card, {
+                        isPlayable,
+                        isDisabled,
+                        isHint
+                    });
+
+                    if (isPlayable) {
+                        cardEl.addEventListener('click', () => this.onPlayerCardClick(card.id));
+                    }
+
+                    wrapper.appendChild(cardEl);
+                    container.appendChild(wrapper);
+                });
+            }
+
+            /**
+             * 在牌桌中央顯示動態提示橫幅
+             */
+            showCenterBanner(text, colorClasses = 'bg-amber-400 text-slate-950') {
+                const container = document.getElementById('centerToastContainer');
+                if (!container) return;
+                const banner = document.createElement('div');
+                banner.className = `floating-banner absolute left-1/2 top-1/2 px-4 py-1.5 rounded-full font-black text-xs sm:text-sm shadow-xl whitespace-nowrap border border-white/30 ${colorClasses}`;
+                banner.textContent = text;
+                container.appendChild(banner);
+                setTimeout(() => banner.remove(), 1550);
+            }
+
+            /**
+             * 開啟規則說明彈窗
+             */
+            openRulesModal() {
+                const modal = document.getElementById('rulesModal');
+                modal.classList.remove('hidden');
+                modal.classList.add('flex');
+            }
+
+            closeRulesModal() {
+                const modal = document.getElementById('rulesModal');
+                modal.classList.add('hidden');
+                modal.classList.remove('flex');
+            }
+
+            /**
+             * 開啟計分板彈窗
+             * @param {boolean} isEndOfRound 是否為第 13 墩結束時自動彈出
+             */
+            openScoreModal(isEndOfRound = false) {
+                const modal = document.getElementById('scoreModal');
+                const titleEl = document.getElementById('scoreModalTitle');
+                const subEl = document.getElementById('scoreModalSubtitle');
+                const nextBtn = document.getElementById('btnNextRound');
+
+                if (isEndOfRound) {
+                    titleEl.innerHTML = `🏆 第 ${this.roundNumber} 局結算計分板`;
+                    subEl.textContent = '本局 13 墩已全部結束，以下為各家亮牌計分明細：';
+                    nextBtn.classList.remove('hidden');
+                } else {
+                    titleEl.innerHTML = `📊 第 ${this.roundNumber} 局即時戰況與計分板`;
+                    subEl.textContent = `目前進行至第 ${this.trickNumber} / 13 墩`;
+                    nextBtn.classList.toggle('hidden', this.PLAYERS.south.hand.length > 0 || this.currentTrick.length > 0);
+                }
+
+                // 渲染四家得分明細
+                const roundScores = this.calculateRoundScores();
+                if (Object.values(roundScores).some(result => result.shootMoon)) {
+                    subEl.textContent += ' 本局全桌豬羊變色：豬 +100、羊 -100。';
+                }
+                const tbody = document.getElementById('scoreTableBody');
+                tbody.innerHTML = this.SEAT_ORDER.map(seat => {
+                    const p = this.PLAYERS[seat];
+                    const calc = roundScores[seat];
+
+                    const cardsHtml = p.captured.length > 0
+                        ? p.captured.map(c => {
+                            const s = this.SUITS[c.suit];
+                            return `<span class="mini-score-card ${s.color} mr-1 mb-1">${s.symbol}${c.label}</span>`;
+                        }).join('')
+                        : `<span class="text-slate-500 italic">無計分牌</span>`;
+
+                    const roundScoreColor = calc.score > 0 ? 'text-emerald-400' : calc.score < 0 ? 'text-rose-400' : 'text-slate-200';
+                    const totalScoreColor = p.totalScore > 0 ? 'text-emerald-300' : p.totalScore < 0 ? 'text-rose-400' : 'text-amber-300';
+
+                    return `
+                        <tr class="${seat === 'south' ? 'bg-emerald-950/35' : ''} hover:bg-white/5">
+                            <td class="py-3 px-3 font-black text-white whitespace-nowrap">
+                                ${p.name}
+                            </td>
+                            <td class="py-3 px-3">
+                                <div class="flex flex-wrap items-center">${cardsHtml}</div>
+                            </td>
+                            <td class="py-3 px-3 text-right text-xs text-slate-300">
+                                ${calc.formula}
+                            </td>
+                            <td class="py-3 px-3 text-right font-black ${roundScoreColor} whitespace-nowrap">
+                                ${calc.score > 0 ? `+${calc.score}` : calc.score}
+                            </td>
+                            <td class="py-3 px-3 text-right font-black text-base ${totalScoreColor} whitespace-nowrap">
+                                ${p.totalScore > 0 ? `+${p.totalScore}` : p.totalScore}
+                            </td>
+                        </tr>
+                    `;
+                }).join('');
+
+                // 渲染歷史局數紀錄
+                document.getElementById('historyCountText').textContent = `已完成 ${this.roundHistory.length} 局`;
+                const histContainer = document.getElementById('roundHistoryContainer');
+                if (this.roundHistory.length === 0) {
+                    histContainer.innerHTML = `<div class="text-slate-500 italic py-2 text-center">尚無歷史結算紀錄</div>`;
+                } else {
+                    histContainer.innerHTML = this.roundHistory.map(h => `
+                        <div class="flex flex-wrap items-center justify-between bg-slate-900/90 px-3 py-1.5 rounded-lg border border-white/5">
+                            <span class="font-bold text-amber-300">第 ${h.round} 局</span>
+                            <div class="flex items-center gap-3">
+                                <span>您：<strong class="${h.scores.south >= 0 ? 'text-emerald-400' : 'text-rose-400'}">${h.scores.south > 0 ? '+' + h.scores.south : h.scores.south}</strong></span>
+                                <span>東：<strong class="${h.scores.east >= 0 ? 'text-emerald-400' : 'text-rose-400'}">${h.scores.east > 0 ? '+' + h.scores.east : h.scores.east}</strong></span>
+                                <span>北：<strong class="${h.scores.north >= 0 ? 'text-emerald-400' : 'text-rose-400'}">${h.scores.north > 0 ? '+' + h.scores.north : h.scores.north}</strong></span>
+                                <span>西：<strong class="${h.scores.west >= 0 ? 'text-emerald-400' : 'text-rose-400'}">${h.scores.west > 0 ? '+' + h.scores.west : h.scores.west}</strong></span>
+                            </div>
+                        </div>
+                    `).join('');
+                }
+
+                modal.classList.remove('hidden');
+                modal.classList.add('flex');
+            }
+
+            closeScoreModal() {
+                const modal = document.getElementById('scoreModal');
+                modal.classList.add('hidden');
+                modal.classList.remove('flex');
+            }
+
+            /**
+             * 進入下一局
+             */
+            startNextRound() {
+                this.closeScoreModal();
+                this.roundNumber++;
+                this.startRound();
+            }
+
+            /**
+             * 彈出重新開始確認視窗
+             */
+            confirmRestartMatch() {
+                const modal = document.getElementById('confirmModal');
+                modal.classList.remove('hidden');
+                modal.classList.add('flex');
+            }
+
+            closeConfirmModal() {
+                const modal = document.getElementById('confirmModal');
+                modal.classList.add('hidden');
+                modal.classList.remove('flex');
+            }
+
+            /**
+             * 重置整場比賽與所有累計分數
+             */
+            resetFullMatch() {
+                this.closeConfirmModal();
+                this.closeScoreModal();
+                this.roundNumber = 1;
+                this.roundHistory = [];
+                for (const seat of this.SEAT_ORDER) {
+                    this.PLAYERS[seat].totalScore = 0;
+                }
+                this.startRound();
+            }
+
+            /**
+             * 切換音效開關
+             */
+            toggleSound() {
+                this.sound.enabled = !this.sound.enabled;
+                document.getElementById('soundIcon').textContent = this.sound.enabled ? '🔊' : '🔇';
+                this.showCenterBanner(
+                    this.sound.enabled ? '🔊 遊戲音效已開啟' : '🔇 遊戲音效已靜音',
+                    'bg-slate-800 text-white'
+                );
+            }
+        }
+
+        // 建立全域遊戲實例並於視窗載入後啟動
+        const game = new GongZhuGame();
+        window.onload = function () {
+            game.init();
+        };
+    </script>
+</body>
+</html>
