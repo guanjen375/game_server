@@ -19,7 +19,7 @@
         :root {
             /* 畫面可見高度：手機瀏覽器的網址列與工具列會蓋住 100vh 的底部，支援時改用 100dvh */
             --app-h: 100vh;
-            /* 牌的寬度：手牌依視窗寬度縮放，其餘固定比例 */
+            /* 牌的寬度：手牌由 fitHand() 依畫面算好設在個人區上（這裡只是算好之前的預設），其餘固定比例 */
             --hand-w: max(19px, min(44px, calc((100vw - 32px) / 18.6)));
             --river-w: 17px;
             --meld-w: 15px;
@@ -137,12 +137,33 @@
             100% { background: rgba(56, 189, 248, 0.32); box-shadow: 0 0 0 3px #38bdf8, 0 0 14px rgba(56, 189, 248, 0.95); }
         }
 
-        /* 玩家手牌互動（上方留空間給抬起的牌和加台角標） */
-        #playerHand { padding-top: calc(16px + var(--hand-w) * 0.22); }
+        /* 個人區（自己的資訊列、動作列、手牌）：字、按鈕、明牌都跟著手牌大小走 */
+        #mySeat { --hand-gap: max(2px, calc(var(--hand-w) * 0.05)); }
+        #panel-0 { --tiny-w: calc(var(--hand-w) * 0.42); }
+        .me-avatar {
+            width: clamp(30px, calc(var(--hand-w) * 0.62), 44px);
+            height: clamp(30px, calc(var(--hand-w) * 0.62), 44px);
+            font-size: clamp(16px, calc(var(--hand-w) * 0.34), 24px);
+        }
+        .me-name { font-size: clamp(14px, calc(var(--hand-w) * 0.3), 21px); }
+        .me-text, .bar-text { font-size: clamp(12px, calc(var(--hand-w) * 0.25), 18px); line-height: 1.35; }
+        .me-badge { font-size: clamp(11px, calc(var(--hand-w) * 0.22), 15px); }
+        #actionBar {
+            --tiny-w: calc(var(--hand-w) * 0.34);
+            min-height: max(44px, calc(var(--hand-w) * 0.72 + 12px));
+            gap: clamp(8px, calc(var(--hand-w) * 0.16), 14px);
+        }
+
+        /* 玩家手牌：一排，直拿平板時兩排（上方留空間給抬起的牌和加台角標） */
+        #playerHand { padding-top: calc(var(--hand-w) * 0.46); row-gap: calc(var(--hand-w) * 0.26); }
+        .hand-row { display: flex; flex-wrap: wrap; align-items: flex-end; column-gap: var(--hand-gap); row-gap: calc(var(--hand-w) * 0.26); }
         .hand-tile-wrap { position: relative; transition: transform 0.18s cubic-bezier(0.2, 0.8, 0.2, 1); }
         .hand-tile-wrap.playable { cursor: pointer; }
-        .hand-tile-wrap.playable:hover { transform: translateY(-8px); }
-        .hand-tile-wrap.selected { transform: translateY(-16px); }
+        /* 平板點過的牌會一直停在 hover 狀態，只有滑鼠才浮起 */
+        @media (hover: hover) {
+            .hand-tile-wrap.playable:hover { transform: translateY(calc(var(--hand-w) * -0.12)); }
+        }
+        .hand-tile-wrap.selected, .hand-tile-wrap.selected:hover { z-index: 2; transform: translateY(calc(var(--hand-w) * -0.24)); }
         .hand-tile-wrap.selected .mj-tile {
             box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.12), 0 calc(var(--w) * 0.09) 0 #1f8a57, 0 0 0 3px #fbbf24, 0 0 18px rgba(251, 191, 36, 0.85);
         }
@@ -151,7 +172,14 @@
             0% { box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.12), 0 calc(var(--w) * 0.09) 0 #1f8a57, 0 0 0 3px #38bdf8; }
             100% { box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.12), 0 calc(var(--w) * 0.09) 0 #1f8a57, 0 0 0 4px #38bdf8, 0 0 20px rgba(56, 189, 248, 0.9); }
         }
-        .hand-tile-wrap.drawn { margin-left: calc(var(--hand-w) * 0.45); }
+        .hand-tile-wrap.drawn, .hand-slot { margin-left: calc(var(--hand-w) * 0.45); }
+        /* 還沒摸牌時先留好剛摸那張的位置，摸牌、打牌時手牌才不會左右跳 */
+        .hand-slot { width: var(--hand-w); flex-shrink: 0; }
+        /* 自己吃碰槓的牌：接在手牌右邊，牌小一點（間距要跟 renderHand() 算分排時用的一致） */
+        #playerHand { --meld-w: calc(var(--hand-w) * 0.62); }
+        .my-meld { margin-left: calc(var(--hand-w) * 0.4); }
+        .my-meld + .my-meld { margin-left: calc(var(--hand-w) * 0.1); }
+        .hand-row > .my-meld:first-child { margin-left: 0; }
         .hand-tile-wrap.waiting { opacity: 0.95; }
         /* 圈風、門風的牌：右上角金色角標，標出湊成刻子能加幾台 */
         .tai-badge {
@@ -275,20 +303,23 @@
             100% { box-shadow: 0 0 0 3px #fde047, 0 0 22px rgba(251, 191, 36, 0.85); }
         }
 
-        /* 動作按鈕（吃、碰、槓、胡） */
+        /* 動作按鈕（吃、碰、槓、胡）：跟著手牌放大，平板上好按 */
         .action-btn {
-            padding: 6px 14px;
-            border-radius: 12px;
+            min-height: clamp(32px, calc(var(--hand-w) * 0.72), 54px);
+            padding: 4px clamp(14px, calc(var(--hand-w) * 0.3), 24px);
+            border-radius: clamp(12px, calc(var(--hand-w) * 0.22), 16px);
             font-weight: 900;
-            font-size: 14px;
+            font-size: clamp(14px, calc(var(--hand-w) * 0.3), 21px);
             display: inline-flex;
             align-items: center;
-            gap: 6px;
+            gap: clamp(6px, calc(var(--hand-w) * 0.14), 10px);
             box-shadow: 0 4px 0 rgba(0, 0, 0, 0.35), 0 6px 14px rgba(0, 0, 0, 0.35);
             transition: transform 0.12s ease, filter 0.12s ease;
             animation: popIn 0.25s cubic-bezier(0.18, 0.89, 0.32, 1.28);
         }
-        .action-btn:hover { filter: brightness(1.1); transform: translateY(-2px); }
+        @media (hover: hover) {
+            .action-btn:hover { filter: brightness(1.1); transform: translateY(-2px); }
+        }
         .action-btn:active { transform: translateY(1px); }
         @keyframes popIn {
             0% { transform: scale(0.3); opacity: 0; }
@@ -329,28 +360,17 @@
             <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center shadow-md text-xl font-black text-rose-800" style="font-family: 'Noto Serif TC', serif;">
                 中
             </div>
-            <div>
-                <h1 class="text-base sm:text-lg font-black tracking-wide text-amber-300 flex items-center gap-2">
-                    <span class="hidden sm:inline">台灣麻將</span>
-                    <span id="roundBadge" class="text-xs font-bold px-2 py-0.5 rounded-full bg-emerald-800/90 text-emerald-200 border border-emerald-500/40">
-                        東風圈 · 東局
-                    </span>
-                </h1>
-                <p class="text-[11px] text-emerald-200/80 hidden sm:block">十六張 · 五組面子加一對眼 · 吃只能吃上家 · 胡 &gt; 碰槓 &gt; 吃 · 底台計分、自摸三家付</p>
-            </div>
-        </div>
-
-        <!-- 中央狀態提示條 -->
-        <div class="order-3 sm:order-none mx-auto sm:mx-0 flex items-center gap-2 bg-emerald-950/80 border border-emerald-600/40 px-3 py-1 rounded-full shadow-inner">
-            <span class="text-xs text-emerald-300 font-medium">剩餘：</span>
-            <span id="wallCounter" class="text-xs sm:text-sm font-extrabold text-amber-300">0 張</span>
-            <span class="text-white/20">|</span>
-            <span class="text-xs text-emerald-300 font-medium">莊家：</span>
-            <span id="dealerIndicator" class="text-xs sm:text-sm font-extrabold text-white">—</span>
+            <!-- 剩幾張看牌桌中央、誰是莊家看面板上的「莊」，這裡只留圈風局數，標題列才不會佔兩行 -->
+            <h1 class="text-base sm:text-lg font-black tracking-wide text-amber-300 flex items-center gap-2">
+                <span class="hidden sm:inline">台灣麻將</span>
+                <span id="roundBadge" class="text-xs sm:text-sm font-bold px-2 py-0.5 rounded-full bg-emerald-800/90 text-emerald-200 border border-emerald-500/40">
+                    東風圈 · 東局
+                </span>
+            </h1>
         </div>
 
         <!-- 右側功能按鈕列 -->
-        <div class="order-2 sm:order-none flex items-center gap-1 sm:gap-2">
+        <div class="flex items-center gap-1 sm:gap-2">
             <button onclick="game.showHint()" class="px-2 sm:px-2.5 py-1.5 rounded-lg bg-sky-600/80 hover:bg-sky-500 active:scale-95 text-xs font-bold transition flex items-center gap-1 shadow">
                 <span>💡</span><span class="hidden md:inline">出牌提示</span>
             </button>
@@ -397,7 +417,7 @@
                             <div id="wind-0" class="wind-dot absolute bottom-1 left-1/2 -translate-x-1/2">南</div>
                             <div class="text-[8px] sm:text-[10px] font-bold text-amber-200/75 leading-none sm:mb-1">圈風</div>
                             <div id="centerRound" class="text-xl sm:text-4xl xl:text-5xl font-black text-amber-300 leading-none" style="font-family: 'Noto Serif TC', serif;">東</div>
-                            <div id="centerWall" class="text-[10px] sm:text-[11px] leading-none text-emerald-200 mt-0.5 sm:mt-1.5">剩 0 張</div>
+                            <div id="centerWall" class="text-[11px] sm:text-sm font-bold leading-none text-emerald-200 mt-0.5 sm:mt-1.5">剩 0 張</div>
                         </div>
                     </div>
                     <div id="river-1" class="area-e river justify-start content-center"></div>
@@ -413,14 +433,14 @@
             </div>
         </div>
 
-        <!-- 下方：真人玩家（座位 0） -->
-        <div class="w-full flex flex-col items-center z-20">
+        <!-- 下方：真人玩家（座位 0）的個人區，大小由 fitHand() 依畫面決定 -->
+        <div id="mySeat" class="w-full flex flex-col items-center z-20">
             <div id="panel-0" class="w-full max-w-4xl xl:max-w-5xl bg-slate-900/80 backdrop-blur-md border border-white/15 rounded-2xl px-3 py-1.5 transition-all duration-300"></div>
             <!-- 動作按鈕列 -->
-            <div id="actionBar" class="min-h-[44px] w-full flex flex-wrap items-center justify-center gap-2 py-1.5"></div>
-            <!-- 玩家手牌 -->
+            <div id="actionBar" class="w-full flex flex-wrap items-center justify-center py-1.5"></div>
+            <!-- 玩家手牌（含自己吃碰槓的牌） -->
             <div class="w-full flex justify-center items-end pb-1 overflow-x-auto">
-                <div id="playerHand" class="flex items-end gap-[2px]"></div>
+                <div id="playerHand" class="flex flex-col items-start"></div>
             </div>
         </div>
     </main>
@@ -2027,8 +2047,6 @@
 
             renderHeader() {
                 document.getElementById('roundBadge').textContent = this.roundLabel();
-                document.getElementById('wallCounter').textContent = `${Math.max(0, this.drawable())} 張`;
-                document.getElementById('dealerIndicator').textContent = `${this.players[this.dealer].short}${this.dealerStreak ? ` · 連 ${this.dealerStreak}` : ''}`;
             }
 
             renderCenter() {
@@ -2064,9 +2082,10 @@
                 const panel = document.getElementById(`panel-${seat}`);
                 const active = (this.phase === 'turn' && this.turn === seat) || (seat === 0 && this.phase === 'claim' && this.claim && this.claim.humanOpt) || (seat === 0 && this.phase === 'rob');
                 panel.classList.toggle('active-turn-ring', !!active);
-                const wind = `<span class="text-[10px] px-1.5 py-0.5 rounded font-black bg-emerald-700/80 text-emerald-50 border border-emerald-400/40" style="font-family: 'Noto Serif TC', serif;">${WIND_CHARS[this.seatWind(seat)]}</span>`;
+                const badgeSize = seat === 0 ? 'me-badge' : 'text-[10px]';
+                const wind = `<span class="${badgeSize} px-1.5 py-0.5 rounded font-black bg-emerald-700/80 text-emerald-50 border border-emerald-400/40" style="font-family: 'Noto Serif TC', serif;">${WIND_CHARS[this.seatWind(seat)]}</span>`;
                 const dealer = seat === this.dealer
-                    ? `<span class="text-[10px] px-1.5 py-0.5 rounded bg-rose-600 text-white font-black">莊${this.dealerStreak ? `·連${this.dealerStreak}` : ''}</span>` : '';
+                    ? `<span class="${badgeSize} px-1.5 py-0.5 rounded bg-rose-600 text-white font-black">莊${this.dealerStreak ? `·連${this.dealerStreak}` : ''}</span>` : '';
                 const scoreCls = p.score > 0 ? 'text-emerald-300' : p.score < 0 ? 'text-rose-400' : 'text-amber-300';
                 const thinking = p.isAI && this.phase === 'turn' && this.turn === seat
                     ? '<span class="text-[10px] px-1.5 py-0.5 rounded bg-amber-400 text-slate-950 font-black">思考中...</span>' : '';
@@ -2084,13 +2103,19 @@
 
                 if (seat === 0) {
                     const turnBadge = this.autoWin && this.phase !== 'end'
-                        ? '<span class="text-xs px-2 py-0.5 rounded-full bg-violet-500 text-white font-black">🤖 自動胡牌中</span>'
+                        ? '<span class="me-badge px-2 py-0.5 rounded-full bg-violet-500 text-white font-black">🤖 自動胡牌中</span>'
                         : active
-                            ? `<span class="text-xs px-2 py-0.5 rounded-full bg-amber-400 text-slate-950 font-black animate-bounce">${this.phase === 'turn' ? '輪到您出牌！' : '可以吃碰槓胡！'}</span>` : '';
+                            ? `<span class="me-badge px-2 py-0.5 rounded-full bg-amber-400 text-slate-950 font-black animate-bounce">${this.phase === 'turn' ? '輪到您出牌！' : '可以吃碰槓胡！'}</span>` : '';
+                    // 自己的明牌放在手牌旁邊（renderHand），這一列只放名字、門風、莊家、累計分和花牌
                     panel.innerHTML = `
                         <div class="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
-                            <div class="flex items-center gap-2">${head}${turnBadge}</div>
-                            <div class="flex flex-wrap items-end gap-1.5">${melds}${flowers}</div>
+                            <div class="flex flex-wrap items-center gap-x-2 gap-y-1">
+                                <div class="me-avatar rounded-full border ${p.ring} flex items-center justify-center shrink-0">${p.avatar}</div>
+                                <span class="me-name font-black text-white">${p.short}</span>${wind}${dealer}
+                                <span class="me-text text-slate-300 whitespace-nowrap ml-1">累計 <strong class="${scoreCls}">${this.fmt(p.score)}</strong></span>
+                                ${flowers}
+                            </div>
+                            ${turnBadge}
                         </div>`;
                     return;
                 }
@@ -2130,6 +2155,7 @@
             /** 依畫面大小調整牌桌：左右面板與牌河放不下時把牌縮小，空間有餘時把牌河放大，資訊卡放不下的段落先藏起來 */
             fitTable() {
                 if (typeof getComputedStyle !== 'function') return;
+                this.fitHand();
                 for (const seat of [1, 3]) {
                     const panel = document.getElementById(`panel-${seat}`);
                     this.shrinkToFit(panel, ['--meld-w', '--tiny-w'], 0.55, () => panel.scrollHeight > panel.clientHeight + 1);
@@ -2157,7 +2183,7 @@
                 const setW = w => table.style.setProperty('--river-w', `${w.toFixed(1)}px`);
                 table.style.removeProperty('--river-w');
                 const base = parseFloat(getComputedStyle(table).getPropertyValue('--river-w'));
-                const handTile = document.querySelector('#playerHand .mj-tile');
+                const handTile = document.querySelector('#playerHand .mj-tile.hand');
                 const maxW = Math.max(base, Math.min(44, (handTile ? handTile.offsetWidth : 46) * 0.85));
 
                 const ghosts = [];
@@ -2230,6 +2256,29 @@
                 ]);
             }
 
+            /**
+             * 個人區大小：一排放得下十六張加剛摸的一張（另留一點給槓）就排一排（橫放平板、電腦），
+             * 直拿平板或手機一排只能放很小的牌，改排兩排、牌放大；只看畫面大小，整局不會變
+             */
+            fitHand() {
+                const area = document.getElementById('mySeat');
+                const width = area.clientWidth, height = window.innerHeight;
+                // 一排放 slots 張牌寬（剛摸那張前面的空隙算 0.45 張）時，牌最寬能多寬：牌距是牌寬的 5%、至少 2px
+                const widest = slots => {
+                    const w = width / (slots + 0.05 * (slots - 1));
+                    return w * 0.05 >= 2 ? w : (width - 2 * (slots - 1)) / slots;
+                };
+                const one = Math.min(widest(17.8), 76, height * 0.08);
+                const two = Math.min(widest(9.45), 76, height * 0.065);
+                const w = Math.floor((two > one * 1.25 ? two : one) * 10) / 10;
+                area.style.setProperty('--hand-w', `${w}px`);
+                if (w !== this.handTileW || width !== this.handWidth) {
+                    this.handTileW = w;
+                    this.handWidth = width;
+                    this.renderHand();
+                }
+            }
+
             /** 把 props 列出的牌寬一起按比例縮小（第一個每次縮 1px），直到 overflows() 不成立或縮到 minScale */
             shrinkToFit(el, props, minScale, overflows) {
                 props.forEach(prop => el.style.removeProperty(prop));
@@ -2265,7 +2314,7 @@
                 const myTurn = this.phase === 'turn' && this.turn === 0;
                 const hasDrawn = myTurn && p.drawn !== null;
                 const hintIndex = myTurn && this.hintTile !== null ? tiles.lastIndexOf(this.hintTile) : -1;
-                container.innerHTML = tiles.map((t, i) => {
+                const cells = tiles.map((t, i) => {
                     const cls = ['hand-tile-wrap'];
                     if (myTurn && !this.autoWin) cls.push('playable');
                     if (i === this.selectedIndex) cls.push('selected');
@@ -2274,7 +2323,37 @@
                     const tai = this.windTai(0, t);
                     const badge = tai ? `<span class="tai-badge" title="${tai === 2 ? '圈風＋門風' : t === EAST + this.roundWind ? '圈風' : '門風'}：湊成刻子 +${tai} 台">+${tai}</span>` : '';
                     return `<div class="${cls.join(' ')}" data-i="${i}">${TileArt.html(t, 'hand')}${badge}</div>`;
-                }).join('');
+                });
+                // 手牌、剛摸那張（還沒摸時先留好位置，摸牌、打牌時牌才不會跳）、吃碰槓的牌依序排；
+                // width 是寬度、lead 是跟前一格的距離，都以牌寬為單位，要跟 CSS 的間距一致
+                const w = this.handTileW || 46, gap = Math.max(2, w * 0.05) / w;
+                const items = cells.map((html, i) => {
+                    const drawn = hasDrawn && i === tiles.length - 1;
+                    return { html, width: 1, lead: gap + (drawn ? 0.45 : 0), drawn };
+                });
+                if (!hasDrawn && tiles.length === 3 * (5 - p.melds.length) + 1) {
+                    items.push({ html: '<div class="hand-slot"></div>', width: 1, lead: gap + 0.45, drawn: true });
+                }
+                p.melds.forEach((m, k) => {
+                    const n = m.tiles.length;
+                    items.push({ html: `<div class="my-meld">${this.meldHTML(m, 0)}</div>`, width: n * 0.62 + (n + 3) / w, lead: gap + (k ? 0.1 : 0.4) });
+                });
+                // 一排放不下（直拿平板、手機）就分兩排，挑兩排寬度最接近的切法；剛摸那張不跟前一張分開。
+                // 摸牌前後格子寬度一樣，切的位置也一樣；手牌置中，兩邊各留 0.12 張給凸出去的加台角標
+                const rowWidth = row => row.reduce((sum, item, k) => sum + item.width + (k ? item.lead : 0), 0);
+                let rows = [items];
+                if (rowWidth(items) > this.handWidth / w - 0.25) {
+                    let best = Infinity;
+                    for (let b = 1; b < items.length; b++) {
+                        if (items[b].drawn) continue;
+                        const worst = Math.max(rowWidth(items.slice(0, b)), rowWidth(items.slice(b)));
+                        if (worst < best - 1e-6) {
+                            best = worst;
+                            rows = [items.slice(0, b), items.slice(b)];
+                        }
+                    }
+                }
+                container.innerHTML = rows.map(row => `<div class="hand-row">${row.map(item => item.html).join('')}</div>`).join('');
                 container.querySelectorAll('[data-i]').forEach(el => {
                     el.addEventListener('click', () => this.onHandTileClick(Number(el.dataset.i)));
                 });
@@ -2284,11 +2363,10 @@
 
             /** 選好要打的牌時，場上（四家牌河、明牌）同一種牌跟著閃爍，一眼看出這張出現過沒有 */
             highlightSameTiles(t) {
-                for (const id of ['riverTable', 'panel-0', 'panel-1', 'panel-2', 'panel-3']) {
-                    document.getElementById(id).querySelectorAll('[data-tile]').forEach(el => {
-                        el.classList.toggle('same-tile', Number(el.dataset.tile) === t);
-                    });
-                }
+                const onTable = '#riverTable [data-tile], #playerHand .my-meld [data-tile], #panel-1 [data-tile], #panel-2 [data-tile], #panel-3 [data-tile]';
+                document.querySelectorAll(onTable).forEach(el => {
+                    el.classList.toggle('same-tile', Number(el.dataset.tile) === t);
+                });
             }
 
             /** 您聽哪些牌：輪到您出牌時不算剛摸的那張；吃碰完還沒打牌時不算聽牌 */
@@ -2337,14 +2415,14 @@
                 let html = '';
                 if (this.autoWin && this.phase !== 'end') {
                     // 輪到誰都顯示一樣的內容，自動打牌時動作列就不會跟著重畫
-                    html += `<span class="text-xs text-violet-200 font-bold">🤖 自動胡牌中・聽：${this.waitsText(this.tingWaits())}</span>`;
+                    html += `<span class="bar-text text-violet-200 font-bold">🤖 自動胡牌中・聽：${this.waitsText(this.tingWaits())}</span>`;
                     html += btn('取消自動', 'bg-slate-700 text-white', 'game.toggleAutoWin()');
                 } else if (this.phase === 'claim' && this.claim && this.claim.humanOpt) {
                     const o = this.claim.humanOpt, t = this.claim.tile;
                     // 碰、槓圈風、門風或三元牌會加台：按鈕上直接標出來
                     const tai = isDragon(t) ? 1 : this.windTai(0, t);
-                    const taiTag = tai ? `<span class="text-[10px] font-black px-1 rounded bg-black/20">+${tai}台</span>` : '';
-                    html += `<span class="flex items-center gap-1 text-xs text-amber-200 font-bold">${this.players[this.claim.seat].short} 打出 ${mini([t])}</span>`;
+                    const taiTag = tai ? `<span class="text-[0.65em] font-black px-1 rounded bg-black/20">+${tai}台</span>` : '';
+                    html += `<span class="bar-text flex items-center gap-1.5 text-amber-200 font-bold">${this.players[this.claim.seat].short} 打出 ${mini([t])}</span>`;
                     if (o.win) html += btn('胡', 'bg-rose-600 text-white', "game.humanClaim('win')");
                     if (o.kong) html += btn('槓', 'bg-amber-500 text-slate-950', "game.humanClaim('kong')", taiTag);
                     if (o.pung) html += btn('碰', 'bg-amber-400 text-slate-950', "game.humanClaim('pung')", taiTag);
@@ -2353,7 +2431,7 @@
                     });
                     html += btn('過', 'bg-slate-700 text-white', "game.humanClaim('pass')");
                 } else if (this.phase === 'rob' && this.claim) {
-                    html += `<span class="flex items-center gap-1 text-xs text-amber-200 font-bold">${this.players[this.claim.seat].short} 加槓 ${mini([this.claim.tile])}，可以搶槓胡</span>`;
+                    html += `<span class="bar-text flex items-center gap-1.5 text-amber-200 font-bold">${this.players[this.claim.seat].short} 加槓 ${mini([this.claim.tile])}，可以搶槓胡</span>`;
                     html += btn('搶槓胡', 'bg-rose-600 text-white', 'game.humanRob(true)');
                     html += btn('過', 'bg-slate-700 text-white', 'game.humanRob(false)');
                 } else if (this.phase === 'turn' && this.turn === 0) {
@@ -2364,12 +2442,12 @@
                     }
                     // 摸牌前就已經聽牌：按下自動胡牌會直接打掉剛摸的牌（能自摸時直接按自摸就好）
                     if (!opts.win && this.tingWaits().length) html += autoBtn;
-                    html += `<span class="text-xs text-emerald-200/90 text-center">${this.discardPreview()}</span>`;
+                    html += `<span class="bar-text text-emerald-200/90 text-center">${this.discardPreview()}</span>`;
                 } else if (this.phase !== 'end') {
                     const waits = this.tingWaits();
                     html += waits.length
-                        ? `<span class="text-xs text-amber-300 font-bold">🀄 聽牌中：${this.waitsText(waits)}</span>${autoBtn}`
-                        : `<span class="text-xs text-emerald-200/70">${this.phase === 'turn' ? `等待 ${this.players[this.turn].short} 出牌…` : '　'}</span>`;
+                        ? `<span class="bar-text text-amber-300 font-bold">🀄 聽牌中：${this.waitsText(waits)}</span>${autoBtn}`
+                        : `<span class="bar-text text-emerald-200/70">${this.phase === 'turn' ? `等待 ${this.players[this.turn].short} 出牌…` : '　'}</span>`;
                 }
                 this.setHTML('actionBar', html);
             }
@@ -2632,7 +2710,7 @@
         const game = new MahjongGame();
         window.onload = function () {
             game.init();
-            // 牌桌大小改變（手機旋轉、網址列收合、動作按鈕換行）時，重新調整牌河與左右面板
+            // 牌桌大小改變（平板、手機旋轉，網址列收合，動作按鈕換行）時，重新調整手牌、牌河與左右面板
             const observer = new ResizeObserver(() => game.scheduleFitTable());
             ['riverTable', 'panel-1', 'panel-3', 'valueCard', 'statusCard'].forEach(id => observer.observe(document.getElementById(id)));
         };
