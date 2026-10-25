@@ -122,6 +122,20 @@
         .mj-tile.win-tile {
             box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.12), 0 calc(var(--w) * 0.09) 0 #1f8a57, 0 0 0 3px #f59e0b, 0 0 16px rgba(245, 158, 11, 0.9);
         }
+        /* 選好要打的牌時，場上同一種牌閃藍光：疊一層在牌面上，不會蓋掉剛打出那張的亮框，也不會讓它重播彈出動畫 */
+        .mj-tile.same-tile { z-index: 1; }
+        .mj-tile.same-tile::after {
+            content: "";
+            position: absolute;
+            inset: 0;
+            border-radius: inherit;
+            pointer-events: none;
+            animation: sameTileBlink 0.6s ease-in-out infinite alternate;
+        }
+        @keyframes sameTileBlink {
+            0% { background: rgba(56, 189, 248, 0); box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.35); }
+            100% { background: rgba(56, 189, 248, 0.32); box-shadow: 0 0 0 3px #38bdf8, 0 0 14px rgba(56, 189, 248, 0.95); }
+        }
 
         /* 玩家手牌互動（上方留空間給抬起的牌和加台角標） */
         #playerHand { padding-top: calc(16px + var(--hand-w) * 0.22); }
@@ -497,7 +511,8 @@
                 </div>
 
                 <div class="bg-slate-800/80 border border-white/10 rounded-xl p-3.5 text-xs text-slate-300">
-                    💡 <strong>貼心設計：</strong>輪到您時，點一下手牌會抬起並顯示「打這張會聽哪些牌、還剩幾張」；可以吃碰槓胡時下方會跳出按鈕，不想要就按「過」。點擊上方「出牌提示」可得到電腦建議的出牌。<br>
+                    💡 <strong>貼心設計：</strong>輪到您時，點一下手牌會抬起並顯示「打這張會聽哪些牌、還剩幾張」，場上（牌河、明牌）同一種牌也會跟著閃藍光，方便打別人打過的牌；可以吃碰槓胡時下方會跳出按鈕，不想要就按「過」。點擊上方「出牌提示」可得到電腦建議的出牌。<br>
+                    🤖 聽牌後下方會出現「自動胡牌」：按下去就摸什麼打什麼（不吃、不碰、不槓），有人放槍、自摸或可以搶槓時自動胡牌；想自己打就按「取消自動」，每局開始時也會自動關掉。<br>
                     ⭐ 手牌中的圈風、門風會在右上角標出金色「+1」（圈風剛好也是門風時是「+2」），代表湊成刻子能加的台數；左側「加台牌」列出這一局的圈風、門風與正花，右側則有聽牌進度與還沒出現的餘牌張數。
                 </div>
             </div>
@@ -817,7 +832,7 @@
             /** 產生一張牌的 HTML（back 為牌背） */
             html(t, cls = '', back = false) {
                 if (back) return `<div class="mj-tile back ${cls}"></div>`;
-                return `<div class="mj-tile ${cls}" title="${tileName(t)}">${this.svg(t)}</div>`;
+                return `<div class="mj-tile ${cls}" data-tile="${t}" title="${tileName(t)}">${this.svg(t)}</div>`;
             }
         };
 
@@ -1332,6 +1347,7 @@
                 this.noClaims = true;
                 this.selectedIndex = -1;
                 this.hintTile = null;
+                this.autoWin = false;     // 自動胡牌：聽牌後摸什麼打什麼、能胡就胡（每局開始時關掉）
                 this.timer = null;
                 this.history = [];
                 this.lastResult = null;
@@ -1444,6 +1460,7 @@
                 this.turnFlags = {};
                 this.selectedIndex = -1;
                 this.hintTile = null;
+                this.autoWin = false;
                 this.lastResult = null;
                 this.render();
                 const dealer = this.players[this.dealer];
@@ -1529,6 +1546,7 @@
                 if (seat === 0) this.sound.playDraw();
                 this.render();
                 if (p.isAI) this.schedule(() => this.aiTurn(seat), 650);
+                else if (this.autoWin) this.schedule(() => this.autoTurn(), 650);
             }
 
             /** 輪到自己時可做的事：自摸、暗槓、加槓（剛吃碰完不能槓） */
@@ -1554,6 +1572,13 @@
                     if (d && d.action === 'kong') return this.declareKong(seat, d.kind, d.tile);
                 }
                 this.discard(seat, MahjongAI.chooseDiscard(this, seat, level));
+            }
+
+            /** 自動胡牌：能自摸就胡，否則把剛摸到的牌打掉（手牌不動） */
+            autoTurn() {
+                if (!this.autoWin || this.phase !== 'turn' || this.turn !== 0) return;
+                if (this.selfOptions(0).win) return this.selfWin(0);
+                this.discard(0, this.players[0].drawn);
             }
 
             selfWin(seat) {
@@ -1587,6 +1612,7 @@
                 });
                 const aiRobber = robbers.find(q => this.players[q].isAI);
                 if (robbers.includes(0) && (aiRobber === undefined || order.indexOf(0) < order.indexOf(aiRobber))) {
+                    if (this.autoWin) return this.robKong(0, seat, tile);
                     this.phase = 'rob';
                     this.claim = { seat, tile, aiRobber };
                     this.render();
@@ -1688,9 +1714,12 @@
                 this.claim = { seat, tile, order, responses, humanOpt };
                 this.phase = 'claim';
                 if (humanOpt && this.humanCanMatter()) {
-                    this.render();
-                    this.sound.playSelect();
-                    return;   // 等玩家按下吃、碰、槓、胡或過
+                    if (!this.autoWin) {
+                        this.render();
+                        this.sound.playSelect();
+                        return;   // 等玩家按下吃、碰、槓、胡或過
+                    }
+                    if (humanOpt.win) responses.set(0, 'win');   // 自動胡牌：能胡就胡，吃碰槓一律不要
                 }
                 this.claim.humanOpt = null;
                 this.render();
@@ -2054,8 +2083,10 @@
                     </div>`;
 
                 if (seat === 0) {
-                    const turnBadge = active
-                        ? `<span class="text-xs px-2 py-0.5 rounded-full bg-amber-400 text-slate-950 font-black animate-bounce">${this.phase === 'turn' ? '輪到您出牌！' : '可以吃碰槓胡！'}</span>` : '';
+                    const turnBadge = this.autoWin && this.phase !== 'end'
+                        ? '<span class="text-xs px-2 py-0.5 rounded-full bg-violet-500 text-white font-black">🤖 自動胡牌中</span>'
+                        : active
+                            ? `<span class="text-xs px-2 py-0.5 rounded-full bg-amber-400 text-slate-950 font-black animate-bounce">${this.phase === 'turn' ? '輪到您出牌！' : '可以吃碰槓胡！'}</span>` : '';
                     panel.innerHTML = `
                         <div class="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
                             <div class="flex items-center gap-2">${head}${turnBadge}</div>
@@ -2236,7 +2267,7 @@
                 const hintIndex = myTurn && this.hintTile !== null ? tiles.lastIndexOf(this.hintTile) : -1;
                 container.innerHTML = tiles.map((t, i) => {
                     const cls = ['hand-tile-wrap'];
-                    if (myTurn) cls.push('playable');
+                    if (myTurn && !this.autoWin) cls.push('playable');
                     if (i === this.selectedIndex) cls.push('selected');
                     if (i === hintIndex) cls.push('hint');
                     if (hasDrawn && i === tiles.length - 1) cls.push('drawn');
@@ -2247,6 +2278,28 @@
                 container.querySelectorAll('[data-i]').forEach(el => {
                     el.addEventListener('click', () => this.onHandTileClick(Number(el.dataset.i)));
                 });
+                // 選牌一改就要更新場上的閃爍；render() 也是畫完牌河、面板才畫手牌，重畫後不會漏掉
+                this.highlightSameTiles(myTurn && this.selectedIndex >= 0 ? tiles[this.selectedIndex] : null);
+            }
+
+            /** 選好要打的牌時，場上（四家牌河、明牌）同一種牌跟著閃爍，一眼看出這張出現過沒有 */
+            highlightSameTiles(t) {
+                for (const id of ['riverTable', 'panel-0', 'panel-1', 'panel-2', 'panel-3']) {
+                    document.getElementById(id).querySelectorAll('[data-tile]').forEach(el => {
+                        el.classList.toggle('same-tile', Number(el.dataset.tile) === t);
+                    });
+                }
+            }
+
+            /** 您聽哪些牌：輪到您出牌時不算剛摸的那張；吃碰完還沒打牌時不算聽牌 */
+            tingWaits() {
+                const p = this.players[0];
+                const c = countsOf(p.hand);
+                if (this.phase === 'turn' && this.turn === 0) {
+                    if (p.drawn === null) return [];
+                    c[p.drawn]--;
+                }
+                return Hand.waits(c, 5 - p.melds.length);
             }
 
             /** 聽牌文字：「三萬（剩 2）、六萬（剩 3）」 */
@@ -2276,13 +2329,17 @@
                 return waits.length ? `${head} · <span class="text-amber-300 font-bold">打出後聽：${this.waitsText(waits)}</span>` : head;
             }
 
-            /** 下方動作列：吃碰槓胡、自摸、槓、出牌提示 */
+            /** 下方動作列：吃碰槓胡、自摸、槓、自動胡牌、出牌提示（內容沒變就不重畫，按鈕才不會一直重播彈出動畫、按到一半被換掉） */
             renderActions() {
-                const bar = document.getElementById('actionBar');
                 const btn = (label, cls, onclick, extra = '') => `<button class="action-btn ${cls}" onclick="${onclick}">${label}${extra}</button>`;
                 const mini = tiles => `<span class="flex items-end gap-[1px]">${tiles.map(t => TileArt.html(t, 'tiny')).join('')}</span>`;
+                const autoBtn = btn('🤖 自動胡牌', 'bg-violet-500 text-white', 'game.toggleAutoWin()');
                 let html = '';
-                if (this.phase === 'claim' && this.claim && this.claim.humanOpt) {
+                if (this.autoWin && this.phase !== 'end') {
+                    // 輪到誰都顯示一樣的內容，自動打牌時動作列就不會跟著重畫
+                    html += `<span class="text-xs text-violet-200 font-bold">🤖 自動胡牌中・聽：${this.waitsText(this.tingWaits())}</span>`;
+                    html += btn('取消自動', 'bg-slate-700 text-white', 'game.toggleAutoWin()');
+                } else if (this.phase === 'claim' && this.claim && this.claim.humanOpt) {
                     const o = this.claim.humanOpt, t = this.claim.tile;
                     // 碰、槓圈風、門風或三元牌會加台：按鈕上直接標出來
                     const tai = isDragon(t) ? 1 : this.windTai(0, t);
@@ -2305,21 +2362,22 @@
                     for (const k of opts.kongs) {
                         html += btn(k.kind === 'concealed' ? '暗槓' : '加槓', 'bg-amber-500 text-slate-950', `game.humanKong('${k.kind}', ${k.tile})`, mini([k.tile]));
                     }
+                    // 摸牌前就已經聽牌：按下自動胡牌會直接打掉剛摸的牌（能自摸時直接按自摸就好）
+                    if (!opts.win && this.tingWaits().length) html += autoBtn;
                     html += `<span class="text-xs text-emerald-200/90 text-center">${this.discardPreview()}</span>`;
                 } else if (this.phase !== 'end') {
-                    const p = this.players[0];
-                    const waits = Hand.waits(countsOf(p.hand), 5 - p.melds.length);
+                    const waits = this.tingWaits();
                     html += waits.length
-                        ? `<span class="text-xs text-amber-300 font-bold">🀄 聽牌中：${this.waitsText(waits)}</span>`
+                        ? `<span class="text-xs text-amber-300 font-bold">🀄 聽牌中：${this.waitsText(waits)}</span>${autoBtn}`
                         : `<span class="text-xs text-emerald-200/70">${this.phase === 'turn' ? `等待 ${this.players[this.turn].short} 出牌…` : '　'}</span>`;
                 }
-                bar.innerHTML = html;
+                this.setHTML('actionBar', html);
             }
 
             /* ===================== 玩家操作 ===================== */
 
             onHandTileClick(index) {
-                if (this.phase !== 'turn' || this.turn !== 0) return;
+                if (this.phase !== 'turn' || this.turn !== 0 || this.autoWin) return;
                 const tiles = this.handDisplayOrder();
                 if (this.settings.discardMode === 'single' || this.selectedIndex === index) {
                     this.discard(0, tiles[index]);
@@ -2340,8 +2398,31 @@
                 if (this.selfOptions(0).kongs.some(k => k.kind === kind && k.tile === tile)) this.declareKong(0, kind, tile);
             }
 
+            /** 自動胡牌開關：聽牌後才能打開；輪到您出牌時打開，會立刻打掉剛摸的牌 */
+            toggleAutoWin() {
+                if (this.autoWin) {
+                    this.autoWin = false;
+                    this.showCenterBanner('✋ 已取消自動胡牌', 'bg-slate-800 text-amber-300');
+                    this.render();
+                    return;
+                }
+                const deciding = this.phase === 'rob' || (this.phase === 'claim' && this.claim && this.claim.humanOpt);
+                if (this.phase === 'end' || deciding || !this.tingWaits().length) return;
+                this.autoWin = true;
+                this.selectedIndex = -1;
+                this.hintTile = null;
+                this.sound.playSelect();
+                this.showCenterBanner('🤖 自動胡牌：摸什麼打什麼，能胡就胡', 'bg-violet-500 text-white');
+                if (this.phase === 'turn' && this.turn === 0) this.autoTurn();
+                else this.render();
+            }
+
             /** 出牌提示：輪到您出牌時建議打哪張；可以吃碰槓時建議要不要 */
             showHint() {
+                if (this.autoWin && this.phase !== 'end') {
+                    this.showCenterBanner('🤖 自動胡牌中，不用提示；想自己打請按「取消自動」', 'bg-violet-500 text-white');
+                    return;
+                }
                 if (this.phase === 'claim' && this.claim && this.claim.humanOpt) {
                     const d = MahjongAI.decideClaim(this, 0, this.claim.humanOpt, this.claim.tile, 'hard');
                     const text = d === 'win' ? '胡！' : d === 'kong' ? '槓' : d === 'pung' ? '碰' : d && d.type === 'chow' ? '吃' : '過（不要）';
