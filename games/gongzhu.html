@@ -146,6 +146,12 @@
             animation: popIn 0.25s cubic-bezier(0.18, 0.89, 0.32, 1.28);
         }
 
+        @media (max-width: 640px) {
+            /* 手機上左右兩家的面板很窄：吃到的計分牌縮小、排緊，吃很多張也不用在面板裡捲 */
+            #captured-west, #captured-east { gap: 2px; }
+            #captured-west .mini-score-card, #captured-east .mini-score-card { padding: 0 2px; font-size: 10px; }
+        }
+
         @keyframes popIn {
             0% { transform: scale(0.3); opacity: 0; }
             100% { transform: scale(1); opacity: 1; }

@@ -2102,14 +2102,16 @@
                 const dealer = seat === this.dealer
                     ? `<span class="${badgeSize} px-1.5 py-0.5 rounded bg-rose-600 text-white font-black">莊${this.dealerStreak ? `·連${this.dealerStreak}` : ''}</span>` : '';
                 const scoreCls = p.score > 0 ? 'text-emerald-300' : p.score < 0 ? 'text-rose-400' : 'text-amber-300';
+                // 手機上左右兩家的面板很窄，輪到誰看面板的金框就好，不另外放「思考中...」
                 const thinking = p.isAI && this.phase === 'turn' && this.turn === seat
-                    ? '<span class="text-[10px] px-1.5 py-0.5 rounded bg-amber-400 text-slate-950 font-black">思考中...</span>' : '';
+                    ? `<span class="${seat === 2 ? 'inline-block' : 'hidden sm:inline-block'} text-[10px] px-1.5 py-0.5 rounded bg-amber-400 text-slate-950 font-black whitespace-nowrap">思考中...</span>` : '';
                 const melds = p.melds.map(m => this.meldHTML(m, seat)).join('');
                 const flowers = p.flowers.length
                     ? `<div class="flex items-end gap-[1px]">${sortTiles(p.flowers).map(f => TileArt.html(f, 'tiny')).join('')}</div>` : '';
+                // 手機上左右兩家的面板很窄，不放頭像，名字和門風、莊家才排得下
                 const head = `
                     <div class="flex items-center gap-2 min-w-0">
-                        <div class="w-8 h-8 rounded-full border ${p.ring} flex items-center justify-center text-base shrink-0">${p.avatar}</div>
+                        <div class="w-8 h-8 rounded-full border ${p.ring} ${seat === 2 ? 'flex' : 'hidden sm:flex'} items-center justify-center text-base shrink-0">${p.avatar}</div>
                         <div class="min-w-0">
                             <div class="flex items-center gap-1 flex-wrap"><span class="font-bold text-xs sm:text-sm text-white truncate">${p.name}</span>${wind}${dealer}${thinking}</div>
                             <div class="text-[11px] text-slate-300">累計 <strong class="${scoreCls}">${this.fmt(p.score)}</strong></div>
@@ -2147,7 +2149,7 @@
                 panel.innerHTML = `
                     ${head}
                     <div class="mt-1.5 text-[10px] text-slate-400">手牌 ${p.hand.length} 張</div>
-                    <div class="mt-0.5">${backs}</div>
+                    <div class="mt-0.5" data-backs>${backs}</div>
                     ${melds ? `<div class="mt-1.5 flex flex-wrap items-end gap-1">${melds}</div>` : ''}
                     ${flowers ? `<div class="mt-1.5">${flowers}</div>` : ''}`;
             }
@@ -2173,7 +2175,15 @@
                 this.fitHand();
                 for (const seat of [1, 3]) {
                     const panel = document.getElementById(`panel-${seat}`);
-                    this.shrinkToFit(panel, ['--meld-w', '--tiny-w'], 0.55, () => panel.scrollHeight > panel.clientHeight + 1);
+                    const backs = panel.querySelector('[data-backs]');
+                    const overflows = () => panel.scrollHeight > panel.clientHeight + 1;
+                    backs.style.removeProperty('display');
+                    this.shrinkToFit(panel, ['--meld-w', '--tiny-w'], 0.55, overflows);
+                    // 縮到最小還放不下（小手機）：不畫手牌牌背（上面已寫「手牌 N 張」），明牌和花再放大到放得下的大小
+                    if (overflows()) {
+                        backs.style.display = 'none';
+                        this.shrinkToFit(panel, ['--meld-w', '--tiny-w'], 0.55, overflows);
+                    }
                 }
                 this.fitRivers();
                 this.fitInfoCards();
