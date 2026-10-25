@@ -481,7 +481,7 @@
                         <li><strong>碰</strong>：任何一家打出的牌，手上有一對就能碰成刻子。</li>
                         <li><strong>槓</strong>：明槓（別人打出、手上有三張）、暗槓（自己摸齊四張）、加槓（已碰的刻子再摸到第四張）；槓完從牌尾補一張。</li>
                         <li><strong>胡</strong>：自己摸到（自摸）或胡別人打出的牌（放槍）；別人加槓時也可以搶槓胡。</li>
-                        <li>同一張牌有人要胡、有人要碰時：<strong>胡 &gt; 碰、槓 &gt; 吃</strong>；多人都能胡時，由打牌者的下家起算最近的一家胡（截胡）。</li>
+                        <li>同一張牌有人要胡、有人要碰時：<strong>胡 &gt; 碰、槓 &gt; 吃</strong>；多人都能胡同一張牌（搶槓也一樣）時，<strong>每一家都胡（一炮多響）</strong>，放槍的人各付一份，胡的人裡有莊家就連莊。</li>
                     </ul>
                 </div>
 
@@ -743,6 +743,7 @@
         const EAST = 27;
         const RESERVE = 16;               // 留八墩：牌牆剩 16 張就流局
         const RIVER_BUDGET = 18;          // 決定牌河牌寬時，預留每家可以打出 18 張的空間
+        const MULTI_WIN = ['', '', '一炮雙響', '一炮三響'];   // 同一張牌幾家一起胡
         const NUMERALS = '一二三四五六七八九';
         const WIND_CHARS = '東南西北';
         const SUIT_CHARS = ['萬', '筒', '條'];
@@ -1605,7 +1606,7 @@
                 const p = this.players[seat];
                 const first = this.noClaims && p.discards.length === 0;
                 this.finishWin({
-                    winner: seat, payer: null, winTile: p.drawn, selfDraw: true,
+                    winners: [seat], payer: null, winTile: p.drawn, selfDraw: true,
                     flags: {
                         kongDraw: this.turnFlags.kongDraw,
                         lastTile: this.turnFlags.lastTile,
@@ -1630,15 +1631,15 @@
                     c[tile]++;
                     return Hand.isWin(c, 5 - this.players[q].melds.length);
                 });
-                const aiRobber = robbers.find(q => this.players[q].isAI);
-                if (robbers.includes(0) && (aiRobber === undefined || order.indexOf(0) < order.indexOf(aiRobber))) {
-                    if (this.autoWin) return this.robKong(0, seat, tile);
+                // 能搶槓的每一家都胡（一炮多響）；您也能搶時先問您，自動胡牌就直接搶
+                if (robbers.includes(0)) {
+                    if (this.autoWin) return this.robKong(robbers, seat, tile);
                     this.phase = 'rob';
-                    this.claim = { seat, tile, aiRobber };
+                    this.claim = { seat, tile, robbers };
                     this.render();
                     return;
                 }
-                if (aiRobber !== undefined) this.robKong(aiRobber, seat, tile);
+                if (robbers.length) this.robKong(robbers, seat, tile);
                 else this.completeAddedKong(seat, tile);
             }
 
@@ -1665,19 +1666,19 @@
                 this.schedule(() => this.drawFor(seat, true, true), 650);
             }
 
-            robKong(winner, from, tile) {
+            robKong(winners, from, tile) {
                 const p = this.players[from];
                 p.hand.splice(p.hand.indexOf(tile), 1);
                 p.drawn = null;
-                this.finishWin({ winner, payer: from, winTile: tile, selfDraw: false, flags: { robKong: true }, addTile: true });
+                this.finishWin({ winners, payer: from, winTile: tile, selfDraw: false, flags: { robKong: true }, addTile: true });
             }
 
-            /** 玩家決定是否搶槓 */
+            /** 玩家決定是否搶槓：不搶時，能搶的電腦照樣胡 */
             humanRob(yes) {
                 if (this.phase !== 'rob' || !this.claim) return;
-                const { seat, tile, aiRobber } = this.claim;
-                if (yes) this.robKong(0, seat, tile);
-                else if (aiRobber !== undefined) this.robKong(aiRobber, seat, tile);
+                const { seat, tile, robbers } = this.claim;
+                const winners = yes ? robbers : robbers.filter(q => q !== 0);
+                if (winners.length) this.robKong(winners, seat, tile);
                 else this.completeAddedKong(seat, tile);
             }
 
@@ -1746,18 +1747,14 @@
                 this.schedule(() => this.resolveClaims(), 550);
             }
 
-            /** 玩家的選項是否有機會勝過電腦（例如電腦要截胡時，玩家的碰就沒有意義） */
+            /** 玩家的選項有沒有意義：能胡就一定問（別家也胡時一起胡）；不能胡時，電腦要胡或碰槓，您的吃碰就沒有意義 */
             humanCanMatter() {
-                const { order, responses, humanOpt } = this.claim;
-                const humanBest = humanOpt.win ? 3 : (humanOpt.kong || humanOpt.pung) ? 2 : 1;
-                let aiBest = 0, aiWinPos = 99;
-                for (const [q, r] of responses) {
-                    const rank = this.rankOf(r);
-                    aiBest = Math.max(aiBest, rank);
-                    if (rank === 3) aiWinPos = Math.min(aiWinPos, order.indexOf(q));
-                }
-                if (humanBest > aiBest) return true;
-                return humanBest === 3 && aiBest === 3 && order.indexOf(0) < aiWinPos;
+                const { responses, humanOpt } = this.claim;
+                if (humanOpt.win) return true;
+                const humanBest = (humanOpt.kong || humanOpt.pung) ? 2 : 1;
+                let aiBest = 0;
+                for (const r of responses.values()) aiBest = Math.max(aiBest, this.rankOf(r));
+                return humanBest > aiBest;
             }
 
             /** 玩家回應：win、kong、pung、chow（第幾種吃法）或 pass */
@@ -1769,11 +1766,11 @@
                 this.resolveClaims();
             }
 
-            /** 依優先順序處理：胡（截胡）＞ 碰、槓 ＞ 吃；都沒人要就換下家摸牌 */
+            /** 依優先順序處理：胡（要胡的每一家都胡，一炮多響）＞ 碰、槓 ＞ 吃；都沒人要就換下家摸牌 */
             resolveClaims() {
                 const { seat, tile, order, responses } = this.claim;
-                const winner = order.find(q => responses.get(q) === 'win');
-                if (winner !== undefined) return this.winByDiscard(winner, seat, tile);
+                const winners = order.filter(q => responses.get(q) === 'win');
+                if (winners.length) return this.winByDiscard(winners, seat, tile);
                 const melder = order.find(q => responses.get(q) === 'kong' || responses.get(q) === 'pung');
                 if (melder !== undefined) return this.takeMeld(melder, seat, tile, responses.get(melder));
                 const chower = order.find(q => this.rankOf(responses.get(q)) === 1);
@@ -1818,60 +1815,71 @@
                 if (p.isAI) this.schedule(() => this.aiTurn(q), 700);
             }
 
-            winByDiscard(winner, from, tile) {
+            winByDiscard(winners, from, tile) {
                 this.players[from].discards.pop();
                 this.finishWin({
-                    winner, payer: from, winTile: tile, selfDraw: false,
+                    winners, payer: from, winTile: tile, selfDraw: false,
                     flags: { lastDiscard: !!(this.lastDiscard && this.lastDiscard.last) }, addTile: true
                 });
             }
 
             /** 八仙過海（三家付）、七搶一（第八張花的人付） */
             winBySpecial(winner, payer, special) {
-                this.finishWin({ winner, payer, winTile: null, selfDraw: payer === null, flags: {}, special });
+                this.finishWin({ winners: [winner], payer, winTile: null, selfDraw: payer === null, flags: {}, special });
             }
 
             /**
-             * 胡牌結算：算台、依底台付錢（莊家相關的那筆加莊家台與連莊台）
+             * 胡牌結算：算台、依底台付錢（莊家相關的那筆加莊家台與連莊台）；
+             * 一炮多響時 winners 有好幾家，每家各算各的台，放槍的人各付一份
              */
-            finishWin({ winner, payer, winTile, selfDraw, flags, addTile, special }) {
+            finishWin({ winners, payer, winTile, selfDraw, flags, addTile, special }) {
                 clearTimeout(this.timer);
-                const p = this.players[winner];
-                if (addTile) p.hand.push(winTile);
-                let tai;
-                if (special) {
-                    tai = Scoring.compute({ special, flags: {} });
-                } else {
-                    const need = 5 - p.melds.length;
-                    const counts = countsOf(p.hand);
-                    const before = counts.slice();
-                    before[winTile]--;
-                    tai = Scoring.compute({
-                        counts, melds: p.melds, flowers: p.flowers, winTile, selfDraw,
-                        seatWind: this.seatWind(winner), roundWind: this.roundWind,
-                        waits: Hand.waits(before, need).length, flags
-                    });
-                }
                 const dealerTai = 1 + 2 * this.dealerStreak;
                 const delta = [0, 0, 0, 0], notes = ['', '', '', ''];
-                const pay = (from, extra) => {
-                    const amount = this.stake.base + (tai.tai + extra) * this.stake.perTai;
-                    delta[from] -= amount;
-                    delta[winner] += amount;
-                    notes[from] = `${selfDraw ? '自摸' : special || '放槍'}付 ${amount.toLocaleString()}${extra ? `（含莊家 ${extra} 台）` : ''}`;
-                };
-                if (selfDraw) {
-                    for (const q of [0, 1, 2, 3]) {
-                        if (q !== winner) pay(q, winner === this.dealer || q === this.dealer ? dealerTai : 0);
+                const bills = [[], [], [], []];   // 每家付給誰多少，最後寫成備註
+                const wins = winners.map(winner => {
+                    const p = this.players[winner];
+                    if (addTile) p.hand.push(winTile);
+                    let tai;
+                    if (special) {
+                        tai = Scoring.compute({ special, flags: {} });
+                    } else {
+                        const need = 5 - p.melds.length;
+                        const counts = countsOf(p.hand);
+                        const before = counts.slice();
+                        before[winTile]--;
+                        tai = Scoring.compute({
+                            counts, melds: p.melds, flowers: p.flowers, winTile, selfDraw,
+                            seatWind: this.seatWind(winner), roundWind: this.roundWind,
+                            waits: Hand.waits(before, need).length, flags
+                        });
                     }
-                } else {
-                    pay(payer, winner === this.dealer || payer === this.dealer ? dealerTai : 0);
-                }
-                notes[winner] = `${special || (selfDraw ? '自摸' : '胡牌')} ${tai.tai} 台${winner === this.dealer ? `（莊家 ${dealerTai} 台另計）` : ''}`;
-                p.stats.win++;
-                if (selfDraw) p.stats.selfDraw++;
+                    const pay = (from, extra) => {
+                        const amount = this.stake.base + (tai.tai + extra) * this.stake.perTai;
+                        delta[from] -= amount;
+                        delta[winner] += amount;
+                        bills[from].push({ to: winner, amount, extra });
+                    };
+                    if (selfDraw) {
+                        for (const q of [0, 1, 2, 3]) {
+                            if (q !== winner) pay(q, winner === this.dealer || q === this.dealer ? dealerTai : 0);
+                        }
+                    } else {
+                        pay(payer, winner === this.dealer || payer === this.dealer ? dealerTai : 0);
+                    }
+                    notes[winner] = `${special || (selfDraw ? '自摸' : '胡牌')} ${tai.tai} 台${winner === this.dealer ? `（莊家 ${dealerTai} 台另計）` : ''}`;
+                    p.stats.win++;
+                    return { winner, tai };
+                });
+                bills.forEach((list, from) => {
+                    if (!list.length) return;
+                    const each = list.map(({ to, amount, extra }) =>
+                        `${list.length > 1 ? `${this.players[to].short} ` : ''}${amount.toLocaleString()}${extra ? `（含莊家 ${extra} 台）` : ''}`);
+                    notes[from] = `${selfDraw ? '自摸' : special || '放槍'}付 ${each.join('、')}`;
+                });
+                if (selfDraw) this.players[winners[0]].stats.selfDraw++;
                 else this.players[payer].stats.dealIn++;
-                this.endHand({ type: 'win', winner, payer, selfDraw, winTile, tai, delta, notes, special });
+                this.endHand({ type: 'win', wins, payer, selfDraw, winTile, delta, notes, special });
             }
 
             exhaustiveDraw() {
@@ -1898,14 +1906,19 @@
                     this.sound.playExhausted();
                     this.showCenterBanner('🀫 流局（荒莊），莊家連莊', 'bg-slate-800 text-amber-300');
                 } else {
-                    const w = this.players[result.winner];
+                    const wins = result.wins;
+                    const iWon = wins.some(w => w.winner === 0);
                     this.sound.speak(result.selfDraw ? '自摸' : '胡');
-                    if (result.winner === 0) this.sound.playWin();
+                    if (iWon) this.sound.playWin();
                     else if (result.payer === 0 || result.selfDraw) this.sound.playLose();
-                    this.showCenterBanner(`🎉 ${w.short}${result.special || (result.selfDraw ? '自摸' : '胡牌')}！${result.tai.tai} 台`, result.winner === 0 ? 'bg-amber-400 text-slate-950' : 'bg-rose-600 text-white');
+                    const text = wins.length > 1
+                        ? `${MULTI_WIN[wins.length]}！${wins.map(w => `${this.players[w.winner].short} ${w.tai.tai} 台`).join('、')}`
+                        : `${this.players[wins[0].winner].short}${result.special || (result.selfDraw ? '自摸' : '胡牌')}！${wins[0].tai.tai} 台`;
+                    this.showCenterBanner(`🎉 ${text}`, iWon ? 'bg-amber-400 text-slate-950' : 'bg-rose-600 text-white');
                 }
 
-                const keep = result.type === 'draw' || result.winner === this.dealer;
+                // 流局、或胡牌的人裡有莊家（一炮多響也算）就連莊
+                const keep = result.type === 'draw' || result.wins.some(w => w.winner === this.dealer);
                 if (keep) {
                     this.dealerStreak++;
                     result.nextNote = `${this.players[result.dealer].short}連莊`;
@@ -1965,7 +1978,9 @@
                 const recent = this.history.slice(0, 12).map(h => {
                     const what = h.type === 'draw'
                         ? '<span class="text-slate-400">流局</span>'
-                        : `<span class="font-bold ${h.winner === 0 ? 'text-emerald-300' : 'text-rose-300'}">${this.players[h.winner].short}${h.special || (h.selfDraw ? '自摸' : '胡')} ${h.tai.tai}台</span>`;
+                        : `<span class="font-bold ${h.wins.some(w => w.winner === 0) ? 'text-emerald-300' : 'text-rose-300'}">${h.wins.length > 1
+                            ? `${h.wins.map(w => this.players[w.winner].short).join('、')}${MULTI_WIN[h.wins.length]}`
+                            : `${this.players[h.wins[0].winner].short}${h.special || (h.selfDraw ? '自摸' : '胡')} ${h.wins[0].tai.tai}台`}</span>`;
                     const d = h.delta[0];
                     return `
                         <div class="flex items-center justify-between gap-1.5">
@@ -2571,24 +2586,33 @@
                         </div>`).join('');
                     taiBox.innerHTML = '';
                 } else {
-                    const w = this.players[r.winner];
-                    title.textContent = `🎉 ${w.name} ${r.special || (r.selfDraw ? '自摸' : '胡牌')}！`;
-                    sub.textContent = `${r.label} · ${r.tai.tai} 台 · ${r.selfDraw ? '三家各付' : `${this.players[r.payer].short} ${r.special ? '付' : '放槍'}`} · ${r.nextNote}`;
-                    const concealed = sortTiles(w.hand);
-                    if (r.winTile !== null) concealed.splice(concealed.indexOf(r.winTile), 1);
-                    handBox.innerHTML = `
-                        ${w.melds.map(m => this.meldHTML({ ...m, concealed: false }, 0, 'result')).join('')}
-                        <div class="flex items-end gap-[1px]">${concealed.map(t => TileArt.html(t, 'result')).join('')}</div>
-                        ${r.winTile !== null ? `<div class="flex flex-col items-center gap-0.5"><span class="text-[10px] text-amber-300 font-bold">${r.selfDraw ? '自摸' : '胡'}</span>${TileArt.html(r.winTile, 'result win-tile')}</div>` : ''}
-                        ${w.flowers.length ? `<div class="flex items-end gap-[1px] ml-2">${sortTiles(w.flowers).map(f => TileArt.html(f, 'tiny')).join('')}</div>` : ''}`;
-                    const items = r.tai.items.length ? r.tai.items : [{ name: '屁胡（無台）', tai: 0 }];
-                    taiBox.innerHTML = items.map(it => `
-                        <div class="flex items-center justify-between bg-slate-800/80 border border-white/10 rounded-lg px-2.5 py-1.5">
-                            <span class="text-slate-200">${it.name}</span><span class="font-black text-amber-300">${it.tai} 台</span>
-                        </div>`).join('') + `
-                        <div class="flex items-center justify-between bg-amber-500/20 border border-amber-400/40 rounded-lg px-2.5 py-1.5">
-                            <span class="text-amber-200 font-bold">合計</span><span class="font-black text-amber-300">${r.tai.tai} 台</span>
-                        </div>`;
+                    // 一炮多響：每個胡牌的人各列一份手牌和台數
+                    const multi = r.wins.length > 1;
+                    const how = r.special || (r.selfDraw ? '自摸' : '胡牌');
+                    title.textContent = multi ? `🎉 ${MULTI_WIN[r.wins.length]}！` : `🎉 ${this.players[r.wins[0].winner].name} ${how}！`;
+                    const taiText = r.wins.map(w => `${multi ? `${this.players[w.winner].short} ` : ''}${w.tai.tai} 台`).join('、');
+                    sub.textContent = `${r.label} · ${taiText} · ${r.selfDraw ? '三家各付' : `${this.players[r.payer].short} ${r.special ? '付' : '放槍'}`} · ${r.nextNote}`;
+                    handBox.innerHTML = r.wins.map(({ winner, tai }) => {
+                        const w = this.players[winner];
+                        const concealed = sortTiles(w.hand);
+                        if (r.winTile !== null) concealed.splice(concealed.indexOf(r.winTile), 1);
+                        return `
+                            ${multi ? `<div class="w-full text-center text-xs sm:text-sm font-black text-amber-300">${w.name} · ${tai.tai} 台</div>` : ''}
+                            ${w.melds.map(m => this.meldHTML({ ...m, concealed: false }, 0, 'result')).join('')}
+                            <div class="flex items-end gap-[1px]">${concealed.map(t => TileArt.html(t, 'result')).join('')}</div>
+                            ${r.winTile !== null ? `<div class="flex flex-col items-center gap-0.5"><span class="text-[10px] text-amber-300 font-bold">${r.selfDraw ? '自摸' : '胡'}</span>${TileArt.html(r.winTile, 'result win-tile')}</div>` : ''}
+                            ${w.flowers.length ? `<div class="flex items-end gap-[1px] ml-2">${sortTiles(w.flowers).map(f => TileArt.html(f, 'tiny')).join('')}</div>` : ''}`;
+                    }).join('<div class="w-full border-t border-white/10"></div>');
+                    taiBox.innerHTML = r.wins.map(({ winner, tai }) => {
+                        const items = tai.items.length ? tai.items : [{ name: '屁胡（無台）', tai: 0 }];
+                        return (multi ? `<div class="col-span-full text-xs font-black text-amber-300 mt-1">${this.players[winner].name}</div>` : '') + items.map(it => `
+                            <div class="flex items-center justify-between bg-slate-800/80 border border-white/10 rounded-lg px-2.5 py-1.5">
+                                <span class="text-slate-200">${it.name}</span><span class="font-black text-amber-300">${it.tai} 台</span>
+                            </div>`).join('') + `
+                            <div class="flex items-center justify-between bg-amber-500/20 border border-amber-400/40 rounded-lg px-2.5 py-1.5">
+                                <span class="text-amber-200 font-bold">合計</span><span class="font-black text-amber-300">${tai.tai} 台</span>
+                            </div>`;
+                    }).join('');
                 }
                 document.getElementById('resultPayments').innerHTML = this.players.map((p, i) => {
                     const d = r.delta[i];
@@ -2626,7 +2650,9 @@
                     ? this.history.map(h => {
                         const text = h.type === 'draw'
                             ? '<span class="text-slate-400">流局</span>'
-                            : `<span class="${h.winner === 0 ? 'text-emerald-400' : 'text-rose-300'} font-bold">${this.players[h.winner].short} ${h.special || (h.selfDraw ? '自摸' : '胡牌')} ${h.tai.tai} 台</span>${h.selfDraw ? '' : `<span class="text-slate-400">（${this.players[h.payer].short}${h.special ? '付' : '放槍'}）</span>`}`;
+                            : `<span class="${h.wins.some(w => w.winner === 0) ? 'text-emerald-400' : 'text-rose-300'} font-bold">${h.wins.length > 1
+                                ? `${MULTI_WIN[h.wins.length]}：${h.wins.map(w => `${this.players[w.winner].short} ${w.tai.tai} 台`).join('、')}`
+                                : `${this.players[h.wins[0].winner].short} ${h.special || (h.selfDraw ? '自摸' : '胡牌')} ${h.wins[0].tai.tai} 台`}</span>${h.selfDraw ? '' : `<span class="text-slate-400">（${this.players[h.payer].short}${h.special ? '付' : '放槍'}）</span>`}`;
                         return `<div class="flex flex-wrap items-center justify-between gap-2 bg-slate-900/90 px-3 py-1.5 rounded-lg border border-white/5">
                             <span class="font-bold text-amber-300">${h.label}${h.dealerStreak ? ` · 連${h.dealerStreak}` : ''}</span>
                             <span>${text}</span>
