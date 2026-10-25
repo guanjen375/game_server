@@ -58,6 +58,11 @@ CATALOG = {
         "desc": "花牌、吃碰槓、台數計算，和三家電腦對打",
         "aliases": ["麻將", "majhong"],
     },
+    "mahjong-me": {
+        "name": "台灣麻將（自我模式）", "category": "牌類", "icon": "發", "style": "tile",
+        "desc": "胡牌被胡限定個人",
+        "aliases": [],
+    },
     "gongzhu": {
         "name": "拱豬", "category": "牌類", "icon": "♠Q", "style": "cardface",
         "desc": "四人撲克吃墩，避開豬（♠Q）、搶到羊（♦J）",
