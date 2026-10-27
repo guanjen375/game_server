@@ -1131,10 +1131,10 @@
                 return score - this.threatPenalty(st, 1 - side, vals);
             },
 
-            orderMoves(b, buf, n, vals, keys) {
+            orderMoves(b, buf, n, vals, keys, k1 = -1, k2 = -1) {
                 for (let i = 0; i < n; i++) {
                     const m = buf[i], cap = b[m & 31];
-                    keys[i] = cap !== EMPTY ? 10000 + vals[cap] * 16 - vals[b[m >> 5]] : 0;
+                    keys[i] = cap !== EMPTY ? 10000 + vals[cap] * 16 - vals[b[m >> 5]] : m === k1 ? 2 : m === k2 ? 1 : 0;
                 }
                 for (let i = 1; i < n; i++) {
                     const m = buf[i], k = keys[i];
@@ -1162,7 +1162,8 @@
                 const n = this.genMoves(st, side, buf);
                 if (n === 0 && st.hidden === 0) return -WIN_SCORE + ply;   // 無棋可走判負
                 const b = st.board;
-                this.orderMoves(b, buf, n, this.computeValues(st, ctx.vals[ply]), ctx.keys[ply]);
+                const killers = ctx.killers;
+                this.orderMoves(b, buf, n, this.computeValues(st, ctx.vals[ply]), ctx.keys[ply], killers[2 * ply], killers[2 * ply + 1]);
 
                 let best = -INF;
                 if (st.hidden > 0) {
@@ -1200,7 +1201,14 @@
                     b[to] = cap;
                     if (sc > best) best = sc;
                     if (sc > alpha) alpha = sc;
-                    if (alpha >= beta) break;
+                    if (alpha >= beta) {
+                        // 殺手著法：讓對方截斷的安靜走法，同一層的其他局面多半也有效，下次優先嘗試
+                        if (cap === EMPTY && killers[2 * ply] !== m) {
+                            killers[2 * ply + 1] = killers[2 * ply];
+                            killers[2 * ply] = m;
+                        }
+                        break;
+                    }
                 }
                 return best;
             },
@@ -1239,8 +1247,9 @@
 
             /**
              * 估算每一格暗棋翻開後的期望分數（依暗棋池中各兵種的機率加權）
+             * shallowDepth：周圍沒有明棋、也不在明炮線上的暗棋改用的淺層深度；搜尋逾時中止時回傳 null
              */
-            evaluateFlips(st, side, depth, ctx) {
+            evaluateFlips(st, side, depth, ctx, shallowDepth = 0) {
                 const b = st.board, result = [];
                 // 有明炮所在的列與行：翻棋可能改變炮架，需要較深入的計算
                 let cannonLines = 0;
@@ -1256,7 +1265,7 @@
                             if (s >= 0 && isPiece(b[s])) { interacting = true; break; }
                         }
                     }
-                    const d = interacting ? depth : 0;
+                    const d = interacting ? depth : shallowDepth;
                     const total = st.hidden;
                     let expected = 0;
                     for (let code = 1; code <= 14; code++) {
@@ -1272,11 +1281,45 @@
                         st.hidden++;
                         st.pool[code]++;
                         b[sq] = HIDDEN;
+                        if (ctx.aborted) return null;
                         expected += (cnt / total) * sc;
                     }
                     result.push({ sq, score: expected });
                 }
                 return result;
+            },
+
+            /**
+             * 以固定深度搜尋根節點的每一步走子 / 吃子（迭代加深的其中一輪）；逾時中止時回傳 null
+             * 分數在「目前最佳 − margin」以內的走法都算出確切分數，較差的只得到上限值，因此加上小幅隨機後也不會被選中。
+             * adjust(board, move, captured) 在走完這步的盤面上計算額外加減分（防鬼打牆），會先算好再決定搜尋窗口。
+             */
+            searchMoves(st, side, depth, order, ctx, adjust, alpha, margin) {
+                const b = st.board, results = [];
+                for (const m of order) {
+                    const from = m >> 5, to = m & 31, cap = b[to], q = st.quiet;
+                    b[to] = b[from];
+                    b[from] = EMPTY;
+                    if (cap !== EMPTY) {
+                        st.alive[cap]--;
+                        st.quiet = 0;
+                    } else {
+                        st.quiet = q + 1;
+                    }
+                    const adj = adjust ? adjust(b, m, cap) : 0;
+                    let sc;
+                    if (cap !== EMPTY && this.aliveOf(st, 1 - side) === 0) sc = WIN_SCORE;
+                    else sc = -this.search(st, 1 - side, depth - 1, -INF, -(alpha - margin - adj), 1, false, ctx);
+                    if (cap !== EMPTY) st.alive[cap]++;
+                    st.quiet = q;
+                    b[from] = b[to];
+                    b[to] = cap;
+                    if (ctx.aborted) return null;
+                    sc += adj;
+                    results.push({ move: m, score: sc });
+                    if (sc > alpha) alpha = sc;
+                }
+                return results;
             },
 
             /**
@@ -1315,7 +1358,7 @@
                         let sc;
                         if (cap !== EMPTY && this.aliveOf(st, 1 - side) === 0) sc = WIN_SCORE;
                         else sc = -this.search(st, 1 - side, depth - 1, -INF, lv.exact ? INF : -alpha, 1, false, ctx);
-                        const adj = adjust ? adjust(b) : 0;
+                        const adj = adjust ? adjust(b, m, cap) : 0;
                         if (cap !== EMPTY) st.alive[cap]++;
                         st.quiet = q;
                         b[from] = b[to];
@@ -1336,15 +1379,19 @@
 
         /**
          * 電腦 AI：翻棋依暗棋池機率計算期望值，走子以迭代加深 Alpha-Beta 搜尋
+         * 困難難度（deep）在時間內把翻棋與走子一起加深；antiLoop：電腦避免重複走同樣的路線（提示不套用，玩家可以重複走）
          */
         const BanqiAI = {
             LEVELS: {
-                easy:   { moveDepth: 1, flipDepth: 0, timeMs: 400,  noise: 14,  randomRate: 0.3, exact: true },
-                normal: { moveDepth: 2, flipDepth: 1, timeMs: 600,  noise: 4,   randomRate: 0,   exact: true },
-                hard:   { moveDepth: 3, flipDepth: 2, timeMs: 1200, noise: 0.3, randomRate: 0,   exact: false },
+                easy:   { moveDepth: 1, flipDepth: 0, timeMs: 400,  noise: 14,  randomRate: 0.3, exact: true, antiLoop: true },
+                normal: { moveDepth: 2, flipDepth: 1, timeMs: 600,  noise: 4,   randomRate: 0,   exact: true, antiLoop: true },
+                hard:   { moveDepth: 12, timeMs: 1000, noise: 0.25, margin: 1, randomRate: 0, deep: true, antiLoop: true },
                 hint:   { moveDepth: 3, flipDepth: 2, timeMs: 1000, noise: 0,   randomRate: 0,   exact: false }
             },
             FLIP_BONUS: 1.5,
+            // 防鬼打牆：最近 window 手內，走回這枚棋子 trail 步內待過的格子每次扣 revisit 分、重現出現過的局面每次扣 repeat 分；
+            // 合計上限 cap（低於一枚兵卒：寧可換條路走，也不會為了換路線送子）
+            LOOP: { revisit: 3, repeat: 4, trail: 6, window: 24, cap: 7.5 },
             _ctx: null,
 
             getContext(timeMs) {
@@ -1352,9 +1399,11 @@
                     this._ctx = {
                         bufs: Array.from({ length: 64 }, () => new Int16Array(192)),
                         keys: Array.from({ length: 64 }, () => new Float64Array(192)),
-                        vals: Array.from({ length: 64 }, () => new Float64Array(15))
+                        vals: Array.from({ length: 64 }, () => new Float64Array(15)),
+                        killers: new Int16Array(128)
                     };
                 }
+                this._ctx.killers.fill(-1);
                 const ctx = this._ctx;
                 ctx.nodes = 0;
                 ctx.aborted = false;
@@ -1365,8 +1414,9 @@
 
             /**
              * 為 side 方選出一個動作：{ type: 'flip', sq } 或 { type: 'move' | 'capture', from, to }
+             * history：{ positions: 每一手之後的局面, log: 每一手的紀錄 }
              */
-            chooseAction(gameState, side, levelName, recentKeys) {
+            chooseAction(gameState, side, levelName, history) {
                 const lv = this.LEVELS[levelName] || this.LEVELS.normal;
                 const st = Engine.cloneState(gameState);
                 const b = st.board;
@@ -1391,34 +1441,136 @@
                 }
 
                 const ctx = this.getContext(lv.timeMs);
-                const noise = () => (Math.random() * 2 - 1) * lv.noise;
-                const candidates = [];
-
+                const adjust = lv.antiLoop ? this.loopPenalty(side, history)
+                    : this.repeatPenalty(side, history, Engine.evaluate(st, side));
                 // 翻棋：和局計數越高越傾向翻棋，避免原地兜圈
-                if (st.hidden > 0) {
-                    const bonus = this.FLIP_BONUS + st.quiet * 0.3;
-                    for (const f of Engine.evaluateFlips(st, side, lv.flipDepth, ctx)) {
-                        candidates.push({ type: 'flip', sq: f.sq, score: f.score + bonus + noise() });
-                    }
-                }
-
-                // 走子 / 吃子：領先時避免重複局面
-                if (moveCount > 0) {
-                    const baseEval = Engine.evaluate(st, side);
-                    const adjust = recentKeys && recentKeys.size
-                        ? board => (recentKeys.has(positionKey(board, 1 - side)) ? (baseEval > 15 ? -25 : -4) : 0)
-                        : null;
-                    for (const r of Engine.searchRoot(st, side, lv, ctx, adjust)) {
-                        candidates.push({ ...toAction(r.move), score: r.score + noise() });
-                    }
-                }
+                const flipBonus = this.FLIP_BONUS + st.quiet * 0.3;
+                const candidates = lv.deep
+                    ? this.searchDeep(st, side, lv, ctx, moveBuf.subarray(0, moveCount), adjust, flipBonus)
+                    : this.searchFixed(st, side, lv, ctx, adjust, flipBonus);
 
                 if (!candidates.length) return null;
-                let best = candidates[0];
+                let best = null, bestScore = -INF;
                 for (const c of candidates) {
-                    if (c.score > best.score) best = c;
+                    const sc = c.score + (Math.random() * 2 - 1) * lv.noise;
+                    if (sc > bestScore) {
+                        bestScore = sc;
+                        best = c;
+                    }
                 }
-                return best;
+                return best.type === 'flip' ? { type: 'flip', sq: best.sq } : toAction(best.move);
+            },
+
+            /**
+             * 簡單 / 普通 / 提示：固定深度（翻棋 flipDepth、走子 moveDepth）
+             */
+            searchFixed(st, side, lv, ctx, adjust, flipBonus) {
+                const candidates = [];
+                if (st.hidden > 0) {
+                    for (const f of Engine.evaluateFlips(st, side, lv.flipDepth, ctx) || []) {
+                        candidates.push({ type: 'flip', sq: f.sq, score: f.score + flipBonus });
+                    }
+                }
+                for (const r of Engine.searchRoot(st, side, lv, ctx, adjust)) {
+                    candidates.push({ type: 'move', move: r.move, score: r.score });
+                }
+                return candidates;
+            },
+
+            /**
+             * 困難：在時間內迭代加深，時間到就採用最後一輪完整算完的結果。
+             * 翻棋本身算一手；翻棋與走子要看到同樣奇偶的手數，分數才比得起來（評估時輪到哪一方會有落差）。
+             * 翻棋最花時間：前段兩者一起加深，之後翻棋固定，走子每次加深兩層
+             */
+            searchDeep(st, side, lv, ctx, moves, adjust, flipBonus) {
+                const b = st.board;
+                let order = Array.from(moves);
+                // 先隨機打散（同分時不會總走同一步），再把吃子排在前面
+                for (let i = order.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [order[i], order[j]] = [order[j], order[i]];
+                }
+                const vals = Engine.computeValues(st, new Float64Array(15));
+                const capValue = m => (b[m & 31] !== EMPTY ? vals[b[m & 31]] : 0);
+                order.sort((x, y) => capValue(y) - capValue(x));
+
+                const start = performance.now();
+                let flips = [], flipPlies = 0, moveMs = 0, done = [];
+                for (let depth = 1; depth <= lv.moveDepth; depth++) {
+                    const elapsed = performance.now() - start;
+                    const withFlips = st.hidden > 0 && (depth === 1 || elapsed < lv.timeMs * 0.25);
+                    if (!withFlips) {
+                        if (!order.length) break;
+                        if (st.hidden > 0 && (depth - flipPlies) % 2) continue;   // 翻棋已固定：只搜同樣奇偶的深度
+                        // 每多一層約多花 4 倍時間，預估這一輪算不完就不開始
+                        if (elapsed + moveMs * (st.hidden > 0 ? 16 : 4) > lv.timeMs) break;
+                    }
+                    ctx.checkTime = depth > 1;
+                    ctx.aborted = false;
+                    if (withFlips) {
+                        // 周圍沒有棋子的暗棋只算淺層，但深度的奇偶同樣要一致
+                        const res = Engine.evaluateFlips(st, side, depth - 1, ctx, (depth - 1) % 2);
+                        if (!res) break;
+                        flips = res.map(f => ({ type: 'flip', sq: f.sq, score: f.score + flipBonus }));
+                        flipPlies = depth;
+                    }
+                    const cands = flips.slice();
+                    let alpha = -INF;
+                    for (const c of cands) {
+                        if (c.score > alpha) alpha = c.score;
+                    }
+                    if (order.length) {
+                        const t0 = performance.now();
+                        const res = Engine.searchMoves(st, side, depth, order, ctx, adjust, alpha, lv.margin);
+                        if (!res) break;
+                        moveMs = performance.now() - t0;
+                        for (const r of res) cands.push({ type: 'move', move: r.move, score: r.score });
+                        order = res.slice().sort((x, y) => y.score - x.score).map(r => r.move);
+                    }
+                    done = cands;
+                    let top = -INF;
+                    for (const c of cands) {
+                        if (c.score > top) top = c.score;
+                    }
+                    if (cands.length <= 1 || Math.abs(top) >= WIN_SCORE - 100) break;   // 只有一種走法，或已分出勝負
+                }
+                return done;
+            },
+
+            /**
+             * 防鬼打牆（電腦用）：這枚棋子走回自己最近待過的格子、或走出先前出現過的局面，依次數扣分；吃子不扣
+             */
+            loopPenalty(side, history) {
+                if (!history) return null;
+                const L = this.LOOP;
+                const seen = new Map();
+                for (const key of history.positions) seen.set(key, (seen.get(key) || 0) + 1);
+                const own = history.log.slice(-L.window).filter(e => e.color === side && e.kind !== 'flip');
+                return (board, m, captured) => {
+                    if (captured !== EMPTY) return 0;
+                    const from = m >> 5, to = m & 31, code = board[to];
+                    // 由近到遠追溯這枚棋子走過的格子（追到它上一次吃子為止：吃完退回原位不算繞圈）
+                    let revisits = 0, cur = from, steps = 0;
+                    for (let i = own.length - 1; i >= 0 && steps < L.trail; i--) {
+                        const e = own[i];
+                        if (e.to !== cur || e.code !== code) continue;
+                        if (e.kind === 'capture') break;
+                        cur = e.from;
+                        steps++;
+                        if (cur === to) revisits++;
+                    }
+                    const repeats = seen.get(positionKey(board, 1 - side)) || 0;
+                    return -Math.min(L.cap, L.revisit * revisits + L.repeat * repeats);
+                };
+            },
+
+            /**
+             * 提示用：只避開最近 16 手內出現過的局面（領先時加重）
+             */
+            repeatPenalty(side, history, baseEval) {
+                const recent = new Set(history ? history.positions.slice(-16) : []);
+                if (!recent.size) return null;
+                return board => (recent.has(positionKey(board, 1 - side)) ? (baseEval > 15 ? -25 : -4) : 0);
             }
         };
 
@@ -1615,12 +1767,13 @@
                 if (this.gameOver) return;
                 const seat = this.turn, player = this.PLAYERS[seat];
                 if (!player.isAI) return;
-                const action = BanqiAI.chooseAction(this.state, player.color, this.settings.difficulty, this.recentPositions());
+                const action = BanqiAI.chooseAction(this.state, player.color, this.settings.difficulty, this.aiHistory());
                 if (action) this.performAction(seat, action);
             }
 
-            recentPositions() {
-                return new Set(this.positionHistory.slice(-16));
+            // 給電腦參考的本局紀錄（避免重複走同樣的路線）
+            aiHistory() {
+                return { positions: this.positionHistory, log: this.moveLog };
             }
 
             /**
@@ -1894,7 +2047,7 @@
                     return;
                 }
                 const player = this.PLAYERS[this.turn];
-                const action = BanqiAI.chooseAction(this.state, player.color, 'hint', this.recentPositions());
+                const action = BanqiAI.chooseAction(this.state, player.color, 'hint', this.aiHistory());
                 if (!action) return;
                 this.hint = action;
                 this.selectedSq = -1;
