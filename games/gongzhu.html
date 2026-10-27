@@ -694,6 +694,237 @@
         }
 
         /**
+         * 拱豬電腦 AI：記牌（每張出過的牌、誰缺哪一門），把還沒出現的牌依缺門隨機發給其他三家，
+         * 每張能出的牌都把這一局模擬打完許多次，用正式計分（豬、羊、變壓器、收全紅、全吃）選平均得分最高的。
+         * 牌以整數表示：花色 S=0 H=1 C=2 D=3，c = 花色 * 13 + (點數 - 2)
+         */
+        const GongZhuAI = {
+            SUIT_INDEX: { S: 0, H: 1, C: 2, D: 3 },
+            PIG: 10, SHEEP: 48, TRANS: 34,           // ♠Q、♦J、♣10
+            HEART_POINTS: [0, 0, 0, -10, -10, -10, -10, -10, -10, -20, -30, -40, -50],   // ♥2 ~ ♥A
+            BUDGET_MS: 160, MIN_SAMPLES: 24, MAX_SAMPLES: 400,
+
+            toInt(card) { return this.SUIT_INDEX[card.suit] * 13 + card.rank - 2; },
+
+            /**
+             * view：{ me, legal, hand, trick: [{ p, card }], history: [[{ p, card } x4]], captured: [[card] x4], mode }
+             * 座位以出牌順序 0~3 表示；回傳 legal 裡的一張牌
+             */
+            choose(view) {
+                const legal = view.legal;
+                if (legal.length === 1) return legal[0];
+                const me = view.me;
+                const hand = view.hand.map(c => this.toInt(c));
+                const trick = view.trick.map(t => ({ p: t.p, c: this.toInt(t.card) }));
+                // 每家已出的張數、缺門
+                const played = new Array(4).fill(0);
+                const voids = [0, 0, 0, 0];             // bit s = 這家沒有花色 s
+                const seen = new Uint8Array(52);          // 自己的牌 + 出過的牌
+                const gone = new Uint8Array(52);          // 出過的牌
+                for (const c of hand) seen[c] = 1;
+                const noteTrick = tr => {
+                    const lead = Math.floor(tr[0].c / 13);
+                    for (const t of tr) {
+                        seen[t.c] = 1;
+                        gone[t.c] = 1;
+                        played[t.p]++;
+                        if (Math.floor(t.c / 13) !== lead) voids[t.p] |= 1 << lead;
+                    }
+                };
+                for (const tr of view.history) noteTrick(tr.map(t => ({ p: t.p, c: this.toInt(t.card) })));
+                if (trick.length) noteTrick(trick);
+                const goneBeforeTrick = gone.slice();
+                for (const t of trick) goneBeforeTrick[t.c] = 0;
+                const unseen = [];
+                for (let c = 0; c < 52; c++) if (!seen[c]) unseen.push(c);
+                const need = [0, 1, 2, 3].map(p => (p === me ? 0 : 13 - played[p]));
+                // 已吃的計分牌
+                const cap = view.captured.map(list => this.newCap(list.map(c => this.toInt(c))));
+
+                const cands = legal.map(c => this.toInt(c));
+                const sums = new Float64Array(cands.length);
+                const hands = [[], [], [], []];
+                const t0 = Date.now();
+                let n = 0;
+                for (; n < this.MAX_SAMPLES; n++) {
+                    if (n >= this.MIN_SAMPLES && Date.now() - t0 > this.BUDGET_MS) break;
+                    if (!this.deal(unseen, need, voids, me, hands)) break;
+                    hands[me] = hand;
+                    for (let i = 0; i < cands.length; i++) {
+                        sums[i] += this.playout(hands, trick, cands[i], me, cap, view.mode, goneBeforeTrick);
+                    }
+                }
+                // 平均分數相同時（例如同一門兩張相鄰的小牌）照快速策略的選擇
+                const pref = this.policy(me, hand, trick, cap, gone);
+                let best = 0, bestScore = -Infinity;
+                for (let i = 0; i < cands.length; i++) {
+                    const s = sums[i] / Math.max(1, n) + (cands[i] === pref ? 0.01 : 0);
+                    if (s > bestScore) { bestScore = s; best = i; }
+                }
+                return legal[best];
+            },
+
+            newCap(list) {
+                const c = { pig: false, sheep: false, trans: false, hearts: 0, heartSum: 0, any: false };
+                for (const x of list) this.addCap(c, x);
+                return c;
+            },
+            addCap(c, x) {
+                if (x === this.PIG) c.pig = true;
+                else if (x === this.SHEEP) c.sheep = true;
+                else if (x === this.TRANS) c.trans = true;
+                else if (x >= 13 && x < 26) { c.hearts++; c.heartSum += this.HEART_POINTS[x - 13]; }
+                else return;
+                c.any = true;
+            },
+            // 與 GongZhuGame.calculatePlayerScore 相同的算法
+            score(c, roundAllHearts, mode) {
+                if (!c.any) return 0;
+                if (c.trans && !c.pig && !c.sheep && c.hearts === 0) return 50;
+                const allHearts = c.hearts === 13;
+                if (allHearts && c.pig && c.sheep && c.trans) return mode === 'super_slam' ? 1000 : 800;
+                let base = allHearts ? 200 : c.heartSum;
+                const changed = allHearts || roundAllHearts;
+                if (c.pig) base += changed ? 100 : -100;
+                if (c.sheep) base += changed ? -100 : 100;
+                return c.trans ? base * 2 : base;
+            },
+
+            /**
+             * 依缺門把沒看到的牌隨機發給其他三家（限制最多的花色先發）；發不出來就回傳 false
+             */
+            deal(unseen, need, voids, me, hands) {
+                const order = unseen.slice();
+                for (let attempt = 0; attempt < 30; attempt++) {
+                    for (let i = order.length - 1; i > 0; i--) {
+                        const j = Math.floor(Math.random() * (i + 1));
+                        const x = order[i]; order[i] = order[j]; order[j] = x;
+                    }
+                    const elig = s => { let k = 0; for (let p = 0; p < 4; p++) if (p !== me && !(voids[p] >> s & 1)) k++; return k; };
+                    const e = [elig(0), elig(1), elig(2), elig(3)];
+                    order.sort((a, b) => e[Math.floor(a / 13)] - e[Math.floor(b / 13)]);
+                    const left = need.slice();
+                    for (let p = 0; p < 4; p++) hands[p] = [];
+                    let ok = true;
+                    for (const c of order) {
+                        const s = Math.floor(c / 13);
+                        let total = 0;
+                        for (let p = 0; p < 4; p++) if (p !== me && left[p] > 0 && !(voids[p] >> s & 1)) total += left[p];
+                        if (!total) { ok = false; break; }
+                        let r = Math.random() * total;
+                        for (let p = 0; p < 4; p++) {
+                            if (p === me || left[p] <= 0 || (voids[p] >> s & 1)) continue;
+                            r -= left[p];
+                            if (r < 0) { hands[p].push(c); left[p]--; break; }
+                        }
+                    }
+                    if (ok) return true;
+                    if (attempt === 25) voids = [0, 0, 0, 0];   // 推論有誤時退回不考慮缺門
+                }
+                return false;
+            },
+
+            /**
+             * 從目前這一墩接著把整局打完（me 先出 first），回傳 me 的得分
+             */
+            playout(hands0, trick0, first, me, cap0, mode, gone0) {
+                const hands = hands0.map(h => h.slice());
+                const cap = cap0.map(c => ({ ...c }));
+                const gone = gone0.slice();             // gone[c] = 1：這張牌已經出過
+                let trick = trick0.map(t => ({ p: t.p, c: t.c }));
+                for (const t of trick) gone[t.c] = 1;
+                let p = me;
+                let card = first;
+                for (;;) {
+                    const h = hands[p];
+                    h.splice(h.indexOf(card), 1);
+                    trick.push({ p, c: card });
+                    gone[card] = 1;
+                    if (trick.length === 4) {
+                        const lead = Math.floor(trick[0].c / 13);
+                        let w = trick[0];
+                        for (const t of trick) if (Math.floor(t.c / 13) === lead && t.c > w.c) w = t;
+                        for (const t of trick) this.addCap(cap[w.p], t.c);
+                        trick = [];
+                        p = w.p;
+                        if (!hands[p].length) break;
+                    } else {
+                        p = (p + 1) % 4;
+                    }
+                    card = this.policy(p, hands[p], trick, cap, gone);
+                }
+                const allHearts = cap.some(c => c.hearts === 13);
+                return this.score(cap[me], allHearts, mode);
+            },
+
+            /**
+             * 模擬用的快速出牌策略（只看自己的手牌與桌面）
+             */
+            policy(p, hand, trick, cap, gone) {
+                if (!trick.length) return this.lead(hand, gone);
+                const lead = Math.floor(trick[0].c / 13);
+                let lo = -1, hi = -1;
+                for (const c of hand) if (Math.floor(c / 13) === lead) { if (lo < 0 || c < lo) lo = c; if (c > hi) hi = c; }
+                if (lo < 0) return this.discard(hand, gone);
+                if (lo === hi) return lo;
+                let win = trick[0].c, pts = 0, hasPig = false, hasSheep = false;
+                for (const t of trick) {
+                    if (Math.floor(t.c / 13) === lead && t.c > win) win = t.c;
+                    if (t.c === this.PIG) hasPig = true;
+                    else if (t.c === this.SHEEP) hasSheep = true;
+                    else if (t.c >= 13 && t.c < 26) pts += this.HEART_POINTS[t.c - 13];
+                }
+                const last = trick.length === 3;
+                // 手上有豬、桌上已有比豬大的黑桃：送豬
+                if (lead === 0 && hand.includes(this.PIG) && win > this.PIG) return this.PIG;
+                // 羊在桌上而且沒有豬、紅心不多：用最大的牌搶
+                if (hasSheep && !hasPig && pts > -60 && hi > win) return hi;
+                // 能閃就出不會贏的最大牌
+                let duck = -1;
+                for (const c of hand) if (Math.floor(c / 13) === lead && c < win && c > duck) duck = c;
+                if (duck >= 0) return duck;
+                // 閃不掉：最後一家而且沒有分數，就用最大的牌收下（豬除外）
+                if (last && !hasPig && pts === 0) {
+                    for (let c = hi; c >= lo; c--) if (hand.includes(c) && c !== this.PIG) return c;
+                }
+                // 否則出最小的（期待後面的人蓋過）
+                if (lo === this.PIG) { for (const c of hand) if (Math.floor(c / 13) === lead && c !== this.PIG) return c; }
+                return lo;
+            },
+
+            lead(hand, gone) {
+                const pigOut = !gone[this.PIG] && !hand.includes(this.PIG);
+                let best = hand[0], bs = Infinity;
+                for (const c of hand) {
+                    const s = Math.floor(c / 13), r = c % 13;
+                    let v = r;
+                    if (s === 1) v += 6;                                  // 紅心盡量晚出
+                    if (s === 0 && pigOut && r >= 10) v += 20;            // 豬還在外面：別領 ♠Q 以上
+                    if (c === this.PIG) v += 25;
+                    if (c === this.SHEEP) v += 15;
+                    if (c === this.TRANS) v += 4;
+                    if (v < bs) { bs = v; best = c; }
+                }
+                return best;
+            },
+
+            discard(hand, gone) {
+                if (hand.includes(this.PIG)) return this.PIG;
+                let best = hand[0], bs = -Infinity;
+                const pigOut = !gone[this.PIG];
+                for (const c of hand) {
+                    const s = Math.floor(c / 13), r = c % 13;
+                    let v = r;
+                    if (s === 1) v += 8 + (r >= 3 ? 6 : 0);              // 有分的紅心先墊
+                    if (s === 0 && r >= 11 && pigOut) v += 12;            // ♠K、♠A 在豬還沒出時很危險
+                    if (c === this.SHEEP) v -= 30;                        // 羊留給自己
+                    if (v > bs) { bs = v; best = c; }
+                }
+                return best;
+            }
+        };
+
+        /**
          * 拱豬主遊戲控制器
          */
         class GongZhuGame {
@@ -745,6 +976,7 @@
                 this.isProcessingTrick = false;
                 this.roundHistory = [];
                 this.hintCardId = null;
+                this.trickHistory = []; // 本局已打完的每一墩（電腦記牌用）
             }
 
             /**
@@ -977,6 +1209,7 @@
                 this.currentTrick = [];
                 this.isProcessingTrick = false;
                 this.hintCardId = null;
+                this.trickHistory = [];
 
                 // 清空桌面出牌區
                 for (const seat of this.SEAT_ORDER) {
@@ -1093,104 +1326,19 @@
             }
 
             /**
-             * 電腦 AI 智慧出牌決策邏輯
+             * 電腦出牌（出牌提示也用這個）：交給 GongZhuAI，只提供自己的手牌與桌上公開的資訊
              */
             chooseBestCardForAI(seat) {
-                const legalCards = this.getLegalCards(seat);
-                if (legalCards.length === 1) return legalCards[0];
-
-                // 情況 A：AI 是本墩首出玩家
-                if (this.currentTrick.length === 0) {
-                    // 避免主動領出黑桃 A/K 或大紅心，優先出梅花、小方塊或安全小牌
-                    const safeLeads = legalCards.filter(c => {
-                        if (c.suit === 'S' && c.rank >= 12) return false; // 不主動出 ♠Q/K/A
-                        if (c.suit === 'H' && c.rank >= 10) return false; // 不主動出大紅心
-                        return true;
-                    });
-                    const pool = safeLeads.length > 0 ? safeLeads : legalCards;
-                    // 選點數偏小的安全牌領出
-                    pool.sort((a, b) => a.rank - b.rank);
-                    return pool[0];
-                }
-
-                // 判斷目前桌面上領先的牌與計分風險
-                const leadSuit = this.leadSuit;
-                const highestInLeadSuit = Math.max(
-                    ...this.currentTrick.filter(t => t.card.suit === leadSuit).map(t => t.card.rank)
-                );
-                const trickHasPig = this.currentTrick.some(t => t.card.id === 'S12');
-                const trickHasSheep = this.currentTrick.some(t => t.card.id === 'D11');
-                const trickHeartsPenalty = this.currentTrick
-                    .filter(t => t.card.suit === 'H')
-                    .reduce((sum, t) => sum + this.getHeartPoint(t.card.rank), 0);
-
-                const isFollowingSuit = legalCards[0].suit === leadSuit;
-
-                // 情況 B：AI 有首出花色（必須跟花色）
-                if (isFollowingSuit) {
-                    const lowerCards = legalCards.filter(c => c.rank < highestInLeadSuit).sort((a, b) => b.rank - a.rank);
-                    const higherCards = legalCards.filter(c => c.rank > highestInLeadSuit).sort((a, b) => a.rank - b.rank);
-
-                    // 若桌面有方塊 J (羊 +100) 且無豬，嘗試用大牌吃下來
-                    if (trickHasSheep && !trickHasPig && higherCards.length > 0) {
-                        return higherCards[higherCards.length - 1];
-                    }
-
-                    // 若是黑桃局，且桌面還沒出 ♠Q，自己手上有 ♠Q 且能安全送出嗎？(只有在有人已經出了 ♠K 或 ♠A 時直接灌豬！)
-                    const pigCard = legalCards.find(c => c.id === 'S12');
-                    if (pigCard && highestInLeadSuit > 12) {
-                        return pigCard; // 直接拱豬給出 K 或 A 的人！
-                    }
-
-                    // 防守「收全紅 / 全吃大滿貫」：若場上有其他玩家已吃超過 8 張紅心且其他人都是 0 張紅心，AI 嘗試搶下 1 張小紅心破全紅
-                    const trickHasHearts = this.currentTrick.some(t => t.card.suit === 'H');
-                    if (trickHasHearts && !trickHasPig && higherCards.length > 0) {
-                        const someoneNearMoon = this.SEAT_ORDER.some(s => s !== seat && this.PLAYERS[s].captured.filter(c => c.suit === 'H').length >= 8);
-                        const othersHaveHeart = this.SEAT_ORDER.filter(s => this.PLAYERS[s].captured.some(c => c.suit === 'H')).length > 1;
-                        if (someoneNearMoon && !othersHaveHeart && trickHeartsPenalty >= -20) {
-                            return higherCards[0];
-                        }
-                    }
-
-                    // 若有比目前最大牌還小的牌，優先打出最大的安全牌（閃避吃墩）
-                    if (lowerCards.length > 0) {
-                        // 但別在還沒人出 K/A 時把 ♠Q 當小牌打出
-                        const nonPigLow = lowerCards.filter(c => c.id !== 'S12');
-                        if (nonPigLow.length > 0) return nonPigLow[0];
-                        return lowerCards[0];
-                    }
-
-                    // 若全都是比桌面大的牌（被迫壓牌）：
-                    // 若是最後一家（第4家）且桌面無負分，可出最大牌順手脫手高危大牌（但避開自吃 ♠Q）
-                    const nonPigHigh = higherCards.filter(c => c.id !== 'S12');
-                    const pool = nonPigHigh.length > 0 ? nonPigHigh : higherCards;
-                    if (this.currentTrick.length === 3 && !trickHasPig && trickHeartsPenalty === 0) {
-                        return pool[pool.length - 1];
-                    }
-                    // 否則出最小的大牌
-                    return pool[0];
-                }
-
-                // 情況 C：AI 無首出花色（墊牌良機！不會贏得本墩）
-                // 優先順序：1. 墊掉黑桃 Q (豬) -> 2. 墊掉大紅心 (♥A, ♥K, ♥Q, ♥J) -> 3. 墊掉黑桃 A/K -> 4. 墊掉點數最大的危險牌
-                const pig = legalCards.find(c => c.id === 'S12');
-                if (pig) return pig;
-
-                const highHearts = legalCards
-                    .filter(c => c.suit === 'H' && c.rank >= 11)
-                    .sort((a, b) => b.rank - a.rank);
-                if (highHearts.length > 0) return highHearts[0];
-
-                const dangerousSpades = legalCards
-                    .filter(c => c.suit === 'S' && c.rank >= 13)
-                    .sort((a, b) => b.rank - a.rank);
-                if (dangerousSpades.length > 0) return dangerousSpades[0];
-
-                // 避免把方塊 J (羊) 墊給別人，挑選其餘點數最大的牌墊掉
-                const nonSheep = legalCards.filter(c => c.id !== 'D11');
-                const dumpPool = nonSheep.length > 0 ? nonSheep : legalCards;
-                dumpPool.sort((a, b) => b.rank - a.rank);
-                return dumpPool[0];
+                const idx = s => this.SEAT_ORDER.indexOf(s);
+                return GongZhuAI.choose({
+                    me: idx(seat),
+                    legal: this.getLegalCards(seat),
+                    hand: this.PLAYERS[seat].hand,
+                    trick: this.currentTrick.map(t => ({ p: idx(t.seat), card: t.card })),
+                    history: this.trickHistory.map(tr => tr.map(t => ({ p: idx(t.seat), card: t.card }))),
+                    captured: this.SEAT_ORDER.map(s => this.PLAYERS[s].captured),
+                    mode: this.scoringRuleMode
+                });
             }
 
             /**
@@ -1238,6 +1386,7 @@
 
                 const winnerSeat = winningEntry.seat;
                 const winnerPlayer = this.PLAYERS[winnerSeat];
+                this.trickHistory.push(this.currentTrick.slice());
 
                 // 標示贏家出的那張牌
                 const winnerSlot = document.getElementById(`trick-slot-${winnerSeat}`);

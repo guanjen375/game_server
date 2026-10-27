@@ -125,7 +125,8 @@ dialog{max-height:calc(var(--app-h)*.88)}dialog[open]{display:flex;flex-directio
  * Bombs cut any ordinary hand, regardless of card count. A plain flush is invalid.
  * Straight order: A2345 < 34567 … 10JQKA < 23456; no other wraparound straights.
  * Passing locks a seat out until the trick resets; later plays do not clear passes.
- * legalMoves returns combo objects; chooseMove returns an array of cards or null.
+ * legalMoves returns combo objects; chooseMove returns an array of cards or null (pass).
+ * chooseMove(hand, lastPlay, { round, seat }) reads only public information from the round.
  */
 (function (root) {
   'use strict';
@@ -261,73 +262,394 @@ dialog{max-height:calc(var(--app-h)*.88)}dialog[open]{display:flex;flex-directio
     return result.sort(compareCombos);
   }
 
-  // Exact hand partitioning helps the AI shed groups while keeping useful combinations.
-  // The search has at most 2^13 states and uses only cards in its own hand.
-  function partitionPlanner(hand) {
-    const indexes = new Map(hand.map((card, index) => [card.id, index]));
-    const buckets = hand.map(() => []);
-    const maskOf = cards => cards.reduce((mask, card) => mask | (1 << indexes.get(card.id)), 0);
-    for (const combo of legalMoves(hand)) {
-      const mask = maskOf(combo.cards);
-      for (let i = 0; i < hand.length; i++) if (mask & (1 << i)) buckets[i].push({ mask, size: combo.size });
+  // ---------------------------------------------------------------------------
+  // Computer player. It only uses public information: its own hand, the cards
+  // already played, each seat's card count and who has passed in this trick.
+  //  1. A planner splits the hand into combos. Combos the unseen cards cannot
+  //     beat are cheap to keep because they win the lead back.
+  //  2. The planner ranks the candidate plays (and passing).
+  //  3. The best few are compared by Monte Carlo: deal the unseen cards to the
+  //     other hands at random, play each candidate out with a fast policy, and
+  //     keep the one with the best average score.
+  // ---------------------------------------------------------------------------
+  const DECK = createDeck();
+  const cardKey = card => rankValue(card.rank) * 4 + suitValue(card.suit);   // 0..51 in game order
+  // The five rank values of each straight (A2345 lowest ... 23456 highest) and of its high card.
+  const STRAIGHT_RANKS = [[11, 12, 0, 1, 2]];
+  for (let k = 1; k <= 8; k++) STRAIGHT_RANKS.push([k - 1, k, k + 1, k + 2, k + 3]);
+  STRAIGHT_RANKS.push([12, 0, 1, 2, 3]);
+  const STRAIGHT_HIGH = [2, 4, 5, 6, 7, 8, 9, 10, 11, 3];
+
+  function unseenInfo(hand, played) {
+    const seen = new Set(hand.map(card => card.id).concat(played));
+    const info = { has: new Array(52).fill(false), count: new Array(13).fill(0), top: new Array(13).fill(-1), size: 0 };
+    for (const card of DECK) {
+      if (seen.has(card.id)) continue;
+      const rank = rankValue(card.rank), suit = suitValue(card.suit);
+      info.has[rank * 4 + suit] = true;
+      info.count[rank]++;
+      info.top[rank] = Math.max(info.top[rank], suit);
+      info.size++;
     }
-    buckets.forEach(bucket => bucket.sort((a, b) => b.size - a.size));
-    const memo = new Map([[0, 0]]);
-    function minimumTurns(mask) {
-      if (memo.has(mask)) return memo.get(mask);
-      let first = 0;
-      while (!(mask & (1 << first))) first++;
-      let best = hand.length;
-      for (const group of buckets[first]) {
-        if ((group.mask & mask) === group.mask) {
-          best = Math.min(best, 1 + minimumTurns(mask ^ group.mask));
-          if (best === 1) break;
-        }
-      }
-      memo.set(mask, best);
-      return best;
-    }
-    return { maskOf, minimumTurns, fullMask: (1 << hand.length) - 1 };
+    return info;
   }
 
-  function chooseMove(hand, target = null, options = {}) {
-    const moves = legalMoves(hand, target, !!options.mustIncludeC3);
-    if (!moves.length) return null;
-    const winningMove = moves.find(move => move.size === hand.length);
-    if (winningMove) return winningMove.cards.slice();
-    const previous = targetCombo(target);
-    if (previous && previous.type === 'single' && options.opponentMin === 1) {
-      const singles = moves.filter(move => move.type === 'single');
-      if (singles.length) return singles[singles.length - 1].cards.slice();
+  function straightIn(unseen, order, minHighSuit = -1, flushSuit = -1) {
+    for (const rank of STRAIGHT_RANKS[order]) {
+      if (flushSuit >= 0 ? !unseen.has[rank * 4 + flushSuit] : !unseen.count[rank]) return false;
+    }
+    if (minHighSuit < 0) return true;
+    if (flushSuit >= 0) return flushSuit > minHighSuit;
+    for (let suit = minHighSuit + 1; suit < 4; suit++) if (unseen.has[STRAIGHT_HIGH[order] * 4 + suit]) return true;
+    return false;
+  }
+
+  function straightFlushIn(unseen, minOrder = 0, minSuit = -1) {
+    for (let order = minOrder; order < 10; order++) {
+      for (let suit = 0; suit < 4; suit++) {
+        if ((order > minOrder || suit > minSuit) && straightIn(unseen, order, -1, suit)) return true;
+      }
+    }
+    return false;
+  }
+
+  // How many different ways the unseen cards could beat `combo` with the same type
+  // (capped at 6). Zero means nobody can answer it; bombs are ignored as too rare.
+  function threatCount(combo, unseen) {
+    const [a, b] = combo.key;
+    let n = 0;
+    switch (combo.type) {
+      case 'single':
+        for (let key = a * 4 + b + 1; key < 52 && n < 6; key++) if (unseen.has[key]) n++;
+        return n;
+      case 'pair':
+        for (let rank = a; rank < 13; rank++) if (unseen.count[rank] >= 2 && (rank > a || unseen.top[rank] > b)) n += 2;
+        return Math.min(n, 6);
+      case 'straight':
+        for (let order = a; order < 10; order++) if (straightIn(unseen, order, order === a ? b : -1)) n += 2;
+        return Math.min(n, 6);
+      case 'fullhouse':
+        for (let rank = a + 1; rank < 13; rank++) {
+          if (unseen.count[rank] >= 3 && unseen.count.some((count, other) => other !== rank && count >= 2)) n += 2;
+        }
+        return Math.min(n, 6);
+      case 'four':
+        return unseen.count.some((count, rank) => rank > a && count === 4) || straightFlushIn(unseen) ? 2 : 0;
+      case 'straightflush':
+        return straightFlushIn(unseen, a, b) ? 2 : 0;
+      default:
+        return 0;
+    }
+  }
+
+  // A combo is a boss when none of the given opponents can answer it.
+  const isBoss = (combo, unseen, counts) => !counts.some(count => count >= combo.size) || threatCount(combo, unseen) === 0;
+
+  // Split the hand into combos at the lowest cost: a boss costs 0.25 (it wins the lead back),
+  // other combos cost 0.4 to 1 depending on how many ways they can be beaten.
+  function makePlanner(hand, unseen, counts) {
+    const index = new Map(hand.map((card, i) => [card.id, i]));
+    const maskOf = cards => cards.reduce((mask, card) => mask | (1 << index.get(card.id)), 0);
+    const groups = legalMoves(hand).map(combo => {
+      const boss = isBoss(combo, unseen, counts);
+      const cost = boss ? 0.25 : 1 - 0.6 * Math.max(0, 1 - threatCount(combo, unseen) / 6);
+      return { combo, mask: maskOf(combo.cards), boss, cost };
+    });
+    // each group is filed under its lowest card, so every partition is tried exactly once
+    const buckets = hand.map(() => []);
+    for (const group of groups) buckets[31 - Math.clz32(group.mask & -group.mask)].push(group);
+    const memo = new Map([[0, { cost: 0, count: 0, group: null }]]);
+    function best(mask) {
+      let result = memo.get(mask);
+      if (result) return result;
+      const first = 31 - Math.clz32(mask & -mask);
+      result = { cost: Infinity, count: 0, group: null };
+      for (const group of buckets[first]) {
+        if ((group.mask & mask) !== group.mask) continue;
+        const rest = best(mask ^ group.mask);
+        const cost = group.cost + rest.cost, count = rest.count + 1;
+        if (cost < result.cost - 1e-9 || (Math.abs(cost - result.cost) < 1e-9 && count < result.count)) result = { cost, count, group };
+      }
+      memo.set(mask, result);
+      return result;
+    }
+    function plan(mask) {
+      const list = [];
+      for (; mask; mask ^= best(mask).group.mask) list.push(best(mask).group);
+      return list;
+    }
+    return { groups, maskOf, best, plan, full: (1 << hand.length) - 1 };
+  }
+
+  // lower = weaker, the kind of combo to get rid of first
+  function weakness(combo) {
+    const [a, b = 0] = combo.key;
+    switch (combo.type) {
+      case 'single': return a + b / 4;
+      case 'pair': return a + b / 4 - 1.5;
+      case 'straight': return a * 1.2 - 4;
+      case 'fullhouse': return a - 4;
+      default: return 20 + (a || 0);
+    }
+  }
+
+  // Score every candidate with the planner (higher = better). Passing is { cards: null }.
+  function rankMoves(view) {
+    const { hand, played, counts, seat, passed, opening } = view;
+    const target = view.target;
+    const moves = legalMoves(hand, target, opening);
+    if (!moves.length) return target ? [{ cards: null, score: 0 }] : [];
+    const finishing = moves.find(move => move.size === hand.length);
+    if (finishing) return [{ cards: finishing.cards, score: Infinity }];
+
+    const unseen = unseenInfo(hand, played);
+    const opponents = [1, 2, 3].map(d => (seat + d) % 4);
+    const oppCounts = opponents.map(s => counts[s]);
+    const minOpp = Math.min(...oppCounts);
+    const planner = makePlanner(hand, unseen, oppCounts);
+    const before = planner.best(planner.full);
+    const plan = planner.plan(planner.full);
+    const weak = plan.filter(group => !group.boss).length;
+    const groupOf = new Map(planner.groups.map(group => [group.mask, group]));
+    const inPlan = new Set(plan.map(group => group.mask));
+
+    if (!target) {
+      const danger = oppCounts.some(count => count <= 2);
+      return moves.map(move => {
+        const mask = planner.maskOf(move.cards);
+        const boss = groupOf.get(mask).boss;
+        let s = planner.best(planner.full ^ mask).cost * 10 + weakness(move) * 0.3 - move.size * 0.6;
+        if (weak <= 1 && !opening) s -= boss ? 50 : 0;                   // can run out: cash the bosses first
+        if (danger && !boss) {                                           // never hand a nearly-finished player an easy lead
+          if (move.size === 1 && oppCounts.includes(1)) s += 30 - weakness(move) * 1.5;
+          if (move.size === 2 && oppCounts.includes(2)) s += 12 - weakness(move) * 0.5;
+        }
+        if (isBomb(move) && weak > 1) s += 25;                           // keep bombs unless they finish the job
+        return { cards: move.cards, score: -s };
+      }).sort((x, y) => y.score - x.score);
     }
 
-    // Bigger custom hands still receive a legal move without using a bit-mask search.
-    if (hand.length > 13) return (previous ? moves[0] : moves[moves.length - 1]).cards.slice();
-    const planner = partitionPlanner(hand);
-    const counts = new Map();
-    hand.forEach(card => counts.set(card.rank, (counts.get(card.rank) || 0) + 1));
-    let best = moves[0];
-    let bestScore = Infinity;
-    moves.forEach((move, index) => {
-      const remainingMask = planner.fullMask ^ planner.maskOf(move.cards);
-      const remainingTurns = planner.minimumTurns(remainingMask);
-      const used = new Map();
-      move.cards.forEach(card => used.set(card.rank, (used.get(card.rank) || 0) + 1));
-      let splitPenalty = 0;
-      used.forEach((count, rank) => {
-        if (counts.get(rank) > count) splitPenalty += counts.get(rank) - 1;
+    const active = opponents.filter(s => !passed[s]).map(s => counts[s]);
+    const threat = view.lastSeat !== null && view.lastSeat !== seat ? counts[view.lastSeat] : 99;
+    const danger = threat <= 2 || (threat <= 3 && target.size >= 2) || minOpp <= 1;
+    const behind = weak >= minOpp + 2 && minOpp <= 5;                    // cannot outrun them: every card left costs points
+    const ranked = [{ cards: null, score: 0 }];
+    for (const move of moves) {
+      const mask = planner.maskOf(move.cards);
+      const rest = planner.best(planner.full ^ mask);
+      let score = before.cost - rest.cost;                               // shedding without needing the lead
+      const wins = isBoss(move, unseen, active);
+      if (wins) score += 0.55;
+      if (groupOf.get(mask).boss || isBomb(move)) {
+        // spending a boss or bomb only pays off when we can then run out, or to stop someone
+        const restPlan = planner.plan(planner.full ^ mask);
+        const restWeak = restPlan.filter(group => !group.boss).length;
+        if (restWeak > restPlan.length - restWeak + 1 && !danger) score -= isBomb(move) ? 2.5 : 0.9;
+      }
+      if (!inPlan.has(mask)) score -= 0.15;
+      if (danger) score += wins ? 3 : 1;
+      if (behind) score += 0.35 * move.size;
+      ranked.push({ cards: move.cards, score });
+    }
+    return ranked.sort((x, y) => y.score - x.score);
+  }
+
+  // ----- fast playouts on integer cards (combo = { type, size, value, bomb tier, keys }) -----
+  const SINGLE = 1, PAIR = 2, STRAIGHT = 5, FULLHOUSE = 6, FOUR = 7, STRAIGHTFLUSH = 8, DRAGON = 13;
+  const fastBeats = (a, b) => !b || (a.bomb ? !b.bomb || a.bomb > b.bomb || (a.bomb === b.bomb && a.value > b.value)
+    : !b.bomb && a.type === b.type && a.value > b.value);
+
+  function fastCombo(cards) {
+    const combo = classify(cards);
+    const type = { single: SINGLE, pair: PAIR, straight: STRAIGHT, fullhouse: FULLHOUSE, four: FOUR, straightflush: STRAIGHTFLUSH, dragon: DRAGON }[combo.type];
+    const bomb = { four: 1, straightflush: 2, dragon: 3 }[combo.type] || 0;
+    const value = combo.key.length === 2 ? combo.key[0] * 4 + combo.key[1] : combo.key[0] || 0;
+    return { type, size: cards.length, value, bomb, keys: cards.map(cardKey) };
+  }
+
+  // Greedy split used in playouts: fours, straights built from lone cards, full houses, pairs, singles.
+  function fastPartition(keys) {
+    const byRank = Array.from({ length: 13 }, () => []);
+    for (const key of keys) byRank[key >> 2].push(key);
+    if (keys.length === 13 && byRank.every(cards => cards.length === 1)) return [{ type: DRAGON, size: 13, value: 0, bomb: 3, keys: keys.slice() }];
+    const out = [], fours = [];
+    for (let r = 0; r < 13; r++) if (byRank[r].length === 4) { fours.push(byRank[r]); byRank[r] = []; }
+    for (let pass = 0; pass < 2; pass++) {
+      for (let order = 0; order < 10; order++) {
+        const ranks = STRAIGHT_RANKS[order];
+        if (!ranks.every(r => byRank[r].length) || ranks.filter(r => byRank[r].length === 1).length < 3) continue;
+        const cards = ranks.map(r => byRank[r].shift());
+        const high = cards[ranks.indexOf(STRAIGHT_HIGH[order])];
+        const flush = cards.every(key => (key & 3) === (cards[0] & 3));
+        out.push({ type: flush ? STRAIGHTFLUSH : STRAIGHT, size: 5, value: order * 4 + (high & 3), bomb: flush ? 2 : 0, keys: cards });
+        break;
+      }
+    }
+    const pairRanks = [];
+    for (let r = 0; r < 13; r++) if (byRank[r].length === 2) pairRanks.push(r);
+    for (let r = 0; r < 13; r++) {
+      if (byRank[r].length !== 3 || !pairRanks.length) continue;
+      const p = pairRanks.shift();
+      out.push({ type: FULLHOUSE, size: 5, value: r, bomb: 0, keys: byRank[r].concat(byRank[p]) });
+      byRank[r] = []; byRank[p] = [];
+    }
+    for (let r = 0; r < 13; r++) {
+      const cards = byRank[r];
+      if (cards.length === 3) {
+        out.push({ type: PAIR, size: 2, value: r * 4 + (cards[2] & 3), bomb: 0, keys: [cards[1], cards[2]] });
+        out.push({ type: SINGLE, size: 1, value: cards[0], bomb: 0, keys: [cards[0]] });
+      } else if (cards.length === 2) {
+        out.push({ type: PAIR, size: 2, value: r * 4 + (cards[1] & 3), bomb: 0, keys: cards });
+      } else if (cards.length === 1) {
+        out.push({ type: SINGLE, size: 1, value: cards[0], bomb: 0, keys: cards });
+      }
+    }
+    for (const four of fours) {
+      let kicker = -1;
+      out.forEach((combo, i) => { if (combo.type === SINGLE && (kicker < 0 || combo.value < out[kicker].value)) kicker = i; });
+      if (kicker >= 0) out.push({ type: FOUR, size: 5, value: four[0] >> 2, bomb: 1, keys: four.concat(out.splice(kicker, 1)[0].keys) });
+      else out.push({ type: PAIR, size: 2, value: four[1], bomb: 0, keys: four.slice(0, 2) }, { type: PAIR, size: 2, value: four[3], bomb: 0, keys: four.slice(2) });
+    }
+    return out;
+  }
+
+  const fastWeakness = c => c.bomb ? 100 + c.value : c.type === SINGLE ? c.value / 4 : c.type === PAIR ? c.value / 4 - 1.5
+    : c.type === STRAIGHT ? (c.value >> 2) * 1.2 - 4 : c.value - 4;
+
+  function fastPolicy(groups, hand, target, lastSeat, seat, counts) {
+    if (!target) {
+      if (groups.length === 1) return groups[0];
+      const oneLeft = [1, 2, 3].some(d => counts[(seat + d) % 4] === 1);
+      let best = null, bestScore = Infinity;
+      for (const c of groups) {
+        let s = fastWeakness(c) - c.size * 0.6 + (c.bomb ? 30 : 0);
+        if (oneLeft && c.type === SINGLE) s = 50 - c.value / 4;
+        if (s < bestScore) { bestScore = s; best = c; }
+      }
+      return best;
+    }
+    let best = null;
+    for (const c of groups) if (!c.bomb && c.type === target.type && fastBeats(c, target) && (!best || c.value < best.value)) best = c;
+    if (!best && counts[lastSeat] <= 2) {
+      // someone is about to go out: break a combo or bomb to stop them
+      if (target.type === SINGLE) {
+        for (let i = hand.length - 1; i >= 0 && !best; i--) if (hand[i] > target.value) best = { type: SINGLE, size: 1, value: hand[i], bomb: 0, keys: [hand[i]] };
+      }
+      if (!best) best = groups.find(c => c.bomb && fastBeats(c, target)) || null;
+    }
+    return best;
+  }
+
+  const penalty = n => n * (n === 13 ? 3 : n >= 10 ? 2 : 1);
+
+  // Play a round out; returns the score change of seat `me`.
+  function playout(state, me) {
+    const hands = state.hands, groups = hands.map(fastPartition), counts = hands.map(hand => hand.length);
+    const passed = state.passed.slice();
+    let { turn, target, lastSeat, passes } = state;
+    for (let guard = 0; guard < 400; guard++) {
+      const combo = fastPolicy(groups[turn], hands[turn], target, lastSeat, turn, counts);
+      if (combo) {
+        const hand = hands[turn];
+        for (const key of combo.keys) hand.splice(hand.indexOf(key), 1);
+        counts[turn] = hand.length;
+        if (!hand.length) {
+          if (turn !== me) return -penalty(counts[me]);
+          return counts.reduce((sum, count, s) => sum + (s === me ? 0 : penalty(count)), 0);
+        }
+        groups[turn] = groups[turn].filter(c => c !== combo);
+        target = combo;
+        lastSeat = turn;
+      } else {
+        passed[turn] = true;
+        if (++passes === 3) {
+          target = null; passes = 0; passed.fill(false); turn = lastSeat;
+          continue;
+        }
+      }
+      do turn = (turn + 1) % 4; while (passed[turn]);
+    }
+    return 0;
+  }
+
+  // Public information for `seat`; never looks inside the other hands.
+  function viewOf(round, seat) {
+    const played = [];
+    for (const action of round.actions) if (action.type === 'play') action.cards.forEach(card => played.push(card.id));
+    return {
+      hand: round.hands[seat], seat, played, opening: round.opening,
+      target: round.lastPlay ? round.lastPlay.combo : null, lastSeat: round.lastPlay ? round.lastPlay.seat : null,
+      counts: round.hands.map(hand => hand.length), passed: round.passed.slice(), passes: round.passes
+    };
+  }
+
+  const AI_BUDGET_MS = 150, AI_CANDIDATES = 7, AI_MIN_SAMPLES = 30, AI_MAX_SAMPLES = 400;
+
+  function chooseFromView(view) {
+    if (view.hand.length > 13) {
+      // custom deals with more than 13 cards: the bit-mask planner is sized for one normal hand
+      const moves = legalMoves(view.hand, view.target, view.opening);
+      return moves.length ? (view.target ? moves[0] : moves[moves.length - 1]).cards.slice() : null;
+    }
+    const ranked = rankMoves(view);
+    if (!ranked.length) return null;
+    if (ranked.length === 1 || ranked[0].score === Infinity) return ranked[0].cards ? ranked[0].cards.slice() : null;
+    const candidates = ranked.slice(0, AI_CANDIDATES);
+    if (view.target && !candidates.some(c => !c.cards)) candidates.push({ cards: null });
+    const me = view.seat;
+    const myKeys = view.hand.map(cardKey);
+    const seen = new Set(myKeys.concat(DECK.filter(card => view.played.includes(card.id)).map(cardKey)));
+    const unseen = [];
+    for (let key = 0; key < 52; key++) if (!seen.has(key)) unseen.push(key);
+    const target = view.target ? fastCombo(view.target.cards) : null;
+    const combos = candidates.map(c => (c.cards ? fastCombo(c.cards) : null));
+    const totals = new Array(candidates.length).fill(0);
+    const start = Date.now();
+    for (let n = 0; n < AI_MAX_SAMPLES && (n < AI_MIN_SAMPLES || Date.now() - start < AI_BUDGET_MS); n++) {
+      for (let i = unseen.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [unseen[i], unseen[j]] = [unseen[j], unseen[i]];
+      }
+      const dealt = [[], [], [], []];
+      let used = 0;
+      for (let d = 1; d <= 3; d++) {
+        const s = (me + d) % 4;
+        dealt[s] = unseen.slice(used, used + view.counts[s]);
+        used += view.counts[s];
+      }
+      combos.forEach((combo, i) => {
+        const hands = dealt.map(hand => hand.slice());
+        hands[me] = myKeys.slice();
+        const state = { hands, turn: me, target, lastSeat: view.lastSeat === null ? me : view.lastSeat, passed: view.passed.slice(), passes: view.passes };
+        if (combo) {
+          for (const key of combo.keys) hands[me].splice(hands[me].indexOf(key), 1);
+          state.target = combo;
+          state.lastSeat = me;
+        } else {
+          state.passed[me] = true;
+          if (++state.passes === 3) {
+            Object.assign(state, { target: null, passes: 0, turn: state.lastSeat });
+            state.passed.fill(false);
+          }
+        }
+        if (state.turn === me) do state.turn = (state.turn + 1) % 4; while (state.passed[state.turn]);
+        totals[i] += playout(state, me);
       });
-      const strength = index / moves.length;
-      let score = previous
-        ? remainingTurns * 2 + strength * 2.8 + splitPenalty * 0.25
-        : remainingTurns * 30 - move.size * 2 + strength + splitPenalty * 0.1;
-      // Preserve a bomb when an ordinary response is available, unless it wins now.
-      if (previous && !isBomb(previous) && isBomb(move)) score += 10;
-      // When an opponent is nearly out, lead a group if possible, or the strongest single.
-      if (!previous && options.opponentMin === 1 && move.size === 1) score += 20 - strength * 6;
-      if (score < bestScore) { bestScore = score; best = move; }
+    }
+    let best = 0;
+    totals.forEach((total, i) => { if (total > totals[best]) best = i; });
+    return candidates[best].cards ? candidates[best].cards.slice() : null;
+  }
+
+  // options.round + options.seat give the full public view; the older options still work for custom hands.
+  function chooseMove(hand, target = null, options = {}) {
+    if (options.round) return chooseFromView(viewOf(options.round, options.seat));
+    const counts = [hand.length, 13, 13, 13];
+    if (options.opponentMin) counts[1] = options.opponentMin;
+    return chooseFromView({
+      hand, seat: 0, played: [], opening: !!options.mustIncludeC3, target: targetCombo(target),
+      lastSeat: target ? 1 : null, counts, passed: [false, false, false, false], passes: 0
     });
-    return best.cards.slice();
   }
 
   class Round {
@@ -540,8 +862,8 @@ class BigTwoApp {
   performPlay(seat,cards){const combo=BigTwo.classify(cards);const newLead=!this.round.opening&&!this.round.lastPlay;const out=this.round.play(seat,cards);if(!out.ok){this.toast(out.error);return false;}if(newLead)this.lastActions=Array(4).fill(null);this.lastActions[seat]={type:'play',label:combo.name+' '+cards.map(c=>SUITS[c.suit].symbol+c.label).join(' ')};if(seat===0)this.selected.clear();this.hintKey='';this.tone(combo.size===5?740:560,.1);if(this.round.over){this.finish();return true;}this.render();this.scheduleAI();return true;}
   pass(){if(this.modal||this.round.over||this.round.turn!==0||this.round.passed[0])return;if(!this.round.lastPlay){this.toast('輪到您自由領出，不能不出。');return;}this.performPass(0);}
   performPass(seat){const out=this.round.pass(seat);if(!out.ok){this.toast(out.error);return false;}this.lastActions[seat]={type:'pass'};if(seat===0)this.selected.clear();this.hintKey='';this.tone(240,.06);if(!this.round.lastPlay){this.toast(`其他三家已PASS，由${SHORT[this.round.turn]}自由領出。`);}this.render();this.scheduleAI();return true;}
-  hint(){if(this.modal||this.round.over||this.round.turn!==0||this.round.passed[0])return;const r=this.round,key=r.hands[0].map(c=>c.id).join(',')+'|'+(r.lastPlay?r.lastPlay.cards.map(c=>c.id).join(','):'free');const moves=BigTwo.legalMoves(r.hands[0],r.lastPlay,r.opening);if(!moves.length){this.clearSelection();this.toast('目前沒有能壓過的牌，請按「不出」。');return;}if(key!==this.hintKey){this.hintKey=key;this.hintIndex=0;const recommended=BigTwo.chooseMove(r.hands[0],r.lastPlay,{mustIncludeC3:r.opening,opponentMin:Math.min(...r.hands.slice(1).map(h=>h.length))});if(recommended){const ids=recommended.map(c=>c.id).sort().join(',');const idx=moves.findIndex(m=>m.cards.map(c=>c.id).sort().join(',')===ids);if(idx>0)moves.unshift(...moves.splice(idx,1));}this.hintMoves=moves;}const move=this.hintMoves[this.hintIndex%this.hintMoves.length];this.hintIndex++;this.selected=new Set(move.cards.map(c=>c.id));this.refreshSelected();this.renderSelection();this.toast(`建議：${move.name} · 再按提示可換一組`);}
-  scheduleAI(){clearTimeout(this.timer);this.timer=null;if(this.modal||this.round.over||this.round.turn===0)return;const round=this.round,seat=round.turn;this.timer=setTimeout(()=>{this.timer=null;if(this.modal||this.round!==round||round.over||round.turn!==seat)return;const opponentMin=Math.min(...round.hands.filter((h,i)=>i!==seat).map(h=>h.length));const cards=BigTwo.chooseMove(round.hands[seat],round.lastPlay,{mustIncludeC3:round.opening,opponentMin});if(cards&&cards.length)this.performPlay(seat,cards);else this.performPass(seat);},950);}
+  hint(){if(this.modal||this.round.over||this.round.turn!==0||this.round.passed[0])return;const r=this.round,key=r.hands[0].map(c=>c.id).join(',')+'|'+(r.lastPlay?r.lastPlay.cards.map(c=>c.id).join(','):'free');const moves=BigTwo.legalMoves(r.hands[0],r.lastPlay,r.opening);if(!moves.length){this.clearSelection();this.toast('目前沒有能壓過的牌，請按「不出」。');return;}if(key!==this.hintKey){this.hintKey=key;this.hintIndex=0;const recommended=BigTwo.chooseMove(r.hands[0],r.lastPlay,{round:r,seat:0});if(recommended){const ids=recommended.map(c=>c.id).sort().join(',');const idx=moves.findIndex(m=>m.cards.map(c=>c.id).sort().join(',')===ids);if(idx>0)moves.unshift(...moves.splice(idx,1));}this.hintMoves=recommended||!r.lastPlay?moves:[null,...moves];}const move=this.hintMoves[this.hintIndex%this.hintMoves.length];this.hintIndex++;if(!move){this.clearSelection();this.toast('建議：這輪先不出，請按「不出」· 再按提示可看能出的牌');return;}this.selected=new Set(move.cards.map(c=>c.id));this.refreshSelected();this.renderSelection();this.toast(`建議：${move.name} · 再按提示可換一組`);}
+  scheduleAI(){clearTimeout(this.timer);this.timer=null;if(this.modal||this.round.over||this.round.turn===0)return;const round=this.round,seat=round.turn;this.timer=setTimeout(()=>{this.timer=null;if(this.modal||this.round!==round||round.over||round.turn!==seat)return;const cards=BigTwo.chooseMove(round.hands[seat],round.lastPlay,{round,seat});if(cards&&cards.length)this.performPlay(seat,cards);else this.performPass(seat);},950);}
   finish(){clearTimeout(this.timer);this.timer=null;this.result=this.round.scoreRound();this.stats.totals=this.stats.totals.map((n,i)=>n+this.result.deltas[i]);this.stats.played++;this.stats.history.push({winner:this.round.winner,deltas:this.result.deltas,number:this.stats.played});this.stats.history=this.stats.history.slice(-30);this.render();this.tone(this.round.winner===0?880:440,.3);this.showScore();}
   showScore(){const r=this.round,ended=r.over;const totals=this.stats.totals;let html='';$('scoreTitle').textContent=ended?'🏆 本局結算':'🏆 累計計分板';$('scoreSubtitle').textContent=`已完成 ${this.stats.played} 局`;
     if(ended)html+=`<div class="score-banner"><div class="trophy">${r.winner===0?'🏆':'👏'}</div><h3>${r.winner===0?'恭喜，您贏了！':SHORT[r.winner]+'獲得本局勝利'}</h3><p>先出完手牌，收下本局所有分數。</p></div>`;
