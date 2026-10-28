@@ -695,7 +695,8 @@
 
         /**
          * 拱豬電腦 AI：記牌（每張出過的牌、誰缺哪一門），把還沒出現的牌依缺門隨機發給其他三家，
-         * 每張能出的牌都把這一局模擬打完許多次，用正式計分（豬、羊、變壓器、收全紅、全吃）選平均得分最高的。
+         * 每張能出的牌都把這一局模擬打完許多次，用正式計分（豬、羊、變壓器、收全紅、全吃）算出四家分數，
+         * 選「自己減掉這局最高分的對手」平均最高的：不只自己少吃分，也會擋別人收全紅、壓這局最高分的人。
          * 牌以整數表示：花色 S=0 H=1 C=2 D=3，c = 花色 * 13 + (點數 - 2)
          */
         const GongZhuAI = {
@@ -703,6 +704,7 @@
             PIG: 10, SHEEP: 48, TRANS: 34,           // ♠Q、♦J、♣10
             HEART_POINTS: [0, 0, 0, -10, -10, -10, -10, -10, -10, -20, -30, -40, -50],   // ♥2 ~ ♥A
             BUDGET_MS: 160, MIN_SAMPLES: 24, MAX_SAMPLES: 400,
+            SHOOT_MIN: 5, SHOOT_MIN_PIG: 3,          // 只有一家吃到紅心、張數到這麼多（有豬時用後者）：模擬時當他在收全紅
 
             toInt(card) { return this.SUIT_INDEX[card.suit] * 13 + card.rank - 2; },
 
@@ -825,7 +827,7 @@
             },
 
             /**
-             * 從目前這一墩接著把整局打完（me 先出 first），回傳 me 的得分
+             * 從目前這一墩接著把整局打完（me 先出 first），回傳 me 的得分減掉這局最高分的對手
              */
             playout(hands0, trick0, first, me, cap0, mode, gone0) {
                 const hands = hands0.map(h => h.slice());
@@ -853,14 +855,97 @@
                     }
                     card = this.policy(p, hands[p], trick, cap, gone);
                 }
+                // 減掉最高分的對手：別人收全紅、分數衝到最高時，就算自己沒被扣分也會想辦法擋
                 const allHearts = cap.some(c => c.hearts === 13);
-                return this.score(cap[me], allHearts, mode);
+                let rival = -Infinity;
+                for (let q = 0; q < 4; q++) if (q !== me) rival = Math.max(rival, this.score(cap[q], allHearts, mode));
+                return this.score(cap[me], allHearts, mode) - rival;
             },
 
             /**
-             * 模擬用的快速出牌策略（只看自己的手牌與桌面）
+             * 模擬用的快速出牌策略（只看自己的手牌與桌面）：有人看起來在收全紅時，他照衝全紅的打法、其他家照攔的打法
              */
             policy(p, hand, trick, cap, gone) {
+                const s = this.shooterOf(cap);
+                if (s >= 0) return p === s ? this.shootPlay(hand, trick, gone) : this.blockPlay(p, s, hand, trick, cap, gone);
+                return this.normalPlay(p, hand, trick, cap, gone);
+            },
+
+            /**
+             * 只有一家吃到紅心、而且張數夠多：這家可能在收全紅，回傳座位；否則回傳 -1
+             */
+            shooterOf(cap) {
+                let s = -1;
+                for (let q = 0; q < 4; q++) {
+                    if (!cap[q].hearts) continue;
+                    if (s >= 0) return -1;
+                    s = q;
+                }
+                return s >= 0 && cap[s].hearts >= (cap[s].pig ? this.SHOOT_MIN_PIG : this.SHOOT_MIN) ? s : -1;
+            },
+
+            // 還沒出過的紅心裡最大的一張（都出完了回傳 -1）
+            topHeart(gone) {
+                for (let c = 25; c >= 13; c--) if (!gone[c]) return c;
+                return -1;
+            },
+
+            /**
+             * 衝全紅：手上有剩下最大的紅心就領；否則領最大的非紅心保持出牌權；跟牌能贏就用最大的贏；沒有這門墊最小的非紅心
+             */
+            shootPlay(hand, trick, gone) {
+                if (!trick.length) {
+                    const top = this.topHeart(gone);
+                    if (top >= 0 && hand.includes(top)) return top;
+                    let best = -1;
+                    for (const c of hand) if (Math.floor(c / 13) !== 1 && (best < 0 || c % 13 > best % 13)) best = c;
+                    return best >= 0 ? best : Math.max(...hand);
+                }
+                const lead = Math.floor(trick[0].c / 13);
+                let lo = -1, hi = -1, win = trick[0].c;
+                for (const t of trick) if (Math.floor(t.c / 13) === lead && t.c > win) win = t.c;
+                for (const c of hand) if (Math.floor(c / 13) === lead) { if (lo < 0 || c < lo) lo = c; if (c > hi) hi = c; }
+                if (lo < 0) {
+                    let best = -1;
+                    for (const c of hand) if (Math.floor(c / 13) !== 1 && (best < 0 || c % 13 < best % 13)) best = c;
+                    return best >= 0 ? best : Math.min(...hand);
+                }
+                return hi > win ? hi : lo;
+            },
+
+            /**
+             * 攔全紅（s 是收全紅的那家）：有剩下最大的紅心就領出來自己吃；紅心墩（或桌上有紅心）他還沒出或正在贏時，能贏就搶；
+             * 沒有這門時，他正在贏就不墊紅心，他已經輸掉這墩就把紅心墊給贏的人
+             */
+            blockPlay(p, s, hand, trick, cap, gone) {
+                if (!trick.length) {
+                    const top = this.topHeart(gone);
+                    if (top >= 0 && hand.includes(top)) return top;
+                    return this.normalPlay(p, hand, trick, cap, gone);
+                }
+                const lead = Math.floor(trick[0].c / 13);
+                const shooterPlayed = trick.some(t => t.p === s);
+                let w = trick[0], heartsIn = false;
+                for (const t of trick) {
+                    if (Math.floor(t.c / 13) === lead && t.c > w.c) w = t;
+                    if (t.c >= 13 && t.c < 26) heartsIn = true;
+                }
+                let lo = -1, hi = -1;
+                for (const c of hand) if (Math.floor(c / 13) === lead) { if (lo < 0 || c < lo) lo = c; if (c > hi) hi = c; }
+                if (lo < 0) {
+                    const hearts = hand.filter(c => Math.floor(c / 13) === 1);
+                    if (shooterPlayed && w.p !== s && hearts.length) return Math.max(...hearts);
+                    const others = hand.filter(c => Math.floor(c / 13) !== 1);
+                    return this.discard(others.length ? others : hand, gone);
+                }
+                if ((lead === 1 || heartsIn) && (!shooterPlayed || w.p === s) && hi > w.c) return hi;
+                return this.normalPlay(p, hand, trick, cap, gone);
+            },
+
+            /**
+             * 平常的出牌策略：能閃就閃，豬和有分的紅心先墊出去
+             */
+            normalPlay(p, hand, trick, cap, gone) {
                 if (!trick.length) return this.lead(hand, gone);
                 const lead = Math.floor(trick[0].c / 13);
                 let lo = -1, hi = -1;
