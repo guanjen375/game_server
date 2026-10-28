@@ -53,6 +53,11 @@ CATALOG = {
         "desc": "標準規則，可悔棋、提示，也能兩人對下",
         "aliases": ["象棋"],
     },
+    "reversi": {
+        "name": "黑白棋", "category": "棋類", "icon": "黑", "style": "disc",
+        "desc": "夾住對方的棋子就翻面，子多的獲勝",
+        "aliases": ["黑白棋"],
+    },
     "mahjong": {
         "name": "台灣十六張麻將", "category": "牌類", "icon": "中", "style": "tile",
         "desc": "花牌、吃碰槓、台數計算，和三家電腦對打",
@@ -150,6 +155,13 @@ h2::after { content: ""; flex: 1; height: 1px; background: rgba(251, 191, 36, 0.
     background: linear-gradient(180deg, #ffffff 0%, #eef2f7 100%);
     box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.25), 0 6px 12px rgba(0, 0, 0, 0.45);
     font: 900 19px 'Noto Serif TC', serif; letter-spacing: -1px;
+}
+/* 黑白棋：一半白、一半黑的棋子（不顯示文字） */
+.disc {
+    border-radius: 50%; font-size: 0;
+    background: radial-gradient(circle at 35% 30%, rgba(255, 255, 255, 0.35) 0%, rgba(255, 255, 255, 0) 45%),
+                linear-gradient(135deg, #f8fafc 50%, #111827 50%);
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.45), inset 0 -3px 0 rgba(0, 0, 0, 0.25);
 }
 .info { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
 .name { font-size: 18px; font-weight: 900; color: #fef3c7; }
