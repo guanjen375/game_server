@@ -271,6 +271,10 @@ dialog{max-height:calc(var(--app-h)*.88)}dialog[open]{display:flex;flex-directio
   //  3. The best few are compared by Monte Carlo: deal the unseen cards to the
   //     other hands at random, play each candidate out with a fast policy, and
   //     keep the one with the best average score.
+  //  4. Early in the round (every opponent still holds 8+ cards) the planner
+  //     sheds the weaker card when following and keeps aces and twos for later;
+  //     the simulations only compare plays it rates close to its best, and
+  //     override it only when another play is clearly better.
   // ---------------------------------------------------------------------------
   const DECK = createDeck();
   const cardKey = card => rankValue(card.rank) * 4 + suitValue(card.suit);   // 0..51 in game order
@@ -393,6 +397,9 @@ dialog{max-height:calc(var(--app-h)*.88)}dialog[open]{display:flex;flex-directio
     }
   }
 
+  // "Early in the round": every opponent still holds at least this many cards.
+  const EARLY_MIN_CARDS = 8;
+
   // Score every candidate with the planner (higher = better). Passing is { cards: null }.
   function rankMoves(view) {
     const { hand, played, counts, seat, passed, opening } = view;
@@ -438,6 +445,8 @@ dialog{max-height:calc(var(--app-h)*.88)}dialog[open]{display:flex;flex-directio
       const mask = planner.maskOf(move.cards);
       const rest = planner.best(planner.full ^ mask);
       let score = before.cost - rest.cost;                               // shedding without needing the lead
+      // the cost above treats an ace like a four once six unseen cards beat both: early on, shed the weaker one
+      if (!danger && minOpp >= EARLY_MIN_CARDS) score -= weakness(move) * 0.08;
       const wins = isBoss(move, unseen, active);
       if (wins) score += 0.55;
       if (groupOf.get(mask).boss || isBomb(move)) {
@@ -594,7 +603,10 @@ dialog{max-height:calc(var(--app-h)*.88)}dialog[open]{display:flex;flex-directio
     const ranked = rankMoves(view);
     if (!ranked.length) return null;
     if (ranked.length === 1 || ranked[0].score === Infinity) return ranked[0].cards ? ranked[0].cards.slice() : null;
-    const candidates = ranked.slice(0, AI_CANDIDATES);
+    // Early in the round the playouts overrate grabbing the lead with an ace or a two, so when following
+    // only the plays the planner rates close to its best are compared (passing is still added below).
+    const early = [1, 2, 3].every(d => view.counts[(view.seat + d) % 4] >= EARLY_MIN_CARDS);
+    const candidates = ranked.slice(0, AI_CANDIDATES).filter(c => !view.target || !early || c.score >= ranked[0].score - 0.6);
     if (view.target && !candidates.some(c => !c.cards)) candidates.push({ cards: null });
     const me = view.seat;
     const myKeys = view.hand.map(cardKey);
@@ -604,6 +616,9 @@ dialog{max-height:calc(var(--app-h)*.88)}dialog[open]{display:flex;flex-directio
     const target = view.target ? fastCombo(view.target.cards) : null;
     const combos = candidates.map(c => (c.cards ? fastCombo(c.cards) : null));
     const totals = new Array(candidates.length).fill(0);
+    const diffSq = new Array(candidates.length).fill(0);   // squared difference from candidate 0 on the same deal
+    const results = new Array(candidates.length).fill(0);
+    let samples = 0;
     const start = Date.now();
     for (let n = 0; n < AI_MAX_SAMPLES && (n < AI_MIN_SAMPLES || Date.now() - start < AI_BUDGET_MS); n++) {
       for (let i = unseen.length - 1; i > 0; i--) {
@@ -633,11 +648,22 @@ dialog{max-height:calc(var(--app-h)*.88)}dialog[open]{display:flex;flex-directio
           }
         }
         if (state.turn === me) do state.turn = (state.turn + 1) % 4; while (state.passed[state.turn]);
-        totals[i] += playout(state, me);
+        results[i] = playout(state, me);
       });
+      for (let i = 0; i < candidates.length; i++) {
+        totals[i] += results[i];
+        diffSq[i] += (results[i] - results[0]) ** 2;
+      }
+      samples++;
     }
-    let best = 0;
-    totals.forEach((total, i) => { if (total > totals[best]) best = i; });
+    // Keep the best average. Early in the round another play must also beat the planner's choice
+    // (candidate 0) by more than two standard errors, so noise alone rarely overrides the planner.
+    let best = 0, bestGain = 0;
+    for (let i = 1; i < candidates.length; i++) {
+      const gain = (totals[i] - totals[0]) / samples;
+      const se = Math.sqrt(Math.max(0, diffSq[i] / samples - gain * gain) / samples);
+      if ((!early || gain > 2 * se) && gain > bestGain) { best = i; bestGain = gain; }
+    }
     return candidates[best].cards ? candidates[best].cards.slice() : null;
   }
 
