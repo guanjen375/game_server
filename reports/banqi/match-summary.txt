@@ -1,0 +1,417 @@
+reports/banqi/matches-1000ms.json.gz {"ms":1000,"depth":12,"seeds":[17],"maxPlies":180,"opponent":"8e50d139bb7887cb2b1ae8efa7ea118c217d3440","noise":0,"margin":0,"nodeVersion":"v20.20.2"}
+{
+  "tally": {
+    "current": 6,
+    "baseline": 4
+  },
+  "ids": {
+    "opening": [
+      {
+        "currentSide": 0,
+        "winner": "current",
+        "plies": 115,
+        "first": "flip e3"
+      },
+      {
+        "currentSide": 1,
+        "winner": "baseline",
+        "plies": 85,
+        "first": "flip e3"
+      }
+    ],
+    "middlegame": [
+      {
+        "currentSide": 0,
+        "winner": "current",
+        "plies": 135,
+        "first": "g2xg3"
+      },
+      {
+        "currentSide": 1,
+        "winner": "current",
+        "plies": 134,
+        "first": "g2xg3"
+      }
+    ],
+    "safe_pressure": [
+      {
+        "currentSide": 0,
+        "winner": "current",
+        "plies": 65,
+        "first": "b2-b3"
+      },
+      {
+        "currentSide": 1,
+        "winner": "baseline",
+        "plies": 146,
+        "first": "b2-b3"
+      }
+    ],
+    "few_piece": [
+      {
+        "currentSide": 0,
+        "winner": "current",
+        "plies": 33,
+        "first": "b3-c3"
+      },
+      {
+        "currentSide": 1,
+        "winner": "baseline",
+        "plies": 27,
+        "first": "b3-c3"
+      }
+    ],
+    "cannon_screen": [
+      {
+        "currentSide": 0,
+        "winner": "current",
+        "plies": 83,
+        "first": "b2-b1"
+      },
+      {
+        "currentSide": 1,
+        "winner": "baseline",
+        "plies": 53,
+        "first": "b2-b1"
+      }
+    ]
+  },
+  "metrics": {
+    "current": {
+      "counterLostInTradeWhileBehind": 0,
+      "newUncoveredTypes": 7,
+      "nonwinningCycles": 0,
+      "scoringCycles": 0,
+      "captures": 50,
+      "flips": 47
+    },
+    "baseline": {
+      "counterLostInTradeWhileBehind": 1,
+      "newUncoveredTypes": 10,
+      "nonwinningCycles": 0,
+      "scoringCycles": 0,
+      "captures": 48,
+      "flips": 41
+    }
+  }
+}
+baseline {"turns":437,"meanMs":493.11,"meanNodes":301714.53,"meanMoveDepth":7.94,"meanFlipDepth":4.96,"maxMs":1006.64}
+current {"turns":439,"meanMs":807.71,"meanNodes":127925.57,"meanMoveDepth":7.54,"meanFlipDepth":5.23,"maxMs":1008.03}
+reports/banqi/matches-8000nodes.json.gz {"ms":150,"depth":12,"nodes":8000,"seeds":[17,91],"maxPlies":240,"opponent":"8e50d139bb7887cb2b1ae8efa7ea118c217d3440","noise":0,"margin":0,"nodeVersion":"v20.20.2"}
+{
+  "tally": {
+    "baseline": 16,
+    "current": 16
+  },
+  "ids": {
+    "opening": [
+      {
+        "currentSide": 0,
+        "winner": "baseline",
+        "plies": 166,
+        "first": "flip e3"
+      },
+      {
+        "currentSide": 1,
+        "winner": "baseline",
+        "plies": 127,
+        "first": "flip e3"
+      },
+      {
+        "currentSide": 0,
+        "winner": "baseline",
+        "plies": 197,
+        "first": "flip e3"
+      },
+      {
+        "currentSide": 1,
+        "winner": "baseline",
+        "plies": 109,
+        "first": "flip e3"
+      }
+    ],
+    "middlegame": [
+      {
+        "currentSide": 0,
+        "winner": "current",
+        "plies": 187,
+        "first": "g2xg3"
+      },
+      {
+        "currentSide": 1,
+        "winner": "baseline",
+        "plies": 185,
+        "first": "g2xg3"
+      },
+      {
+        "currentSide": 0,
+        "winner": "current",
+        "plies": 109,
+        "first": "g2xg3"
+      },
+      {
+        "currentSide": 1,
+        "winner": "baseline",
+        "plies": 165,
+        "first": "g2xg3"
+      }
+    ],
+    "safe_pressure": [
+      {
+        "currentSide": 0,
+        "winner": "current",
+        "plies": 29,
+        "first": "b2-b3"
+      },
+      {
+        "currentSide": 1,
+        "winner": "current",
+        "plies": 46,
+        "first": "flip d4"
+      },
+      {
+        "currentSide": 0,
+        "winner": "current",
+        "plies": 29,
+        "first": "b2-b3"
+      },
+      {
+        "currentSide": 1,
+        "winner": "current",
+        "plies": 46,
+        "first": "flip d4"
+      }
+    ],
+    "last_counter": [
+      {
+        "currentSide": 0,
+        "winner": "baseline",
+        "plies": 38,
+        "first": "b3-a3"
+      },
+      {
+        "currentSide": 1,
+        "winner": "current",
+        "plies": 26,
+        "first": "b3xd3"
+      },
+      {
+        "currentSide": 0,
+        "winner": "baseline",
+        "plies": 38,
+        "first": "b3-a3"
+      },
+      {
+        "currentSide": 1,
+        "winner": "current",
+        "plies": 26,
+        "first": "b3xd3"
+      }
+    ],
+    "few_piece": [
+      {
+        "currentSide": 0,
+        "winner": "current",
+        "plies": 50,
+        "first": "b3-c3"
+      },
+      {
+        "currentSide": 1,
+        "winner": "baseline",
+        "plies": 35,
+        "first": "b3-c3"
+      },
+      {
+        "currentSide": 0,
+        "winner": "current",
+        "plies": 33,
+        "first": "b3-c3"
+      },
+      {
+        "currentSide": 1,
+        "winner": "baseline",
+        "plies": 35,
+        "first": "b3-c3"
+      }
+    ],
+    "long_pursuit": [
+      {
+        "currentSide": 0,
+        "winner": "current",
+        "plies": 35,
+        "first": "c1-d1"
+      },
+      {
+        "currentSide": 1,
+        "winner": "baseline",
+        "plies": 43,
+        "first": "c1-c2"
+      },
+      {
+        "currentSide": 0,
+        "winner": "current",
+        "plies": 35,
+        "first": "c1-d1"
+      },
+      {
+        "currentSide": 1,
+        "winner": "baseline",
+        "plies": 23,
+        "first": "c1-d1"
+      }
+    ],
+    "cannon_screen": [
+      {
+        "currentSide": 0,
+        "winner": "current",
+        "plies": 71,
+        "first": "b2-b1"
+      },
+      {
+        "currentSide": 1,
+        "winner": "baseline",
+        "plies": 53,
+        "first": "b2-b1"
+      },
+      {
+        "currentSide": 0,
+        "winner": "current",
+        "plies": 63,
+        "first": "b2-b1"
+      },
+      {
+        "currentSide": 1,
+        "winner": "baseline",
+        "plies": 53,
+        "first": "b2-b1"
+      }
+    ],
+    "last_target_trade": [
+      {
+        "currentSide": 0,
+        "winner": "current",
+        "plies": 37,
+        "first": "b3xd3"
+      },
+      {
+        "currentSide": 1,
+        "winner": "baseline",
+        "plies": 33,
+        "first": "b3xd3"
+      },
+      {
+        "currentSide": 0,
+        "winner": "current",
+        "plies": 52,
+        "first": "b3xd3"
+      },
+      {
+        "currentSide": 1,
+        "winner": "baseline",
+        "plies": 37,
+        "first": "b3xd3"
+      }
+    ]
+  },
+  "metrics": {
+    "current": {
+      "counterLostInTradeWhileBehind": 2,
+      "newUncoveredTypes": 30,
+      "nonwinningCycles": 0,
+      "scoringCycles": 0,
+      "captures": 119,
+      "flips": 81
+    },
+    "baseline": {
+      "counterLostInTradeWhileBehind": 2,
+      "newUncoveredTypes": 27,
+      "nonwinningCycles": 0,
+      "scoringCycles": 0,
+      "captures": 129,
+      "flips": 95
+    }
+  }
+}
+baseline {"turns":1106,"meanMs":27.59,"meanNodes":7369.86,"meanMoveDepth":4.41,"meanFlipDepth":2.79,"maxMs":247.41}
+current {"turns":1105,"meanMs":55.56,"meanNodes":7253.25,"meanMoveDepth":4.68,"meanFlipDepth":3.26,"maxMs":281.97}
+reports/banqi/ablation-pressure.json.gz {"ms":150,"depth":12,"nodes":8000,"seeds":[17,91],"maxPlies":240,"opponent":"current","opponentAblate":"no-pressure","noise":0,"margin":0,"nodeVersion":"v20.20.2"}
+{
+  "tally": {
+    "current": 4,
+    "baseline": 4
+  },
+  "ids": {
+    "long_pursuit": [
+      {
+        "currentSide": 0,
+        "winner": "current",
+        "plies": 29,
+        "first": "c1-d1"
+      },
+      {
+        "currentSide": 1,
+        "winner": "baseline",
+        "plies": 50,
+        "first": "c1-c2"
+      },
+      {
+        "currentSide": 0,
+        "winner": "current",
+        "plies": 29,
+        "first": "c1-d1"
+      },
+      {
+        "currentSide": 1,
+        "winner": "baseline",
+        "plies": 61,
+        "first": "c1-d1"
+      }
+    ],
+    "few_piece": [
+      {
+        "currentSide": 0,
+        "winner": "current",
+        "plies": 50,
+        "first": "b3-c3"
+      },
+      {
+        "currentSide": 1,
+        "winner": "baseline",
+        "plies": 50,
+        "first": "b3-c3"
+      },
+      {
+        "currentSide": 0,
+        "winner": "current",
+        "plies": 39,
+        "first": "b3-c3"
+      },
+      {
+        "currentSide": 1,
+        "winner": "baseline",
+        "plies": 43,
+        "first": "b3-c3"
+      }
+    ]
+  },
+  "metrics": {
+    "current": {
+      "counterLostInTradeWhileBehind": 0,
+      "newUncoveredTypes": 0,
+      "nonwinningCycles": 0,
+      "scoringCycles": 0,
+      "captures": 6,
+      "flips": 0
+    },
+    "baseline": {
+      "counterLostInTradeWhileBehind": 0,
+      "newUncoveredTypes": 0,
+      "nonwinningCycles": 0,
+      "scoringCycles": 0,
+      "captures": 4,
+      "flips": 0
+    }
+  }
+}
+baseline {"turns":175,"meanMs":21.61,"meanNodes":6798.85,"meanMoveDepth":6.86,"meanFlipDepth":0,"maxMs":92.59}
+current {"turns":176,"meanMs":38.81,"meanNodes":6809.68,"meanMoveDepth":6.51,"meanFlipDepth":0,"maxMs":151.31}

@@ -1,0 +1,1007 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#083c24">
+<title>經典大老二 Big Two — 四人撲克牌桌</title>
+<style>
+:root{color-scheme:dark;--gold:#fbbf24;--muted:#a3c9b4;--line:rgba(255,255,255,.12);--card-w:74px;--card-h:106px;--overlap:-23px}
+*{box-sizing:border-box}body{margin:0;background:#072b18;color:#f8fafc;font-family:"Noto Sans TC","Microsoft JhengHei","PingFang TC",system-ui,sans-serif;font-size:14px;min-width:320px;min-height:100vh;min-height:100dvh}button{font:inherit;color:inherit;cursor:pointer;touch-action:manipulation}button:disabled{cursor:default;opacity:.4}button:focus-visible,summary:focus-visible{outline:3px solid #7dd3fc;outline-offset:4px}button{border:0}button, .card{ -webkit-tap-highlight-color:transparent}h1,h2,h3,p{margin:0}.app{height:100vh;height:var(--app-h);display:flex;flex-direction:column;background:radial-gradient(ellipse at 50% 42%,#196c3e 0%,#0e4b28 52%,#072915 100%)}
+.header{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;padding:14px 26px;background:rgba(0,0,0,.32);border-bottom:1px solid var(--line);z-index:2}.brand{display:flex;align-items:center;gap:12px}.brand-mark{height:44px;width:44px;display:grid;place-items:center;background:linear-gradient(145deg,#fde68a,#d99b12);border:1px solid #ffdf81;border-radius:13px;box-shadow:0 4px 15px #0004;color:#422b09;font-size:29px;font-weight:900;transform:rotate(-5deg)}.brand-title{display:flex;align-items:center;gap:10px}h1{font-size:21px;letter-spacing:2px;color:#fcd34d;font-weight:900}.round-badge{background:#0c5133;border:1px solid #348a5c;border-radius:20px;font-size:11px;color:#b9efd1;padding:3px 9px;font-weight:700;white-space:nowrap}.brand p{font-size:11px;color:#a8cdb6;margin-top:4px;letter-spacing:.4px}.tools{display:flex;gap:7px;align-items:center}.tool{background:#ffffff0b;border:1px solid #ffffff23;border-radius:9px;padding:8px 12px;font-size:12px;font-weight:700;transition:background .15s}.tool:hover{background:#ffffff20}.tool.blue{color:#bae6fd;background:#07598570;border-color:#38bdf845}.tool.gold{color:#fde68a;background:#73531745;border-color:#fbbf2445}.tool.sound{min-width:38px;padding:8px}
+.board-wrap{flex:1;min-height:0;display:flex;align-items:stretch;justify-content:center;padding:16px 25px 8px}.board{width:100%;max-width:1380px;flex:1;position:relative;display:grid;grid-template-columns:190px minmax(0,1fr) 190px;grid-template-rows:auto 3fr minmax(0,2fr);gap:12px 18px;padding:20px 24px 28px;border:2px solid #d7ae4b38;border-radius:32px;box-shadow:inset 0 0 70px #00170d66,0 0 0 7px #072b1826}.board::before{content:"";position:absolute;inset:7px;border:1px solid #fbbf2410;border-radius:25px;pointer-events:none}.table-note{position:absolute;left:25px;top:22px;color:#a3c9b470;font-size:10px;letter-spacing:2px;font-weight:700}.seat{position:relative;align-self:center;background:linear-gradient(145deg,#062f21e8,#06291ed9);border:1px solid #ffffff1c;border-radius:17px;padding:15px;box-shadow:0 6px 22px #0002;transition:border-color .2s,box-shadow .2s}.seat.active{border-color:#fbbf24;box-shadow:0 0 0 1px #fbbf2440,0 0 24px #fbbf2429}.seat.active::after{content:"出牌中";position:absolute;top:-10px;right:13px;border:1px solid #fbbf2470;border-radius:15px;padding:2px 9px;background:#554017;color:#fde68a;font-size:10px;font-weight:800}.seat.north{grid-column:2;grid-row:1;justify-self:center;width:265px;padding:12px 16px}.seat.west{grid-column:1;grid-row:2}.seat.east{grid-column:3;grid-row:2}.seat-top{display:flex;gap:10px;align-items:center}.avatar{width:39px;height:39px;display:grid;place-items:center;flex-shrink:0;background:#143f3b;border:1px solid #77ac9840;border-radius:12px;font-size:24px}.avatar.violet{background:#353449}.avatar.orange{background:#4b3928}.seat-name{font-size:13px;font-weight:800}.seat-total{font-size:10px;color:#b5cdbb;margin-top:3px}.seat-total strong{font-variant-numeric:tabular-nums;color:#fde68a}.count{margin-left:auto;text-align:center;line-height:1.15;min-width:34px}.count strong{font-size:27px;color:#e1f5e8;display:block;font-variant-numeric:tabular-nums}.count small{font-size:9px;color:#85b69a}.count.danger strong{color:#fda4af}.seat-bottom{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:13px;min-height:28px}.north .seat-bottom{margin-top:7px}.backs{display:flex;padding-left:0;height:26px;align-items:center}.back{height:27px;width:18px;background:repeating-linear-gradient(45deg,#234775 0,#234775 2px,#315588 2px,#315588 4px);border:1.5px solid #d4e0e8;border-radius:3px;box-shadow:0 2px 3px #0005;margin-left:-8px;transform:rotate(-7deg)}.back:first-child{margin-left:0}.back:nth-child(2n){transform:rotate(5deg)}.seat-action{font-size:10px;color:#b3cdbd;text-align:right;max-width:120px;line-height:1.6}.seat-action.pass{color:#d1d5db}.seat-action.play{color:#fde68a}
+.arena{grid-column:2;grid-row:2;display:flex;flex-direction:column;align-items:center;justify-content:center;min-width:0;text-align:center;position:relative}.arena-kicker{font-size:10px;letter-spacing:3px;color:#a7c6af;display:flex;align-items:center;gap:9px}.arena-kicker::before,.arena-kicker::after{content:"";width:25px;height:1px;background:#9fba7755}.arena-title{font-size:17px;font-weight:800;color:#e7f0d2;margin:8px 0 14px}.pile{display:flex;min-height:122px;align-items:center;justify-content:center;padding:5px 7px;gap:7px;max-width:100%}.pile .card{width:68px;height:98px;flex-shrink:0;animation:deal .28s ease-out}.pile .card:nth-child(2n){transform:rotate(2deg)}.pile .card:nth-child(2n+1){transform:rotate(-2deg)}.empty-pile{height:105px;width:80px;display:grid;place-items:center;border:1px dashed #f0d66c48;border-radius:12px;background:#05261722;position:relative;transform:rotate(-8deg)}.empty-pile::before{content:"";position:absolute;inset:-3px;transform:rotate(15deg);border:1px solid #f0d66c20;border-radius:12px}.empty-pile span{font-size:38px;color:#d6ce8460;transform:rotate(8deg)}.combo-badge{border-radius:20px;padding:5px 13px;color:#fde68a;background:#143e20;border:1px solid #d9b34540;font-size:11px;margin:8px 0 0;min-height:27px;font-weight:700}.turn-status{margin-top:16px;font-size:12px;color:#cce4d0;min-height:23px;line-height:1.8}.turn-status.your-turn{color:#fde68a}.dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:#fbbf24;margin-right:7px;vertical-align:middle;animation:pulse 1.2s infinite}.table-footer{position:absolute;bottom:10px;left:0;right:0;text-align:center;font-size:9px;color:#a9c9af66;letter-spacing:1.5px}.activity{position:absolute;top:17px;right:22px;color:#b1cdb67a;font-size:10px}
+.hand-area{background:linear-gradient(0deg,#031c13f0,#062a1be8);border-top:1px solid #ffffff14;padding:15px 24px 18px;margin-top:10px;box-shadow:0 -10px 35px #00170820}.hand-inner{max-width:1200px;margin:auto}.hand-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:7px}.you{display:flex;align-items:center;gap:9px}.you .avatar{width:30px;height:30px;font-size:19px;border-radius:9px;background:#6c541c}.you-name{font-size:13px;font-weight:800}.you-name small{font-size:10px;font-weight:400;color:#aacdb7;margin-left:8px}.your-score{font-size:11px;color:#a6bcae}.your-score strong{color:#fde68a;margin-left:4px}.hand-tip{font-size:10px;color:#a3bea9}.hand-scroll{overflow-x:auto;overflow-y:hidden;padding:27px 5px 13px;scrollbar-width:thin;scrollbar-color:#94722b #09291c}.hand{display:flex;align-items:flex-end;justify-content:center;min-height:var(--card-h);width:max-content;min-width:100%;padding:0 5px}.card{position:relative;width:var(--card-w);height:var(--card-h);background:linear-gradient(145deg,#fff,#edf0f1);border-radius:8px;color:#172531;box-shadow:0 5px 10px #0005,inset 0 0 0 1px #00000012;padding:0;flex-shrink:0;text-align:left;user-select:none;transition:transform .18s ease,box-shadow .18s ease}.card.red{color:#dc354d}.card-top{position:absolute;top:7px;left:7px;display:flex;flex-direction:column;align-items:center;font-size:16px;font-weight:900;line-height:1.02;letter-spacing:-1px}.card-top .suit{font-size:14px;letter-spacing:0;margin-top:1px}.card-center{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:31px;pointer-events:none}.card-bottom{position:absolute;bottom:6px;right:6px;font-size:11px;font-weight:800;transform:rotate(180deg)}.card-flag{position:absolute;top:5px;right:4px;background:#08775b;color:white;padding:2px 4px;border-radius:3px;font-size:8px;font-weight:800}.hand .card{margin-left:var(--overlap)}.hand .card:first-child{margin-left:0}.hand .card:hover{transform:translateY(-9px)}.hand .card.selected{transform:translateY(-19px);box-shadow:0 10px 20px #0007,0 0 0 3px #fbbf24;z-index:25!important}.hand .card.selected::after{content:"✓";position:absolute;bottom:5px;left:5px;color:#6f4803;background:#fcd34d;border-radius:50%;font-size:11px;font-weight:900;width:16px;height:16px;text-align:center;line-height:16px}.hand .card:focus-visible{z-index:30!important}.hand .card:disabled{opacity:.85}.selection-row{display:flex;justify-content:center;align-items:center;min-height:25px;margin:0 0 9px;font-size:11px;gap:7px;color:#a4c6af}.selection-row.valid{color:#fcd34d}.selection-row.invalid{color:#fda4af}.actions{display:flex;justify-content:center;gap:9px;align-items:center;flex-wrap:wrap}.action-btn{min-width:93px;border:1px solid #ffffff26;border-radius:9px;background:#ffffff09;font-size:12px;font-weight:800;padding:10px 17px;transition:background .15s,transform .15s}.action-btn:not(:disabled):hover{background:#ffffff1a;transform:translateY(-1px)}.action-btn.primary{min-width:140px;background:linear-gradient(135deg,#fcd34d,#eeb428);color:#42300b;border:1px solid #ffe28a;box-shadow:0 4px 16px #fbbf241b}.action-btn.primary:not(:disabled):hover{background:#fde68a}.action-btn.hint{color:#b4e4fc;border-color:#38bdf845;background:#0c4a6e55}.action-btn.subtle{color:#c0d3c6}.keyboard-note{text-align:center;font-size:9px;color:#7e9b87;margin-top:11px;letter-spacing:.3px}
+dialog{color:#e5eee7;background:linear-gradient(145deg,#102b24,#0a1c18);border:1px solid #8ba99645;border-radius:21px;padding:0;width:min(660px,calc(100% - 28px));max-height:88vh;box-shadow:0 25px 90px #000a}dialog::backdrop{background:#00110dd1;backdrop-filter:blur(5px)}.modal-header{padding:21px 24px 17px;display:flex;justify-content:space-between;align-items:center;gap:12px;border-bottom:1px solid var(--line)}.modal-header h2{color:#fde68a;font-size:20px;font-weight:900}.modal-header p{font-size:11px;color:#9cbbaa;margin-top:5px}.close{font-size:23px;line-height:1;background:#ffffff0b;border:1px solid #ffffff19;border-radius:8px;height:32px;width:32px;flex-shrink:0}.modal-body{padding:20px 24px;line-height:1.85}.modal-footer{padding:16px 24px;border-top:1px solid var(--line);display:flex;justify-content:flex-end;gap:10px}.rule-rank{padding:13px;border-radius:12px;background:#0002;border:1px solid #ffffff12;font-size:12px;text-align:center}.rule-rank strong{color:#fde68a}.rule-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:15px}.rule-box{padding:13px;border:1px solid #ffffff13;border-radius:11px;background:#ffffff04}.rule-box h3{font-size:12px;color:#f1d888;margin-bottom:5px}.rule-box p{font-size:11px;color:#b4cabd}.rule-box.wide{grid-column:1/-1}.rule-small{font-size:11px;color:#a8c0b1;margin-top:14px}.rule-small strong{color:#e4ece5}.score-banner{text-align:center;padding:3px 0 17px}.score-banner .trophy{font-size:42px}.score-banner h3{font-size:22px;font-weight:900;color:#fde68a}.score-banner p{font-size:11px;color:#acc7b5;margin-top:4px}.score-table{width:100%;border-collapse:collapse;font-size:12px}.score-table th{text-align:right;font-size:10px;font-weight:500;color:#9ab9a5;border-bottom:1px solid #ffffff18;padding:9px 7px}.score-table td{padding:12px 7px;text-align:right;border-bottom:1px solid #ffffff0d}.score-table th:first-child,.score-table td:first-child{text-align:left}.score-table .winner{background:#fbbf240b}.positive{color:#6ee7a3;font-weight:800}.negative{color:#fda4af;font-weight:800}.leftover{margin-top:15px;padding-top:10px;border-top:1px solid #ffffff12}.leftover summary{cursor:pointer;font-size:11px;color:#b9cbbf}.leftover-row{font-size:10px;color:#a9bdb0;margin-top:9px}.mini{display:inline-block;background:#eef1ed;color:#26342b;border-radius:4px;padding:1px 5px;font-size:10px;font-weight:700;margin:2px 1px}.mini.red{color:#d52c42}.history{margin-top:17px}.history h3{font-size:11px;color:#c6d4ca;margin-bottom:8px}.history-row{display:flex;justify-content:space-between;gap:12px;padding:7px 0;border-bottom:1px solid #ffffff0b;font-size:10px;color:#a2b9aa}.confirm-copy{font-size:13px;color:#bcd0c3}.toast{position:fixed;bottom:235px;left:50%;transform:translateX(-50%);padding:11px 18px;background:#122d27f5;border:1px solid #d3bb665f;border-radius:12px;z-index:20;box-shadow:0 8px 28px #0006;font-size:12px;color:#fde68a;max-width:calc(100vw - 30px);text-align:center;pointer-events:none}.toast[hidden]{display:none}[hidden]{display:none!important}
+@keyframes pulse{50%{opacity:.35}}@keyframes deal{from{opacity:0;translate:0 15px;scale:.94}to{opacity:1;translate:0 0;scale:1}}
+@media(min-height:850px) and (min-width:850px){.board-wrap{padding-top:25px;padding-bottom:15px}.hand-area{padding-bottom:24px}.pile .card{width:77px;height:111px}.pile{min-height:138px}}
+@media(max-width:1000px){.header{padding:12px 18px;gap:11px}.brand p{font-size:10px}.tool{padding:8px 10px}.board-wrap{padding:15px 15px 5px}.board{grid-template-columns:155px minmax(0,1fr) 155px;padding:18px 16px 25px;gap:10px}.seat{padding:11px}.seat-name{font-size:12px}.avatar{width:33px;height:33px;font-size:21px}.seat-top{gap:7px}.count strong{font-size:23px}.pile{gap:4px}.pile .card{width:56px;height:84px}.pile .card-center{font-size:27px}.seat-bottom{flex-direction:column;align-items:flex-start;gap:7px}.north .seat-bottom{flex-direction:row;align-items:center}.table-note{left:20px;font-size:9px}.activity{right:20px}.arena-title{font-size:15px}.hand-area{padding-left:18px;padding-right:18px}}
+@media(max-width:700px){:root{--card-w:55px;--card-h:83px;--overlap:-31px}.header{padding:10px 13px;gap:10px;align-items:center}.brand-mark{width:34px;height:37px;font-size:25px;border-radius:10px}.brand{gap:9px}.brand-title{gap:7px}h1{font-size:17px;letter-spacing:1px}.brand p{font-size:9px}.tools{gap:5px}.tool{font-size:11px;padding:7px 8px}.tools .tool span{display:none}.tools .tool.sound{min-width:31px;padding:7px}.round-badge{font-size:9px;padding:2px 7px}.board-wrap{padding:10px 9px 0}.board{padding:13px 10px 23px;grid-template-columns:82px minmax(0,1fr) 82px;grid-template-rows:auto 1fr;gap:4px;border-radius:23px}.board::before{border-radius:18px}.table-note{top:17px;left:15px;width:50px;line-height:1.8;font-size:8px;letter-spacing:1px}.activity{top:20px;right:15px;font-size:8px}.seat{border-radius:12px;padding:10px 7px}.seat.north{width:213px;padding:10px 12px}.east .seat-top,.west .seat-top{flex-direction:column;gap:6px}.east .seat-total,.west .seat-total{font-size:8px;white-space:nowrap}.east .count,.west .count{margin:0;display:flex;align-items:baseline;gap:4px}.seat-name{font-size:10px;white-space:nowrap}.seat-total{font-size:9px}.seat-top .avatar{width:30px;height:30px;font-size:20px}.seat-bottom{margin-top:9px;align-items:center}.seat-action{font-size:8px;text-align:center;min-height:24px}.backs{height:22px}.back{height:22px;width:15px;margin-left:-8px}.north .seat-action{font-size:9px;min-height:0}.seat.active::after{font-size:8px;right:50%;transform:translateX(50%);white-space:nowrap;top:-8px;padding:1px 6px}.north.active::after{right:15px;transform:none}.arena-kicker{font-size:8px;letter-spacing:1px;gap:4px}.arena-kicker::before,.arena-kicker::after{width:10px}.arena-title{font-size:12px;margin:7px 0}.pile{min-height:91px;gap:0;padding:4px 0}.pile .card{width:43px;height:66px;margin-left:-15px;border-radius:5px}.pile .card:first-child{margin-left:0}.pile .card-top{font-size:11px;left:4px;top:4px}.pile .card-top .suit{font-size:10px}.pile .card-center{font-size:22px}.pile .card-bottom{font-size:8px;right:4px;bottom:4px}.pile .card-flag{display:none}.empty-pile{height:75px;width:55px}.empty-pile span{font-size:28px}.combo-badge{font-size:9px;padding:4px 8px;min-height:22px;margin-top:5px;max-width:100%}.turn-status{font-size:10px;line-height:1.7;margin-top:11px;max-width:170px}.table-footer{font-size:8px;letter-spacing:.5px}.hand-area{padding:12px 12px 15px;margin-top:10px}.you-name{font-size:12px}.you-name small{font-size:9px;margin-left:4px}.your-score{font-size:10px}.hand-tip{display:none}.hand-scroll{padding:25px 0 12px}.card-top{left:5px;top:6px;font-size:14px}.card-top .suit{font-size:12px}.card-center{font-size:27px}.card-bottom{font-size:9px;right:5px}.card-flag{font-size:7px;padding:1px 2px;right:3px;top:4px}.actions{gap:6px}.action-btn{padding:10px 12px;min-width:68px;font-size:11px}.action-btn.primary{min-width:99px}.action-btn.subtle{padding:10px;min-width:61px}.keyboard-note{font-size:8px;margin-top:10px}.selection-row{font-size:10px;margin-bottom:8px;min-height:24px;text-align:center}.modal-body{padding:17px}.modal-header{padding:18px}.modal-header h2{font-size:17px}.modal-footer{padding:14px 17px}.rule-grid{gap:8px}.rule-box{padding:10px}.rule-rank{font-size:11px;padding:10px}.toast{bottom:220px}}
+@media(max-width:370px){:root{--card-w:50px;--card-h:77px;--overlap:-31px}.brand p{display:none}.brand-mark{display:none}.tool{padding:7px}.board{grid-template-columns:72px minmax(0,1fr) 72px}.seat.north{width:190px}.seat-name{font-size:9px}.pile .card{width:39px;height:61px;margin-left:-16px}.rule-grid{grid-template-columns:1fr}.your-score{font-size:9px}.card-flag{display:none}}
+.round-record{grid-column:1/-1;grid-row:3;min-width:0;min-height:0;display:flex;flex-direction:column;overflow:hidden;contain:size;margin-top:10px;padding-top:13px;border-top:1px solid #e2cd7626}.round-record-heading{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:9px;color:#c8dfce;font-size:11px}.round-record-heading strong{color:#fde68a;font-size:12px}.round-record-heading span{font-size:10px;color:#a9cbb5}.round-actions{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));grid-auto-rows:minmax(0,1fr);gap:9px;flex:1 1 auto;min-height:0}.round-player{min-width:0;min-height:0;display:flex;flex-direction:column;border:1px solid #ffffff1b;border-radius:11px;background:#03291c99;padding:9px 10px}.round-player.leading{border-color:#fbbf2466;background:#293e1b88}.round-player-title{display:flex;align-items:center;justify-content:space-between;gap:5px;font-size:10px;font-weight:800;color:#d7e9db;margin-bottom:7px}.round-player-title small{font-size:8px;color:#fde68a;white-space:nowrap}.round-player-actions{flex:1 1 auto;max-height:132px;min-height:0;overflow-y:auto;scrollbar-width:thin;scrollbar-color:#9c803e #063221}.round-action{display:flex;align-items:center;gap:7px;margin:4px 0 8px;min-height:44px}.round-action:last-child{margin-bottom:0}.round-action-number{width:15px;flex-shrink:0;font-size:9px;color:#8db59d;font-variant-numeric:tabular-nums}.round-action-content{min-width:0}.round-action-type{font-size:9px;color:#b6d1bf;margin-bottom:4px}.round-play-cards{display:flex;gap:3px;flex-wrap:wrap;padding:2px 1px}.round-play-card{display:flex;align-items:center;justify-content:center;gap:3px;min-width:31px;height:28px;padding:2px 4px;background:linear-gradient(145deg,#fff,#e5ede8);color:#21362b;border-radius:4px;box-shadow:0 2px 4px #0004;font-size:11px;line-height:1.2;white-space:nowrap}.round-play-card.red{color:#d52c42}.round-play-card b{font-size:12px}.round-pass{display:inline-block;padding:6px 10px;border:1px dashed #cbd5e14d;border-radius:6px;background:#ffffff09;color:#d4ded8;font-size:11px;font-weight:800;letter-spacing:.5px}.round-waiting{display:block;padding:12px 0;font-size:10px;color:#7b9f88}
+@media(max-width:1000px){.round-actions{gap:6px}.round-player{padding:8px}.round-play-cards{gap:2px}.round-play-card{min-width:25px;font-size:10px;padding:2px 3px}.round-play-card b{font-size:11px}.round-action{gap:4px}.round-player-title{font-size:9px}}
+@media(max-width:700px){.round-record{margin-top:9px;padding-top:10px}.round-actions{grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}.round-record-heading{flex-wrap:wrap;gap:4px}.round-record-heading span{font-size:9px}.round-player-actions{max-height:112px}.round-player-title{font-size:10px}.round-player{padding:8px}.round-action-number{width:12px}.round-play-card{min-width:24px;font-size:10px;padding:2px 3px}.round-play-card b{font-size:11px}.round-action-type{font-size:8px}.round-pass{font-size:10px}.round-waiting{font-size:9px}}
+.seat.passed{opacity:.65}.round-player.passed{border-style:dashed}.round-player-title small.locked{color:#b8c7be}.pile.long-play{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));width:100%;max-width:365px;gap:4px;min-height:0}.pile.long-play .card{width:100%;height:auto;aspect-ratio:2/3;margin:0;transform:none}.pile.long-play .card-top{font-size:12px;top:4px;left:4px}.pile.long-play .card-top .suit{font-size:10px}.pile.long-play .card-center{font-size:22px}.pile.long-play .card-bottom{font-size:8px;bottom:3px;right:3px}
+@media(max-width:700px){.pile.long-play{gap:2px;max-width:210px}.pile.long-play .card{border-radius:3px}.pile.long-play .card-top{font-size:9px;top:3px;left:3px}.pile.long-play .card-top .suit{font-size:8px}.pile.long-play .card-center{font-size:12px;align-items:flex-end;padding-bottom:4px}.pile.long-play .card-bottom{display:none}.round-player-title small.locked{font-size:7px}}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
+/* 手機：頁首縮成一行，手牌區更緊湊，觸控裝置用不到的鍵盤說明不顯示 */
+@media(max-width:700px){.brand p{display:none}.header{padding:8px 13px}.board-wrap{padding-top:6px}.hand-area{margin-top:6px;padding:10px 10px 12px}.hand-heading{margin-bottom:3px}.hand-scroll{padding:21px 0 9px}.selection-row{margin-bottom:6px}.keyboard-note{display:none}}
+/* 較矮的手機（iPhone SE 等）：北家排成一列，三家都不畫牌背，牌桌中央的英文小字和底部的大小順序說明不顯示 */
+@media(max-width:700px) and (max-height:650px){.board{padding-bottom:12px}.table-footer{display:none}.arena-kicker{display:none}.seat.north{grid-column:1/4;display:flex;align-items:center;gap:12px;width:auto;padding:7px 12px}.north .backs,.east .backs,.west .backs{display:none}.north .seat-bottom{min-height:0;margin-top:0}.pile{min-height:84px}.turn-status{margin-top:6px}.you .avatar{width:24px;height:24px;font-size:15px}}
+/* 一個畫面放得下、不用往下捲：整頁固定為可見高度（支援時用 100dvh，不會被手機網址列蓋住），牌桌用頁首和手牌區以外剩下的空間；手牌依畫面高度縮放 */
+:root{--app-h:100vh;--card-h:clamp(86px,calc(var(--app-h)*.145),106px);--card-w:calc(var(--card-h)*.7);--overlap:calc(var(--card-w)*-.31);--record-w:clamp(230px,21vw,330px)}@supports(height:100dvh){:root{--app-h:100dvh}}
+@media(hover:none){.keyboard-note{display:none}}
+/* 電腦、平板：紀錄裡的牌型和出的牌排在同一行 */
+@media(min-width:701px){.round-action{align-items:flex-start;min-height:0;margin:2px 0 5px}.round-action-number{line-height:24px}.round-action-content{display:flex;align-items:flex-start;gap:6px}.round-action-type{flex:none;margin:0;line-height:24px;white-space:nowrap}.round-play-cards{min-width:0}.round-play-card{height:24px}}
+/* 橫的畫面（電腦、平板橫放）：四家紀錄改成牌桌右側一欄，每家一格、出的牌排成一行 */
+@media(min-width:1001px) and (min-aspect-ratio:5/4){.board{grid-template-columns:190px minmax(0,1fr) 190px var(--record-w);grid-template-rows:auto 1fr}.seat.north{grid-column:1/4}.round-record{grid-column:4;grid-row:1/-1;margin:0;padding:0 0 0 16px;border-top:0;border-left:1px solid #e2cd7626}.round-actions{display:flex;flex-direction:column;gap:6px}.round-player{flex:1 1 0;padding:6px 8px}.round-player-actions{max-height:none}.round-record-heading{flex-wrap:wrap;row-gap:2px}.round-player-title{margin-bottom:3px}.activity{right:calc(var(--record-w) + 42px)}.table-footer{right:var(--record-w)}}
+/* 窄的橫畫面（電腦小視窗）：牌桌右側放不下紀錄欄，和手機一樣放進「📋」按鈕打開的視窗 */
+@media(min-width:701px) and (max-width:1000px) and (min-aspect-ratio:5/4){.board{grid-template-rows:auto 1fr}}
+/* 矮的畫面（筆電、平板橫放，和較小的平板直拿）：留白縮小，北家排成一列，牌桌中央的英文小字不顯示。
+   牌桌上要多放一條「已出的牌」，所以橫的畫面到 964px 高、直拿的平板到 1030px 高都用這組緊湊的留白 */
+@media(min-width:701px) and (max-height:820px),(min-width:1001px) and (min-aspect-ratio:5/4) and (max-height:964px),(min-width:701px) and (max-aspect-ratio:5/4) and (max-height:1030px){.header{padding-top:8px;padding-bottom:8px}.board-wrap{padding-top:8px;padding-bottom:6px}.board{padding-top:14px;padding-bottom:22px;row-gap:8px}.table-note,.activity{top:12px}.table-footer{bottom:5px}.seat.north{grid-column:1/4;display:flex;align-items:center;gap:16px;width:auto;padding:8px 16px}.north .seat-bottom{margin-top:0;min-height:0}.north .count{margin-left:10px}.arena-kicker{display:none}.arena-title{margin:2px 0 8px}.pile{min-height:96px}.pile .card{width:60px;height:86px}.pile.long-play{max-width:250px}.empty-pile{height:86px;width:64px}.combo-badge{margin-top:6px}.turn-status{margin-top:6px}.hand-area{margin-top:0;padding-top:8px;padding-bottom:10px}.hand-heading{margin-bottom:2px}.hand-scroll{padding-top:22px;padding-bottom:6px}.selection-row{margin-bottom:5px}.keyboard-note{display:none}}
+/* 很矮的電腦視窗：底部的大小順序說明不顯示 */
+@media(min-width:701px) and (max-height:620px){.table-footer{display:none}.board{padding-bottom:12px}}
+/* 手機直拿：四家紀錄放進「📋」按鈕打開的視窗；手牌依畫面高度縮放，十三張一定排得進螢幕寬度 */
+@media(max-width:700px){:root{--card-h:clamp(70px,calc(var(--app-h)*.135),100px);--card-w:calc(var(--card-h)*.67);--overlap:min(-23px,calc((100vw - 30px - var(--card-w))/12 - var(--card-w)))}.board-wrap{padding-bottom:4px}.hand-area{margin-top:4px;padding-top:8px;padding-bottom:10px}.hand-scroll{padding-top:21px;padding-bottom:6px}}
+/* 窄的手機：頁首排成一行（標題只寫「大老二」）；360px 左右的手機四個動作按鈕也排得進一行 */
+@media(max-width:420px){.title-prefix{display:none}.header{gap:8px}.tools{gap:4px}}
+@media(max-width:370px){.brand-mark{display:grid}.actions{gap:4px}.action-btn,.action-btn.subtle{min-width:0;padding:10px 7px}.action-btn.primary{min-width:72px}}
+@media(max-width:340px){.brand-mark{display:none}}
+#recordBody .round-record{margin:0;padding:0;border:0;overflow:visible;contain:none}
+/* 視窗：標題列和按鈕列固定，內容太長時只捲內容；高度以可見高度為準。手機和矮的畫面把結算表縮緊，看得到整張表和「開始下一局」 */
+dialog{max-height:calc(var(--app-h)*.88)}dialog[open]{display:flex;flex-direction:column}.modal-header,.modal-footer{flex:none}.modal-body{flex:1 1 auto;min-height:0;overflow-y:auto}
+@media(max-width:700px),(max-height:820px){.modal-header{padding:14px 18px}.score-banner{padding:0 0 8px}.score-banner .trophy{font-size:30px;line-height:1.2}.score-banner h3{font-size:18px}.score-table td{padding:8px 6px}.leftover{margin-top:10px}.history{margin-top:12px}}
+/* 手機橫放時畫面太矮，放不下整個遊戲：提示轉成直向（和其他遊戲一樣） */
+.rotate-hint{display:none;position:fixed;inset:0;z-index:100;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:0 24px;background:#072b18;text-align:center}.rotate-hint b{font-size:48px;line-height:1.2}.rotate-hint strong{font-size:18px;font-weight:900;color:#fcd34d}.rotate-hint span{font-size:12px;color:#a7f3d0cc}
+@media(orientation:landscape) and (max-height:500px) and (pointer:coarse){.rotate-hint{display:flex}}
+/* 已出的牌：四種花色各一列（♠ ♥ ♦ ♣）、點數由小到大（3 … 2）。白底＝這一局已經出過，金框＝在您手上，暗的＝還在別家手上。
+   畫面夠大時直接排在牌桌上（橫的畫面在牌桌下緣、直拿的平板在四家紀錄上面），右邊的「整局紀錄」打開出牌紀錄視窗；
+   放不下時頁首會出現「📋」按鈕，一樣打開出牌紀錄視窗（視窗裡一定有一份「已出的牌」） */
+.played-board{display:flex;align-items:center;gap:12px;min-width:0}.played-info{flex:none;width:88px}.played-info strong{display:block;color:#fde68a;font-size:12px}.played-count{display:none;font-size:10px;color:#a9cbb5}
+.played-legend{display:flex;flex-direction:column;gap:2px;margin-top:4px;font-size:10px;line-height:1.3;color:#a9cbb5}.played-legend span{display:flex;align-items:center;gap:5px;white-space:nowrap}
+.played-grid{flex:1 1 auto;min-width:0;display:grid;grid-template-columns:14px repeat(13,minmax(0,1fr));gap:2px;align-items:center}.played-grid em{font-style:normal;font-size:12px;line-height:1;text-align:center;color:#dbe7df}.played-grid em.red{color:#fda4af}
+.played-grid i,.played-legend i{font-style:normal;display:flex;align-items:center;justify-content:center;height:16px;border:1px solid #ffffff26;border-radius:3px;font-size:11px;font-weight:800;line-height:1;color:#cfe0d5;opacity:.5}.played-legend i{flex:none;width:15px;height:13px;font-size:8px}
+.played-grid i.red{color:#fda4af}.played-grid i.out,.played-legend i.out{opacity:1;border-color:transparent;background:linear-gradient(145deg,#fff,#e5ede8);color:#21362b;box-shadow:0 1px 3px #0006}.played-grid i.out.red{color:#d52c42}
+.played-grid i.mine,.played-legend i.mine{opacity:1;border-color:#fbbf24;background:#fbbf2418;color:#fde68a}
+.board>.played-board{display:none;padding-top:9px;border-top:1px solid #e2cd7626}
+@media(min-width:1001px) and (min-aspect-ratio:5/4) and (min-height:700px){.board{grid-template-rows:auto 1fr auto}.board>.played-board{display:flex;grid-column:1/4;grid-row:3}.tools .record-tool{display:none}}
+/* 橫的畫面 700–739px 高（平板橫放用瀏覽器開）：格子矮一點、底部的大小順序說明不顯示（「已出的牌」的排法就是大小順序），才放得下 */
+@media(min-width:1001px) and (min-aspect-ratio:5/4) and (min-height:700px) and (max-height:739px){.board{padding-bottom:12px;row-gap:6px}.table-footer{display:none}.board>.played-board{padding-top:6px}.board>.played-board .played-grid i{height:14px}.played-legend{gap:1px;margin-top:2px;line-height:1.2}.played-legend i{height:11px}}
+/* 橫的畫面 821–964px 高：留白用緊湊的那一組，桌面中央的牌維持原來的大小 */
+@media(min-width:1001px) and (min-aspect-ratio:5/4) and (min-height:821px) and (max-height:964px){.pile{min-height:122px}.pile .card{width:68px;height:98px}.pile.long-play{max-width:365px}.empty-pile{height:105px;width:80px}}
+@media(min-width:701px) and (max-aspect-ratio:1249/1000) and (min-height:900px){.board{grid-template-rows:auto 3fr auto minmax(0,2fr)}.board>.played-board{display:flex;grid-column:1/-1;grid-row:3;margin-top:8px;padding-top:11px}.round-record{grid-row:4;margin-top:0}.tools .record-tool{display:none}}
+/* 視窗裡的「已出的牌」：標題、張數、說明排在上面，格子大一點方便手機上看；搬進視窗的四家紀錄排在它下面 */
+#recordBody .played-board{display:block}#recordBody .played-info{width:auto;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:4px 10px;margin-bottom:8px}#recordBody .played-count{display:inline}
+#recordBody .played-legend{flex-direction:row;flex-wrap:wrap;gap:3px 12px;margin:0;width:100%}#recordBody .played-grid i{height:23px}
+#recordBody .round-record{margin-top:16px;padding-top:13px;border-top:1px solid #e2cd7626}
+/* 出牌紀錄視窗：這一局的出牌順序，一輪一格、最新的一輪在最上面 */
+.full-record{margin-top:16px;padding-top:13px;border-top:1px solid #e2cd7626}
+.log-trick{border:1px solid #ffffff1b;border-radius:11px;background:#03291c99;padding:8px 10px;margin-bottom:8px}.log-trick-title{display:flex;justify-content:space-between;gap:8px;font-size:11px;font-weight:800;color:#fde68a;margin-bottom:4px}.log-trick-title small{font-weight:500;color:#a9cbb5}
+.log-row{display:flex;align-items:center;gap:7px;min-height:30px;font-size:11px;line-height:1.3}.log-who{flex:none;width:36px;font-weight:800;color:#d7e9db}.log-row .round-action-type{flex:none;width:44px;margin:0;font-size:10px;line-height:1.3}.log-row .round-pass{padding:4px 9px}.log-row .round-play-card{height:24px}
+/* 「已出的牌」右邊的「整局紀錄」按鈕；頁首的「📋」在平板寬度只留圖示，按鈕列才排得進一行 */
+.record-more{flex:none;padding:5px 9px;border:1px solid #fbbf2455;border-radius:10px;background:#73531745;color:#fde68a;font-size:10px;font-weight:700;line-height:1.35;text-align:center;white-space:nowrap}.record-more:hover{background:#7353178c}
+@media(min-width:701px) and (max-width:1000px){.tools .record-tool span{display:none}}
+/* 悔牌：沒有可以收回的步驟時按鈕變淡（按了會說明原因） */
+.tool.unavailable{opacity:.45}
+/* 手機：頁首多了「悔牌」共六個圖示按鈕，按鈕和間距縮小才排得進一行（圖示在手機上比較寬，要留餘裕） */
+@media(max-width:440px){.header{padding-left:10px;padding-right:10px;gap:6px}.tools{gap:3px}.tool,.tools .tool.sound{min-width:27px;padding:7px 5px;text-align:center}}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="header">
+    <div class="brand"><div class="brand-mark" aria-hidden="true">♠</div><div><div class="brand-title"><h1><span class="title-prefix">經典</span>大老二</h1><span class="round-badge" id="roundBadge">第 1 局</span></div><p>BIG TWO · 先出完手牌，就贏得這一局。</p></div></div>
+    <nav class="tools" aria-label="遊戲功能">
+      <button class="tool" id="undoBtn" title="悔牌：回到您上一次出牌或不出之前" aria-label="悔牌">↶ <span>悔牌</span></button>
+      <button class="tool record-tool" id="recordBtn" title="出牌紀錄" aria-label="出牌紀錄">📋 <span>出牌紀錄</span></button>
+      <button class="tool" id="rulesBtn" title="遊戲規則" aria-label="遊戲規則">📖 <span>遊戲規則</span></button>
+      <button class="tool gold" id="scoresBtn" title="戰績與計分" aria-label="戰績與計分">🏆 <span>計分板</span></button>
+      <button class="tool sound" id="soundBtn" title="切換音效" aria-label="關閉音效" aria-pressed="true">🔊</button>
+      <button class="tool" id="restartBtn" title="重新發牌" aria-label="重新發牌">↻ <span>重新發牌</span></button>
+    </nav>
+  </header>
+  <main class="board-wrap" aria-label="大老二牌桌">
+    <div class="board">
+      <div class="table-note">CLASSIC<br>四人牌桌</div><div class="activity" id="moveCount">尚未出牌</div>
+      <section class="seat north" id="seat2" aria-label="北家小美"><div class="seat-top"><div class="avatar violet">👩</div><div><div class="seat-name">北家 · 小美</div><div class="seat-total">累計 <strong id="total2">0</strong></div></div><div class="count" id="count2"><strong>13</strong><small>張手牌</small></div></div><div class="seat-bottom"><div class="backs" aria-hidden="true"></div><div class="seat-action" id="action2">等待出牌</div></div></section>
+      <section class="seat west" id="seat3" aria-label="西家阿財"><div class="seat-top"><div class="avatar orange">🧔</div><div><div class="seat-name">西家 · 阿財</div><div class="seat-total">累計 <strong id="total3">0</strong></div></div><div class="count" id="count3"><strong>13</strong><small>張手牌</small></div></div><div class="seat-bottom"><div class="backs" aria-hidden="true"></div><div class="seat-action" id="action3">等待出牌</div></div></section>
+      <section class="arena" aria-label="目前要壓過的牌">
+        <div class="arena-kicker">BIG TWO CLUB</div><div class="arena-title" id="arenaTitle">梅花 3 先出</div>
+        <div class="pile" id="pile"><div class="empty-pile"><span>♠</span></div></div>
+        <div class="combo-badge" id="comboBadge">準備開局</div>
+        <div class="turn-status" id="turnStatus" role="status" aria-live="polite"></div>
+      </section>
+      <section class="seat east" id="seat1" aria-label="東家老王"><div class="seat-top"><div class="avatar">🧑</div><div><div class="seat-name">東家 · 老王</div><div class="seat-total">累計 <strong id="total1">0</strong></div></div><div class="count" id="count1"><strong>13</strong><small>張手牌</small></div></div><div class="seat-bottom"><div class="backs" aria-hidden="true"></div><div class="seat-action" id="action1">等待出牌</div></div></section>
+      <section class="played-board" aria-label="這一局已經出過的牌"><div class="played-info"><strong>已出的牌</strong><span class="played-count">尚未出牌</span><p class="played-legend"><span><i class="out">A</i>已出</span><span><i class="mine">A</i>在您手上</span><span><i>A</i>還在別家</span></p></div><div class="played-grid" role="group" aria-label="已出的牌對照表"></div><button type="button" class="record-more" id="recordMoreBtn" title="打開出牌紀錄：這一局每一輪誰出了什麼">整局<br>紀錄 ▸</button></section>
+      <section class="round-record" aria-label="當輪四家出牌與不出紀錄"><div class="round-record-heading"><strong>當輪出牌 · 四家紀錄</strong><span id="roundActionsStatus">尚未出牌</span></div><div class="round-actions" id="roundActions"></div></section>
+      <div class="table-footer">♣ &lt; ♦ &lt; ♥ &lt; ♠ &nbsp; · &nbsp; 3 最小，2 最大 &nbsp; · &nbsp; 南 → 東 → 北 → 西</div>
+    </div>
+  </main>
+  <section class="hand-area" aria-label="您的手牌與操作">
+    <div class="hand-inner">
+      <div class="hand-heading"><div class="you"><div class="avatar">😎</div><div class="you-name">您（南家）<small id="yourCount">13 張手牌</small></div></div><span class="hand-tip">點選手牌，再按「出牌」</span><div class="your-score">累計 <strong id="total0">0</strong></div></div>
+      <div class="hand-scroll"><div class="hand" id="hand" role="group" aria-label="點選要出的手牌"></div></div>
+      <div class="selection-row" id="selectionInfo" role="status">點選要出的手牌</div>
+      <div class="actions">
+        <button class="action-btn hint" id="hintBtn">💡 出牌提示</button><button class="action-btn primary" id="playBtn" disabled>出牌</button><button class="action-btn" id="passBtn" disabled>不出 PASS</button><button class="action-btn subtle" id="clearBtn" disabled>取消選取</button>
+      </div>
+      <p class="keyboard-note">臺灣玩法 · 不出三條 · PASS 後本輪退出 &nbsp; · &nbsp; Enter 出牌 / P 不出 / H 提示 / Esc 取消</p>
+    </div>
+  </section>
+</div>
+<div class="toast" id="toast" role="status" hidden></div>
+<div class="rotate-hint"><b>📱</b><strong>請把手機轉成直向</strong><span>橫向畫面太矮，放不下整個遊戲畫面</span></div>
+<dialog id="rulesDialog" aria-labelledby="rulesTitle">
+  <div class="modal-header"><div><h2 id="rulesTitle">📖 大老二・臺灣玩法</h2><p>4 人對戰，每人 13 張。第一位出完手牌的玩家獲勝。</p></div><button class="close" data-close aria-label="關閉規則">×</button></div>
+  <div class="modal-body">
+    <div class="rule-rank"><strong>3 &lt; 4 &lt; 5 &lt; 6 &lt; 7 &lt; 8 &lt; 9 &lt; 10 &lt; J &lt; Q &lt; K &lt; A &lt; 2</strong><br>同點數比較花色：<strong>♣ 梅花 &lt; ♦ 方塊 &lt; ♥ 紅心 &lt; ♠ 黑桃</strong></div>
+    <div class="rule-grid">
+      <div class="rule-box"><h3>♣3 開局 · 依序出牌</h3><p>每局由持有梅花 3 的玩家先出，第一手必須含 ♣3。順序為南 → 東 → 北 → 西。</p></div>
+      <div class="rule-box"><h3>一般接牌 · 相同牌型</h3><p>單張接單張、對子接對子、順子接順子、葫蘆接葫蘆。葫蘆不能壓順子。本桌不允許單獨出三張同點數的牌；對子同點數時比其中最大花色。</p></div>
+      <div class="rule-box wide"><h3>切牌 · 可跨張數壓牌</h3><p><strong>鐵支 ＜ 同花順 ＜ 一條龍</strong><br>這三種牌型可切任何一般牌型，包括單張和對子；切牌後只能用更大的切牌接。鐵支為四張同點數＋任一張，共五張；同花順須同花色且連續五張；一條龍為 13 張各不重複的點數（A 到 K 各一張，不限花色）。只有同花色、不連號的五張牌不算牌型。</p></div>
+      <div class="rule-box"><h3>順子如何比大小？</h3><p><strong>23456 ＞ 10JQKA ＞ 9 10 JQK ＞ … ＞ 34567 ＞ A2345</strong><br>23456 最大，A2345 最小。不接受 JQKA2、QKA23 或 KA234。相同連號比尾牌花色：23456 比 6，A2345 比 5。同花順之間也用這個順序。</p></div>
+      <div class="rule-box"><h3>葫蘆與鐵支</h3><p>葫蘆由三張同點數＋一對組成，比三張部分的點數；移除三條打法不影響葫蘆。鐵支之間比四張部分的點數，附帶的第五張不比大小。</p></div>
+      <div class="rule-box"><h3>PASS · 本輪退出</h3><p>一旦不出，本輪就不能再出任何牌（包含切牌），系統會跳過您。等其他三家都已 PASS，最後出牌者自由領出；新一輪所有人恢復出牌。自由領出時不能 PASS。</p></div>
+      <div class="rule-box"><h3>計分方式</h3><p>輸家剩 1–9 張，每張扣 1 分；剩 10–12 張加倍；剩 13 張乘 3。贏家取得所有扣分，四家總和為 0。</p></div>
+    </div>
+    <p class="rule-small">💡 <strong>出牌提示</strong>會選取一組合法牌，重複按可換一組。金框是已選手牌，送出前會檢查牌型與大小。開啟視窗時，電腦會暫停等待。</p>
+    <p class="rule-small">↶ <strong>悔牌</strong>：按錯、出錯牌或誤按「不出」時，按上方的「悔牌」就回到您那一手之前，可以連續按；一局結算之後就不能悔牌了。為了公平，悔牌後電腦三家還沒出的手牌會重新洗過（張數不變）。</p>
+    <p class="rule-small">📋 <strong>出牌紀錄</strong>：「已出的牌」用白底標出這一局已經出過的牌、金框是您手上的牌、暗的還在別家手上；按「整局紀錄」（放不下的畫面按上方的 📋）可以看整局每一輪誰出了什麼。</p>
+  </div><div class="modal-footer"><button class="action-btn primary" data-close>了解，繼續玩</button></div>
+</dialog>
+<dialog id="scoreDialog" aria-labelledby="scoreTitle"><div class="modal-header"><div><h2 id="scoreTitle">🏆 累計計分板</h2><p id="scoreSubtitle">四家累計分數</p></div><button class="close" data-close aria-label="關閉計分板">×</button></div><div class="modal-body" id="scoreBody"></div><div class="modal-footer"><button class="action-btn" data-close>返回牌桌</button><button class="action-btn primary" id="nextBtn" hidden>開始下一局 →</button></div></dialog>
+<dialog id="recordDialog" aria-labelledby="recordTitle"><div class="modal-header"><div><h2 id="recordTitle">📋 出牌紀錄</h2><p>這一局從頭到現在出過的牌，新的一局開始時清空。</p></div><button class="close" data-close aria-label="關閉出牌紀錄">×</button></div><div class="modal-body" id="recordBody"><section class="played-board" aria-label="這一局已經出過的牌"><div class="played-info"><strong>已出的牌</strong><span class="played-count">尚未出牌</span><p class="played-legend"><span><i class="out">A</i>已出</span><span><i class="mine">A</i>在您手上</span><span><i>A</i>還在別家</span></p></div><div class="played-grid" role="group" aria-label="已出的牌對照表"></div></section><section class="full-record" aria-label="本局出牌順序"><div class="round-record-heading"><strong>本局出牌順序</strong><span id="fullRecordStatus">尚未出牌</span></div><div id="fullRecord"></div></section></div><div class="modal-footer"><button class="action-btn primary" data-close>返回牌桌</button></div></dialog>
+<dialog id="restartDialog" aria-labelledby="restartTitle"><div class="modal-header"><div><h2 id="restartTitle">↻ 重新發牌</h2><p>換一手牌，重新開始這一局。</p></div><button class="close" data-close aria-label="取消重新發牌">×</button></div><div class="modal-body"><p class="confirm-copy">目前這局將作廢，不計勝負；已完成的累計戰績會保留。</p></div><div class="modal-footer"><button class="action-btn" data-close>繼續這局</button><button class="action-btn primary" id="confirmRestartBtn">重新發牌</button></div></dialog>
+<script>
+/* Taiwan Big Two rules and round state. No DOM or external dependencies.
+ * Rank order: 3 … K, A, 2. Suit order: clubs, diamonds, hearts, spades.
+ * Ordinary hands: single, pair, straight, full house. Only matching types compete.
+ * Bombs: four of a kind + kicker < straight flush < thirteen-rank dragon.
+ * Bombs cut any ordinary hand, regardless of card count. A plain flush is invalid.
+ * Straight order: A2345 < 34567 … 10JQKA < 23456; no other wraparound straights.
+ * Passing locks a seat out until the trick resets; later plays do not clear passes.
+ * legalMoves returns combo objects; chooseMove returns an array of cards or null (pass).
+ * chooseMove(hand, lastPlay, { round, seat }) reads only public information from the round.
+ */
+(function (root) {
+  'use strict';
+
+  const SUITS = ['C', 'D', 'H', 'S'];
+  const RANKS = [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 2];
+  const NAMES = {
+    single: '單張', pair: '對子', straight: '順子',
+    fullhouse: '葫蘆', four: '鐵支', straightflush: '同花順', dragon: '一條龍'
+  };
+  const labelOf = rank => ({ 11: 'J', 12: 'Q', 13: 'K', 14: 'A' }[rank] || String(rank));
+  const rankValue = rank => rank === 2 ? 12 : rank - 3;
+  const suitValue = suit => SUITS.indexOf(suit);
+  const compareCards = (a, b) => rankValue(a.rank) - rankValue(b.rank) || suitValue(a.suit) - suitValue(b.suit);
+
+  function createDeck() {
+    return SUITS.flatMap(suit => RANKS.map(rank => ({ id: suit + labelOf(rank), suit, rank, label: labelOf(rank) })));
+  }
+
+  function sortCards(cards) { return cards.slice().sort(compareCards); }
+
+  function validCard(card) {
+    return !!card && SUITS.includes(card.suit) && Number.isInteger(card.rank) &&
+      card.rank >= 2 && card.rank <= 14 && card.id === card.suit + labelOf(card.rank);
+  }
+
+  function compareKeys(a, b) {
+    for (let i = 0; i < Math.max(a.length, b.length); i++) {
+      const difference = (a[i] || 0) - (b[i] || 0);
+      if (difference) return difference;
+    }
+    return 0;
+  }
+
+  function compareCombos(a, b) {
+    return a.size - b.size || a.tier - b.tier || compareKeys(a.key, b.key);
+  }
+
+  function classify(input) {
+    if (!Array.isArray(input) || ![1, 2, 5, 13].includes(input.length) ||
+        !input.every(validCard) || new Set(input.map(card => card.id)).size !== input.length) return null;
+    const cards = sortCards(input);
+    const size = cards.length;
+    const groups = new Map();
+    cards.forEach(card => groups.set(card.rank, (groups.get(card.rank) || 0) + 1));
+    const make = (type, tier, key) => ({ size, type, name: NAMES[type], tier, key, cards });
+    if (size === 1) return make('single', 0, [rankValue(cards[0].rank), suitValue(cards[0].suit)]);
+    if (size === 2) {
+      return groups.size === 1 ? make('pair', 0,
+        [rankValue(cards[0].rank), Math.max(...cards.map(card => suitValue(card.suit)))]) : null;
+    }
+    if (size === 13) return groups.size === 13 ? make('dragon', 5, []) : null;
+
+    const isFlush = cards.every(card => card.suit === cards[0].suit);
+    const naturalRanks = [...groups.keys()].sort((a, b) => a - b);
+    let straightHigh = null;
+    let straightOrder = null;
+    if (naturalRanks.length === 5) {
+      if (naturalRanks.join(',') === '2,3,4,5,14') {
+        straightHigh = 5;
+        straightOrder = 0;
+      } else if (naturalRanks.join(',') === '2,3,4,5,6') {
+        straightHigh = 6;
+        straightOrder = 9;
+      } else if (naturalRanks[0] >= 3 && naturalRanks.every((rank, index) => rank === naturalRanks[0] + index)) {
+        straightHigh = naturalRanks[4];
+        straightOrder = straightHigh - 6;
+      }
+    }
+    const straightKey = () => [straightOrder, suitValue(cards.find(card => card.rank === straightHigh).suit)];
+    if (straightHigh !== null && isFlush) return make('straightflush', 4, straightKey());
+    const fourRank = [...groups.keys()].find(rank => groups.get(rank) === 4);
+    if (fourRank !== undefined) return make('four', 3, [rankValue(fourRank)]);
+    const tripleRank = [...groups.keys()].find(rank => groups.get(rank) === 3);
+    if (groups.size === 2 && tripleRank !== undefined) return make('fullhouse', 2, [rankValue(tripleRank)]);
+    if (straightHigh !== null) return make('straight', 0, straightKey());
+    return null;
+  }
+
+  // Accept a combo, a lastPlay record, or an array of cards as the target.
+  function targetCombo(target) {
+    if (!target) return null;
+    if (Array.isArray(target)) return classify(target);
+    if (target.combo) return target.combo;
+    if (target.size && Array.isArray(target.key)) return target;
+    if (Array.isArray(target.cards)) return classify(target.cards);
+    return null;
+  }
+
+  function isBomb(combo) {
+    return !!combo && ['four', 'straightflush', 'dragon'].includes(combo.type);
+  }
+
+  function beats(candidate, target) {
+    const next = targetCombo(candidate);
+    const previous = targetCombo(target);
+    if (!next) return false;
+    if (!target) return true;
+    if (!previous) return false;
+    if (isBomb(next)) {
+      return !isBomb(previous) || next.tier > previous.tier ||
+        (next.tier === previous.tier && compareKeys(next.key, previous.key) > 0);
+    }
+    return !isBomb(previous) && next.size === previous.size && next.type === previous.type &&
+      compareKeys(next.key, previous.key) > 0;
+  }
+
+  function legalMoves(hand, target = null, mustIncludeC3 = false) {
+    if (!Array.isArray(hand) || !hand.every(validCard) || new Set(hand.map(card => card.id)).size !== hand.length) return [];
+    const previous = targetCombo(target);
+    if (target && !previous) return [];
+    const cards = sortCards(hand);
+    const sizes = previous ? [...new Set([previous.size, 5, 13])] : [1, 2, 5, 13];
+    const result = [];
+    for (const size of sizes) {
+      if (size > cards.length) continue;
+      const selected = [];
+      const visit = start => {
+        if (selected.length === size) {
+          if (mustIncludeC3 && !selected.some(card => card.id === 'C3')) return;
+          const combo = classify(selected);
+          if (combo && (!previous || beats(combo, previous))) result.push(combo);
+          return;
+        }
+        for (let i = start; i <= cards.length - (size - selected.length); i++) {
+          selected.push(cards[i]);
+          visit(i + 1);
+          selected.pop();
+        }
+      };
+      visit(0);
+    }
+    return result.sort(compareCombos);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Computer player. It only uses public information: its own hand, the cards
+  // already played, each seat's card count and who has passed in this trick.
+  //  1. A planner splits the hand into combos. Combos the unseen cards cannot
+  //     beat are cheap to keep because they win the lead back.
+  //  2. The planner ranks the candidate plays (and passing).
+  //  3. The best few are compared by Monte Carlo: deal the unseen cards to the
+  //     other hands at random, play each candidate out with a fast policy, and
+  //     keep the one with the best average score.
+  //  4. Early in the round (every opponent still holds 8+ cards) the planner
+  //     sheds the weaker card when following and keeps aces and twos for later;
+  //     the simulations only compare plays it rates close to its best, and
+  //     override it only when another play is clearly better.
+  // ---------------------------------------------------------------------------
+  const DECK = createDeck();
+  const cardKey = card => rankValue(card.rank) * 4 + suitValue(card.suit);   // 0..51 in game order
+  // The five rank values of each straight (A2345 lowest ... 23456 highest) and of its high card.
+  const STRAIGHT_RANKS = [[11, 12, 0, 1, 2]];
+  for (let k = 1; k <= 8; k++) STRAIGHT_RANKS.push([k - 1, k, k + 1, k + 2, k + 3]);
+  STRAIGHT_RANKS.push([12, 0, 1, 2, 3]);
+  const STRAIGHT_HIGH = [2, 4, 5, 6, 7, 8, 9, 10, 11, 3];
+
+  function unseenInfo(hand, played) {
+    const seen = new Set(hand.map(card => card.id).concat(played));
+    const info = { has: new Array(52).fill(false), count: new Array(13).fill(0), top: new Array(13).fill(-1), size: 0 };
+    for (const card of DECK) {
+      if (seen.has(card.id)) continue;
+      const rank = rankValue(card.rank), suit = suitValue(card.suit);
+      info.has[rank * 4 + suit] = true;
+      info.count[rank]++;
+      info.top[rank] = Math.max(info.top[rank], suit);
+      info.size++;
+    }
+    return info;
+  }
+
+  function straightIn(unseen, order, minHighSuit = -1, flushSuit = -1) {
+    for (const rank of STRAIGHT_RANKS[order]) {
+      if (flushSuit >= 0 ? !unseen.has[rank * 4 + flushSuit] : !unseen.count[rank]) return false;
+    }
+    if (minHighSuit < 0) return true;
+    if (flushSuit >= 0) return flushSuit > minHighSuit;
+    for (let suit = minHighSuit + 1; suit < 4; suit++) if (unseen.has[STRAIGHT_HIGH[order] * 4 + suit]) return true;
+    return false;
+  }
+
+  function straightFlushIn(unseen, minOrder = 0, minSuit = -1) {
+    for (let order = minOrder; order < 10; order++) {
+      for (let suit = 0; suit < 4; suit++) {
+        if ((order > minOrder || suit > minSuit) && straightIn(unseen, order, -1, suit)) return true;
+      }
+    }
+    return false;
+  }
+
+  // How many different ways the unseen cards could beat `combo` with the same type
+  // (capped at 6). Zero means nobody can answer it; bombs are ignored as too rare.
+  function threatCount(combo, unseen) {
+    const [a, b] = combo.key;
+    let n = 0;
+    switch (combo.type) {
+      case 'single':
+        for (let key = a * 4 + b + 1; key < 52 && n < 6; key++) if (unseen.has[key]) n++;
+        return n;
+      case 'pair':
+        for (let rank = a; rank < 13; rank++) if (unseen.count[rank] >= 2 && (rank > a || unseen.top[rank] > b)) n += 2;
+        return Math.min(n, 6);
+      case 'straight':
+        for (let order = a; order < 10; order++) if (straightIn(unseen, order, order === a ? b : -1)) n += 2;
+        return Math.min(n, 6);
+      case 'fullhouse':
+        for (let rank = a + 1; rank < 13; rank++) {
+          if (unseen.count[rank] >= 3 && unseen.count.some((count, other) => other !== rank && count >= 2)) n += 2;
+        }
+        return Math.min(n, 6);
+      case 'four':
+        return unseen.count.some((count, rank) => rank > a && count === 4) || straightFlushIn(unseen) ? 2 : 0;
+      case 'straightflush':
+        return straightFlushIn(unseen, a, b) ? 2 : 0;
+      default:
+        return 0;
+    }
+  }
+
+  // A combo is a boss when none of the given opponents can answer it.
+  const isBoss = (combo, unseen, counts) => !counts.some(count => count >= combo.size) || threatCount(combo, unseen) === 0;
+
+  // Split the hand into combos at the lowest cost: a boss costs 0.25 (it wins the lead back),
+  // other combos cost 0.4 to 1 depending on how many ways they can be beaten.
+  function makePlanner(hand, unseen, counts) {
+    const index = new Map(hand.map((card, i) => [card.id, i]));
+    const maskOf = cards => cards.reduce((mask, card) => mask | (1 << index.get(card.id)), 0);
+    const groups = legalMoves(hand).map(combo => {
+      const boss = isBoss(combo, unseen, counts);
+      const cost = boss ? 0.25 : 1 - 0.6 * Math.max(0, 1 - threatCount(combo, unseen) / 6);
+      return { combo, mask: maskOf(combo.cards), boss, cost };
+    });
+    // each group is filed under its lowest card, so every partition is tried exactly once
+    const buckets = hand.map(() => []);
+    for (const group of groups) buckets[31 - Math.clz32(group.mask & -group.mask)].push(group);
+    const memo = new Map([[0, { cost: 0, count: 0, group: null }]]);
+    function best(mask) {
+      let result = memo.get(mask);
+      if (result) return result;
+      const first = 31 - Math.clz32(mask & -mask);
+      result = { cost: Infinity, count: 0, group: null };
+      for (const group of buckets[first]) {
+        if ((group.mask & mask) !== group.mask) continue;
+        const rest = best(mask ^ group.mask);
+        const cost = group.cost + rest.cost, count = rest.count + 1;
+        if (cost < result.cost - 1e-9 || (Math.abs(cost - result.cost) < 1e-9 && count < result.count)) result = { cost, count, group };
+      }
+      memo.set(mask, result);
+      return result;
+    }
+    function plan(mask) {
+      const list = [];
+      for (; mask; mask ^= best(mask).group.mask) list.push(best(mask).group);
+      return list;
+    }
+    return { groups, maskOf, best, plan, full: (1 << hand.length) - 1 };
+  }
+
+  // lower = weaker, the kind of combo to get rid of first
+  function weakness(combo) {
+    const [a, b = 0] = combo.key;
+    switch (combo.type) {
+      case 'single': return a + b / 4;
+      case 'pair': return a + b / 4 - 1.5;
+      case 'straight': return a * 1.2 - 4;
+      case 'fullhouse': return a - 4;
+      default: return 20 + (a || 0);
+    }
+  }
+
+  // "Early in the round": every opponent still holds at least this many cards.
+  const EARLY_MIN_CARDS = 8;
+
+  // Score every candidate with the planner (higher = better). Passing is { cards: null }.
+  function rankMoves(view) {
+    const { hand, played, counts, seat, passed, opening } = view;
+    const target = view.target;
+    const moves = legalMoves(hand, target, opening);
+    if (!moves.length) return target ? [{ cards: null, score: 0 }] : [];
+    const finishing = moves.find(move => move.size === hand.length);
+    if (finishing) return [{ cards: finishing.cards, score: Infinity }];
+
+    const unseen = unseenInfo(hand, played);
+    const opponents = [1, 2, 3].map(d => (seat + d) % 4);
+    const oppCounts = opponents.map(s => counts[s]);
+    const minOpp = Math.min(...oppCounts);
+    const planner = makePlanner(hand, unseen, oppCounts);
+    const before = planner.best(planner.full);
+    const plan = planner.plan(planner.full);
+    const weak = plan.filter(group => !group.boss).length;
+    const groupOf = new Map(planner.groups.map(group => [group.mask, group]));
+    const inPlan = new Set(plan.map(group => group.mask));
+
+    if (!target) {
+      const danger = oppCounts.some(count => count <= 2);
+      return moves.map(move => {
+        const mask = planner.maskOf(move.cards);
+        const boss = groupOf.get(mask).boss;
+        let s = planner.best(planner.full ^ mask).cost * 10 + weakness(move) * 0.3 - move.size * 0.6;
+        if (weak <= 1 && !opening) s -= boss ? 50 : 0;                   // can run out: cash the bosses first
+        if (danger && !boss) {                                           // never hand a nearly-finished player an easy lead
+          if (move.size === 1 && oppCounts.includes(1)) s += 30 - weakness(move) * 1.5;
+          if (move.size === 2 && oppCounts.includes(2)) s += 12 - weakness(move) * 0.5;
+        }
+        if (isBomb(move) && weak > 1) s += 25;                           // keep bombs unless they finish the job
+        return { cards: move.cards, score: -s };
+      }).sort((x, y) => y.score - x.score);
+    }
+
+    const active = opponents.filter(s => !passed[s]).map(s => counts[s]);
+    const threat = view.lastSeat !== null && view.lastSeat !== seat ? counts[view.lastSeat] : 99;
+    const danger = threat <= 2 || (threat <= 3 && target.size >= 2) || minOpp <= 1;
+    const behind = weak >= minOpp + 2 && minOpp <= 5;                    // cannot outrun them: every card left costs points
+    const ranked = [{ cards: null, score: 0 }];
+    for (const move of moves) {
+      const mask = planner.maskOf(move.cards);
+      const rest = planner.best(planner.full ^ mask);
+      let score = before.cost - rest.cost;                               // shedding without needing the lead
+      // the cost above treats an ace like a four once six unseen cards beat both: early on, shed the weaker one
+      if (!danger && minOpp >= EARLY_MIN_CARDS) score -= weakness(move) * 0.08;
+      const wins = isBoss(move, unseen, active);
+      if (wins) score += 0.55;
+      if (groupOf.get(mask).boss || isBomb(move)) {
+        // spending a boss or bomb only pays off when we can then run out, or to stop someone
+        const restPlan = planner.plan(planner.full ^ mask);
+        const restWeak = restPlan.filter(group => !group.boss).length;
+        if (restWeak > restPlan.length - restWeak + 1 && !danger) score -= isBomb(move) ? 2.5 : 0.9;
+      }
+      if (!inPlan.has(mask)) score -= 0.15;
+      if (danger) score += wins ? 3 : 1;
+      if (behind) score += 0.35 * move.size;
+      ranked.push({ cards: move.cards, score });
+    }
+    return ranked.sort((x, y) => y.score - x.score);
+  }
+
+  // ----- fast playouts on integer cards (combo = { type, size, value, bomb tier, keys }) -----
+  const SINGLE = 1, PAIR = 2, STRAIGHT = 5, FULLHOUSE = 6, FOUR = 7, STRAIGHTFLUSH = 8, DRAGON = 13;
+  const fastBeats = (a, b) => !b || (a.bomb ? !b.bomb || a.bomb > b.bomb || (a.bomb === b.bomb && a.value > b.value)
+    : !b.bomb && a.type === b.type && a.value > b.value);
+
+  function fastCombo(cards) {
+    const combo = classify(cards);
+    const type = { single: SINGLE, pair: PAIR, straight: STRAIGHT, fullhouse: FULLHOUSE, four: FOUR, straightflush: STRAIGHTFLUSH, dragon: DRAGON }[combo.type];
+    const bomb = { four: 1, straightflush: 2, dragon: 3 }[combo.type] || 0;
+    const value = combo.key.length === 2 ? combo.key[0] * 4 + combo.key[1] : combo.key[0] || 0;
+    return { type, size: cards.length, value, bomb, keys: cards.map(cardKey) };
+  }
+
+  // Greedy split used in playouts: fours, straights built from lone cards, full houses, pairs, singles.
+  function fastPartition(keys) {
+    const byRank = Array.from({ length: 13 }, () => []);
+    for (const key of keys) byRank[key >> 2].push(key);
+    if (keys.length === 13 && byRank.every(cards => cards.length === 1)) return [{ type: DRAGON, size: 13, value: 0, bomb: 3, keys: keys.slice() }];
+    const out = [], fours = [];
+    for (let r = 0; r < 13; r++) if (byRank[r].length === 4) { fours.push(byRank[r]); byRank[r] = []; }
+    for (let pass = 0; pass < 2; pass++) {
+      for (let order = 0; order < 10; order++) {
+        const ranks = STRAIGHT_RANKS[order];
+        if (!ranks.every(r => byRank[r].length) || ranks.filter(r => byRank[r].length === 1).length < 3) continue;
+        const cards = ranks.map(r => byRank[r].shift());
+        const high = cards[ranks.indexOf(STRAIGHT_HIGH[order])];
+        const flush = cards.every(key => (key & 3) === (cards[0] & 3));
+        out.push({ type: flush ? STRAIGHTFLUSH : STRAIGHT, size: 5, value: order * 4 + (high & 3), bomb: flush ? 2 : 0, keys: cards });
+        break;
+      }
+    }
+    const pairRanks = [];
+    for (let r = 0; r < 13; r++) if (byRank[r].length === 2) pairRanks.push(r);
+    for (let r = 0; r < 13; r++) {
+      if (byRank[r].length !== 3 || !pairRanks.length) continue;
+      const p = pairRanks.shift();
+      out.push({ type: FULLHOUSE, size: 5, value: r, bomb: 0, keys: byRank[r].concat(byRank[p]) });
+      byRank[r] = []; byRank[p] = [];
+    }
+    for (let r = 0; r < 13; r++) {
+      const cards = byRank[r];
+      if (cards.length === 3) {
+        out.push({ type: PAIR, size: 2, value: r * 4 + (cards[2] & 3), bomb: 0, keys: [cards[1], cards[2]] });
+        out.push({ type: SINGLE, size: 1, value: cards[0], bomb: 0, keys: [cards[0]] });
+      } else if (cards.length === 2) {
+        out.push({ type: PAIR, size: 2, value: r * 4 + (cards[1] & 3), bomb: 0, keys: cards });
+      } else if (cards.length === 1) {
+        out.push({ type: SINGLE, size: 1, value: cards[0], bomb: 0, keys: cards });
+      }
+    }
+    for (const four of fours) {
+      let kicker = -1;
+      out.forEach((combo, i) => { if (combo.type === SINGLE && (kicker < 0 || combo.value < out[kicker].value)) kicker = i; });
+      if (kicker >= 0) out.push({ type: FOUR, size: 5, value: four[0] >> 2, bomb: 1, keys: four.concat(out.splice(kicker, 1)[0].keys) });
+      else out.push({ type: PAIR, size: 2, value: four[1], bomb: 0, keys: four.slice(0, 2) }, { type: PAIR, size: 2, value: four[3], bomb: 0, keys: four.slice(2) });
+    }
+    return out;
+  }
+
+  const fastWeakness = c => c.bomb ? 100 + c.value : c.type === SINGLE ? c.value / 4 : c.type === PAIR ? c.value / 4 - 1.5
+    : c.type === STRAIGHT ? (c.value >> 2) * 1.2 - 4 : c.value - 4;
+
+  function fastPolicy(groups, hand, target, lastSeat, seat, counts) {
+    if (!target) {
+      if (groups.length === 1) return groups[0];
+      const oneLeft = [1, 2, 3].some(d => counts[(seat + d) % 4] === 1);
+      let best = null, bestScore = Infinity;
+      for (const c of groups) {
+        let s = fastWeakness(c) - c.size * 0.6 + (c.bomb ? 30 : 0);
+        if (oneLeft && c.type === SINGLE) s = 50 - c.value / 4;
+        if (s < bestScore) { bestScore = s; best = c; }
+      }
+      return best;
+    }
+    let best = null;
+    for (const c of groups) if (!c.bomb && c.type === target.type && fastBeats(c, target) && (!best || c.value < best.value)) best = c;
+    if (!best && counts[lastSeat] <= 2) {
+      // someone is about to go out: break a combo or bomb to stop them
+      if (target.type === SINGLE) {
+        for (let i = hand.length - 1; i >= 0 && !best; i--) if (hand[i] > target.value) best = { type: SINGLE, size: 1, value: hand[i], bomb: 0, keys: [hand[i]] };
+      }
+      if (!best) best = groups.find(c => c.bomb && fastBeats(c, target)) || null;
+    }
+    return best;
+  }
+
+  const penalty = n => n * (n === 13 ? 3 : n >= 10 ? 2 : 1);
+
+  // Play a round out; returns the score change of seat `me`.
+  function playout(state, me) {
+    const hands = state.hands, groups = hands.map(fastPartition), counts = hands.map(hand => hand.length);
+    const passed = state.passed.slice();
+    let { turn, target, lastSeat, passes } = state;
+    for (let guard = 0; guard < 400; guard++) {
+      const combo = fastPolicy(groups[turn], hands[turn], target, lastSeat, turn, counts);
+      if (combo) {
+        const hand = hands[turn];
+        for (const key of combo.keys) hand.splice(hand.indexOf(key), 1);
+        counts[turn] = hand.length;
+        if (!hand.length) {
+          if (turn !== me) return -penalty(counts[me]);
+          return counts.reduce((sum, count, s) => sum + (s === me ? 0 : penalty(count)), 0);
+        }
+        groups[turn] = groups[turn].filter(c => c !== combo);
+        target = combo;
+        lastSeat = turn;
+      } else {
+        passed[turn] = true;
+        if (++passes === 3) {
+          target = null; passes = 0; passed.fill(false); turn = lastSeat;
+          continue;
+        }
+      }
+      do turn = (turn + 1) % 4; while (passed[turn]);
+    }
+    return 0;
+  }
+
+  // Public information for `seat`; never looks inside the other hands.
+  function viewOf(round, seat) {
+    const played = [];
+    for (const action of round.actions) if (action.type === 'play') action.cards.forEach(card => played.push(card.id));
+    return {
+      hand: round.hands[seat], seat, played, opening: round.opening,
+      target: round.lastPlay ? round.lastPlay.combo : null, lastSeat: round.lastPlay ? round.lastPlay.seat : null,
+      counts: round.hands.map(hand => hand.length), passed: round.passed.slice(), passes: round.passes
+    };
+  }
+
+  const AI_BUDGET_MS = 150, AI_CANDIDATES = 7, AI_MIN_SAMPLES = 30, AI_MAX_SAMPLES = 400;
+
+  function chooseFromView(view) {
+    if (view.hand.length > 13) {
+      // custom deals with more than 13 cards: the bit-mask planner is sized for one normal hand
+      const moves = legalMoves(view.hand, view.target, view.opening);
+      return moves.length ? (view.target ? moves[0] : moves[moves.length - 1]).cards.slice() : null;
+    }
+    const ranked = rankMoves(view);
+    if (!ranked.length) return null;
+    if (ranked.length === 1 || ranked[0].score === Infinity) return ranked[0].cards ? ranked[0].cards.slice() : null;
+    // Early in the round the playouts overrate grabbing the lead with an ace or a two, so when following
+    // only the plays the planner rates close to its best are compared (passing is still added below).
+    const early = [1, 2, 3].every(d => view.counts[(view.seat + d) % 4] >= EARLY_MIN_CARDS);
+    const candidates = ranked.slice(0, AI_CANDIDATES).filter(c => !view.target || !early || c.score >= ranked[0].score - 0.6);
+    if (view.target && !candidates.some(c => !c.cards)) candidates.push({ cards: null });
+    const me = view.seat;
+    const myKeys = view.hand.map(cardKey);
+    const seen = new Set(myKeys.concat(DECK.filter(card => view.played.includes(card.id)).map(cardKey)));
+    const unseen = [];
+    for (let key = 0; key < 52; key++) if (!seen.has(key)) unseen.push(key);
+    const target = view.target ? fastCombo(view.target.cards) : null;
+    const combos = candidates.map(c => (c.cards ? fastCombo(c.cards) : null));
+    const totals = new Array(candidates.length).fill(0);
+    const diffSq = new Array(candidates.length).fill(0);   // squared difference from candidate 0 on the same deal
+    const results = new Array(candidates.length).fill(0);
+    let samples = 0;
+    const start = Date.now();
+    for (let n = 0; n < AI_MAX_SAMPLES && (n < AI_MIN_SAMPLES || Date.now() - start < AI_BUDGET_MS); n++) {
+      for (let i = unseen.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [unseen[i], unseen[j]] = [unseen[j], unseen[i]];
+      }
+      const dealt = [[], [], [], []];
+      let used = 0;
+      for (let d = 1; d <= 3; d++) {
+        const s = (me + d) % 4;
+        dealt[s] = unseen.slice(used, used + view.counts[s]);
+        used += view.counts[s];
+      }
+      combos.forEach((combo, i) => {
+        const hands = dealt.map(hand => hand.slice());
+        hands[me] = myKeys.slice();
+        const state = { hands, turn: me, target, lastSeat: view.lastSeat === null ? me : view.lastSeat, passed: view.passed.slice(), passes: view.passes };
+        if (combo) {
+          for (const key of combo.keys) hands[me].splice(hands[me].indexOf(key), 1);
+          state.target = combo;
+          state.lastSeat = me;
+        } else {
+          state.passed[me] = true;
+          if (++state.passes === 3) {
+            Object.assign(state, { target: null, passes: 0, turn: state.lastSeat });
+            state.passed.fill(false);
+          }
+        }
+        if (state.turn === me) do state.turn = (state.turn + 1) % 4; while (state.passed[state.turn]);
+        results[i] = playout(state, me);
+      });
+      for (let i = 0; i < candidates.length; i++) {
+        totals[i] += results[i];
+        diffSq[i] += (results[i] - results[0]) ** 2;
+      }
+      samples++;
+    }
+    // Keep the best average. Early in the round another play must also beat the planner's choice
+    // (candidate 0) by more than two standard errors, so noise alone rarely overrides the planner.
+    let best = 0, bestGain = 0;
+    for (let i = 1; i < candidates.length; i++) {
+      const gain = (totals[i] - totals[0]) / samples;
+      const se = Math.sqrt(Math.max(0, diffSq[i] / samples - gain * gain) / samples);
+      if ((!early || gain > 2 * se) && gain > bestGain) { best = i; bestGain = gain; }
+    }
+    return candidates[best].cards ? candidates[best].cards.slice() : null;
+  }
+
+  // options.round + options.seat give the full public view; the older options still work for custom hands.
+  function chooseMove(hand, target = null, options = {}) {
+    if (options.round) return chooseFromView(viewOf(options.round, options.seat));
+    const counts = [hand.length, 13, 13, 13];
+    if (options.opponentMin) counts[1] = options.opponentMin;
+    return chooseFromView({
+      hand, seat: 0, played: [], opening: !!options.mustIncludeC3, target: targetCombo(target),
+      lastSeat: target ? 1 : null, counts, passed: [false, false, false, false], passes: 0
+    });
+  }
+
+  class Round {
+    constructor({ hands, rng = Math.random } = {}) {
+      if (hands !== undefined) {
+        if (!Array.isArray(hands) || hands.length !== 4 || hands.some(hand => !Array.isArray(hand) || !hand.length)) {
+          throw new Error('需要四位玩家，每位至少一張牌。');
+        }
+        const all = hands.flat();
+        if (!all.every(validCard) || new Set(all.map(card => card.id)).size !== all.length) throw new Error('手牌包含無效或重複的牌。');
+        if (!all.some(card => card.id === 'C3')) throw new Error('起始手牌必須包含梅花 3。');
+        this.hands = hands.map(hand => sortCards(hand.map(card => ({ ...card, label: labelOf(card.rank) }))));
+      } else {
+        const deck = createDeck();
+        for (let i = deck.length - 1; i > 0; i--) {
+          const value = rng();
+          if (!Number.isFinite(value) || value < 0 || value >= 1) throw new Error('亂數值必須介於 0（含）與 1（不含）之間。');
+          const j = Math.floor(value * (i + 1));
+          [deck[i], deck[j]] = [deck[j], deck[i]];
+        }
+        this.hands = [[], [], [], []];
+        deck.forEach((card, index) => this.hands[index % 4].push(card));
+        this.hands = this.hands.map(sortCards);
+      }
+      this.turn = this.hands.findIndex(hand => hand.some(card => card.id === 'C3'));
+      this.lastPlay = null;
+      this.passes = 0;
+      this.passed = [false, false, false, false];
+      this.opening = true;
+      this.over = false;
+      this.winner = null;
+      this.actions = [];
+      this.lastAction = { type: 'reset', seat: this.turn };
+      this.turnCount = 0;
+    }
+
+    checkTurn(seat) {
+      if (this.over) return '本局已結束，請開始新局。';
+      if (!Number.isInteger(seat) || seat < 0 || seat > 3) return '無效的玩家。';
+      if (this.passed[seat]) return '本輪已不出，請等下一輪再出牌。';
+      if (seat !== this.turn) return '還沒輪到你出牌。';
+      return null;
+    }
+
+    nextActiveSeat(seat) {
+      for (let offset = 1; offset <= 4; offset++) {
+        const next = (seat + offset) % 4;
+        if (!this.passed[next]) return next;
+      }
+      return seat;
+    }
+
+    play(seat, input) {
+      const error = this.checkTurn(seat);
+      if (error) return { ok: false, error };
+      if (!Array.isArray(input) || !input.length) return { ok: false, error: '請先選擇要出的牌。' };
+      const ids = input.map(card => typeof card === 'string' ? card : card && card.id);
+      if (new Set(ids).size !== ids.length) return { ok: false, error: '不能重複選擇同一張牌。' };
+      const owned = new Map(this.hands[seat].map(card => [card.id, card]));
+      if (ids.some(id => !owned.has(id))) return { ok: false, error: '只能出自己手上的牌。' };
+      const cards = ids.map(id => owned.get(id));
+      const combo = classify(cards);
+      if (!combo) return { ok: false, error: '這不是有效牌型，請選單張、對子、合法五張牌型或一條龍。' };
+      if (this.opening && !ids.includes('C3')) return { ok: false, error: '第一手必須包含梅花 3。' };
+      if (this.lastPlay && !beats(combo, this.lastPlay.combo)) {
+        const previous = this.lastPlay.combo;
+        const error = !isBomb(combo) && !isBomb(previous) && combo.type !== previous.type
+          ? '一般牌必須使用相同牌型；也可用鐵支、同花順或一條龍切牌。'
+          : '出的牌必須大於桌面牌型，或使用更大的炸彈切牌。';
+        return { ok: false, error };
+      }
+
+      const played = new Set(ids);
+      this.hands[seat] = this.hands[seat].filter(card => !played.has(card.id));
+      this.lastPlay = { seat, cards: combo.cards.slice(), combo };
+      this.opening = false;
+      this.lastAction = { type: 'play', seat, cards: combo.cards.slice(), combo };
+      this.actions.push(this.lastAction);
+      this.turnCount++;
+      if (this.hands[seat].length === 0) {
+        this.over = true;
+        this.winner = seat;
+        return { ok: true, won: true };
+      }
+      this.turn = this.nextActiveSeat(seat);
+      return { ok: true, won: false };
+    }
+
+    pass(seat) {
+      const error = this.checkTurn(seat);
+      if (error) return { ok: false, error };
+      if (!this.lastPlay) return { ok: false, error: '自由出牌時不能跳過，請選擇牌型。' };
+      this.passed[seat] = true;
+      this.passes++;
+      this.lastAction = { type: 'pass', seat };
+      this.actions.push(this.lastAction);
+      this.turnCount++;
+      if (this.passes === 3) {
+        const leader = this.lastPlay.seat;
+        this.lastPlay = null;
+        this.passes = 0;
+        this.passed = [false, false, false, false];
+        this.turn = leader;
+        this.lastAction = { type: 'reset', seat: leader };
+        this.actions.push(this.lastAction);
+        return { ok: true, reset: true };
+      }
+      this.turn = this.nextActiveSeat(seat);
+      return { ok: true, reset: false };
+    }
+
+    // A copy of the round (the card objects are never changed, so they are shared).
+    // The table keeps one from before each of the player's moves so the move can be taken back.
+    clone() {
+      const copy = Object.create(Round.prototype);
+      return Object.assign(copy, this, {
+        hands: this.hands.map(hand => hand.slice()), passed: this.passed.slice(), actions: this.actions.slice()
+      });
+    }
+
+    // The first player out wins. Losers with 10–12 cards pay double, 13 pay triple.
+    scoreRound() {
+      const remaining = this.hands.map(hand => hand.length);
+      const multipliers = remaining.map(count => count === 13 ? 3 : count >= 10 ? 2 : 1);
+      const deltas = [0, 0, 0, 0];
+      if (this.over && this.winner !== null) {
+        for (let seat = 0; seat < 4; seat++) {
+          if (seat === this.winner) continue;
+          deltas[seat] = -remaining[seat] * multipliers[seat];
+          deltas[this.winner] -= deltas[seat];
+        }
+      }
+      return { deltas, remaining, multipliers };
+    }
+  }
+
+  const api = { createDeck, sortCards, classify, beats, legalMoves, chooseMove, Round };
+  root.BigTwo = api;
+  if (typeof module !== 'undefined' && module.exports) module.exports = api;
+})(typeof globalThis !== 'undefined' ? globalThis : this);
+
+</script>
+<script>
+'use strict';
+const $ = id => document.getElementById(id);
+const SUITS = {D:{symbol:'♦',name:'方塊',red:true},C:{symbol:'♣',name:'梅花',red:false},H:{symbol:'♥',name:'紅心',red:true},S:{symbol:'♠',name:'黑桃',red:false}};
+const NAMES = ['您（南家）','東家 · 老王','北家 · 小美','西家 · 阿財'];
+const SHORT = ['您','老王','小美','阿財'];
+const signed = n => n > 0 ? '+' + n : String(n);
+class BigTwoApp {
+  constructor(){
+    this.selected=new Set();this.roundNumber=1;this.timer=null;this.toastTimer=null;this.modal=null;this.soundOn=true;this.audio=null;this.hintIndex=0;this.hintKey='';this.lastActions=Array(4).fill(null);this.undoStack=[];this.stats={totals:[0,0,0,0],history:[],played:0};this.bind();this.newRound();
+  }
+  bind(){
+    $('playBtn').addEventListener('click',()=>this.playSelected());$('passBtn').addEventListener('click',()=>this.pass());$('hintBtn').addEventListener('click',()=>this.hint());$('clearBtn').addEventListener('click',()=>this.clearSelection());
+    $('undoBtn').addEventListener('click',()=>this.undo());$('recordMoreBtn').addEventListener('click',()=>this.openDialog('recordDialog'));
+    $('rulesBtn').addEventListener('click',()=>this.openDialog('rulesDialog'));$('recordBtn').addEventListener('click',()=>this.openDialog('recordDialog'));$('scoresBtn').addEventListener('click',()=>this.showScore());
+    $('restartBtn').addEventListener('click',()=>this.round.over?this.nextRound():this.openDialog('restartDialog'));
+    $('confirmRestartBtn').addEventListener('click',()=>{this.closeDialog();this.newRound();});$('nextBtn').addEventListener('click',()=>this.nextRound());
+    $('soundBtn').addEventListener('click',()=>{this.soundOn=!this.soundOn;$('soundBtn').textContent=this.soundOn?'🔊':'🔇';$('soundBtn').setAttribute('aria-label',this.soundOn?'關閉音效':'開啟音效');$('soundBtn').setAttribute('aria-pressed',String(this.soundOn));if(this.soundOn)this.tone(660);});
+    document.querySelectorAll('[data-close]').forEach(b=>b.addEventListener('click',()=>this.closeDialog()));
+    document.querySelectorAll('dialog').forEach(d=>{d.addEventListener('cancel',e=>{e.preventDefault();this.closeDialog();});d.addEventListener('click',e=>{if(e.target===d){const r=d.getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)this.closeDialog();}});});
+    document.addEventListener('keydown',e=>{if(this.modal||e.ctrlKey||e.altKey||e.metaKey||e.repeat)return;const k=e.key.toLowerCase();if(k==='escape'){this.clearSelection();return;}if(k==='enter'){if(e.target.closest('button')&&!e.target.closest('#hand'))return;e.preventDefault();this.playSelected();}else if(k==='p'){e.preventDefault();this.pass();}else if(k==='h'){e.preventDefault();this.hint();}});
+  }
+  tone(freq=520,duration=.08){if(!this.soundOn)return;try{if(!this.audio){const Audio=window.AudioContext||window.webkitAudioContext;if(!Audio)return;this.audio=new Audio();}if(this.audio.state==='suspended')this.audio.resume().catch(()=>{});const o=this.audio.createOscillator(),g=this.audio.createGain();o.type='sine';o.frequency.value=freq;g.gain.setValueAtTime(.045,this.audio.currentTime);g.gain.exponentialRampToValueAtTime(.001,this.audio.currentTime+duration);o.connect(g);g.connect(this.audio.destination);o.start();o.stop(this.audio.currentTime+duration);}catch(e){}}
+  newRound(){clearTimeout(this.timer);this.timer=null;this.round=new BigTwo.Round();this.selected.clear();this.undoStack=[];this.lastActions=Array(4).fill(null);this.hintIndex=0;this.hintKey='';this.result=null;this.render();this.scheduleAI();}
+  nextRound(){this.closeDialog();this.roundNumber++;this.newRound();}
+  openDialog(id){clearTimeout(this.timer);this.timer=null;if(this.modal)this.modal.close();this.modal=$(id);this.modal.showModal();}
+  closeDialog(){if(!this.modal)return;this.modal.close();this.modal=null;this.scheduleAI();}
+  toast(message){clearTimeout(this.toastTimer);$('toast').textContent=message;$('toast').hidden=false;this.toastTimer=setTimeout(()=>$('toast').hidden=true,2500);}
+  cardHTML(c,opening=false){const s=SUITS[c.suit];return `<span class="card-top">${c.label}<span class="suit">${s.symbol}</span></span><span class="card-center">${s.symbol}</span><span class="card-bottom">${c.label}${s.symbol}</span>${opening&&c.id==='C3'?'<span class="card-flag">首出</span>':''}`;}
+  displayCards(cards,combo){
+    if(!combo||!['straight','straightflush'].includes(combo.type))return BigTwo.sortCards(cards);
+    const ranks=cards.some(c=>c.rank===2)?(cards.some(c=>c.rank===14)?[14,2,3,4,5]:[2,3,4,5,6]):cards.map(c=>c.rank).sort((a,b)=>a-b);
+    return ranks.map(rank=>cards.find(c=>c.rank===rank));
+  }
+  render(){
+    const r=this.round;$('roundBadge').textContent=`第 ${this.roundNumber} 局`;$('moveCount').textContent=`已出 ${52-r.hands.reduce((n,h)=>n+h.length,0)} / 52 張`;
+    for(let i=0;i<4;i++){$('total'+i).textContent=signed(this.stats.totals[i]);if(i===0)continue;const panel=$('seat'+i);panel.classList.toggle('active',!r.over&&r.turn===i);panel.classList.toggle('passed',!r.over&&r.passed[i]);const n=r.hands[i].length,count=$('count'+i);count.innerHTML=`<strong>${n}</strong><small>張手牌</small>`;count.classList.toggle('danger',n<=2);panel.querySelector('.backs').innerHTML='<span class="back"></span>'.repeat(Math.min(n,6));const a=this.lastActions[i];const el=$('action'+i);el.className='seat-action'+(a?' '+a.type:'');el.textContent=r.passed[i]?'PASS · 本輪退出':a?(a.type==='pass'?'不出 PASS':a.label):'等待出牌';}
+    const pile=$('pile');pile.innerHTML='';pile.classList.toggle('long-play',!!r.lastPlay&&r.lastPlay.cards.length>5);
+    if(r.lastPlay){const p=r.lastPlay;$('arenaTitle').textContent=`${SHORT[p.seat]} 的出牌`;for(const c of this.displayCards(p.cards,p.combo)){const el=document.createElement('div');el.className='card'+(SUITS[c.suit].red?' red':'');el.innerHTML=this.cardHTML(c);el.setAttribute('aria-label',SUITS[c.suit].name+c.label);pile.appendChild(el);}$('comboBadge').textContent=`${p.combo.name} · ${p.cards.length} 張${r.passes?' · '+r.passes+' 家已PASS':''}`;}
+    else{pile.innerHTML='<div class="empty-pile"><span>♠</span></div>';$('arenaTitle').textContent=r.opening?'梅花 3 先出':'新的一輪 · 自由出牌';$('comboBadge').textContent=r.opening?'第一手必須包含 ♣3':'可重新選擇牌型';}
+    $('turnStatus').className='turn-status'+(!r.over&&r.turn===0?' your-turn':'');
+    if(r.over){$('turnStatus').textContent=`🏆 ${SHORT[r.winner]}出完手牌，贏得本局！`;}
+    else if(r.turn===0){$('turnStatus').innerHTML='<span class="dot"></span>輪到您出牌'+(r.opening?'，請帶上 ♣3':r.lastPlay?'，可同牌型接牌或切牌':'，由您自由領出');}
+    else{$('turnStatus').innerHTML=`<span class="dot"></span>${r.passed[0]?'您已PASS，本輪退出 · ':''}${SHORT[r.turn]}正在思考…`;}
+    $('yourCount').textContent=`${r.hands[0].length} 張手牌`;
+    this.renderRoundActions();this.renderPlayed();this.renderFullRecord();this.renderHand();this.renderSelection();
+    $('undoBtn').classList.toggle('unavailable',r.over||!this.undoStack.length);
+  }
+  getCurrentRoundActions(){
+    const actions=this.round.actions;let end=actions.length;
+    // 其他三家都已 PASS 後保留完整紀錄，直到領出者打出新一輪的第一手。
+    if(end&&actions[end-1].type==='reset')end--;
+    let start=0;
+    for(let i=end-1;i>=0;i--){if(actions[i].type==='reset'){start=i+1;break;}}
+    return actions.slice(start,end).filter(a=>a.type==='play'||a.type==='pass');
+  }
+  renderRoundActions(){
+    const actions=this.getCurrentRoundActions();const plays=actions.filter(a=>a.type==='play');const leader=plays.length?plays[plays.length-1]:null;
+    const closed=this.round.actions.length>0&&this.round.actions[this.round.actions.length-1].type==='reset';
+    $('roundActionsStatus').textContent=this.round.over?'本局已結束':closed?'其他三家已PASS · 新一輪出牌後清空':actions.length?`共 ${actions.length} 次行動 · 最新在上`:'等待梅花 3 開局';
+    $('roundActions').innerHTML=NAMES.map((name,seat)=>{
+      const entries=actions.map((action,index)=>({action,index})).filter(item=>item.action.seat===seat);
+      const isLeader=leader&&leader.seat===seat;
+      const content=entries.reverse().map(({action,index})=>{
+        if(action.type==='pass')return `<div class="round-action" data-action="pass"><span class="round-action-number">${index+1}</span><span class="round-pass">PASS · 不出</span></div>`;
+        const cards=this.displayCards(action.cards,action.combo).map(c=>this.chipHTML(c)).join('');
+        return `<div class="round-action" data-action="play"><span class="round-action-number">${index+1}</span><div class="round-action-content"><div class="round-action-type">${action.combo.name}</div><div class="round-play-cards">${cards}</div></div></div>`;
+      }).join('')||'<span class="round-waiting">尚未出牌</span>';
+      const locked=this.round.passed[seat];
+      return `<section class="round-player${isLeader?' leading':''}${locked?' passed':''}" data-seat="${seat}" aria-label="${name}當輪紀錄"><div class="round-player-title"><span>${name}</span>${isLeader?`<small>${closed?'本輪最後出牌':'目前領先'}</small>`:locked?'<small class="locked">本輪已退出</small>':''}</div><div class="round-player-actions">${content}</div></section>`;
+    }).join('');
+  }
+  chipHTML(c){return `<span class="round-play-card${SUITS[c.suit].red?' red':''}" data-card="${c.id}" title="${SUITS[c.suit].name}${c.label}"><b>${c.label}</b><span>${SUITS[c.suit].symbol}</span></span>`;}
+  // 已出的牌：四種花色各一列、點數由小到大；白底＝這一局已經出過，金框＝在您手上，暗的＝還在別家手上
+  renderPlayed(){
+    const out=new Set();for(const a of this.round.actions)if(a.type==='play')a.cards.forEach(c=>out.add(c.id));
+    const mine=new Set(this.round.hands[0].map(c=>c.id));
+    const html=['S','H','D','C'].map(suit=>{
+      const s=SUITS[suit];
+      return `<em${s.red?' class="red"':''} aria-hidden="true">${s.symbol}</em>`+['3','4','5','6','7','8','9','10','J','Q','K','A','2'].map(label=>{
+        const id=suit+label,state=out.has(id)?'out':mine.has(id)?'mine':'';
+        return `<i class="${s.red?'red ':''}${state}" data-card="${id}" title="${s.name}${label}：${state==='out'?'已出':state==='mine'?'在您手上':'還在別家'}">${label}</i>`;
+      }).join('');
+    }).join('');
+    document.querySelectorAll('.played-grid').forEach(el=>{el.innerHTML=html;});
+    document.querySelectorAll('.played-count').forEach(el=>{el.textContent=out.size?`已出 ${out.size} / 52 張`:'尚未出牌';});
+  }
+  // 出牌紀錄視窗：這一局從頭到現在的出牌順序，一輪一格，最新的一輪在最上面
+  renderFullRecord(){
+    const actions=this.round.actions,tricks=[];let current=null;
+    for(const a of actions){if(a.type==='reset'){current=null;continue;}if(!current){current=[];tricks.push(current);}current.push(a);}
+    const open=!this.round.over&&actions.length>0&&actions[actions.length-1].type!=='reset';
+    const count=actions.reduce((n,a)=>n+(a.type==='play'?a.cards.length:0),0);
+    $('fullRecordStatus').textContent=tricks.length?`共 ${tricks.length} 輪 · 已出 ${count} 張 · 最新在上`:'尚未出牌';
+    $('fullRecord').innerHTML=tricks.map((list,i)=>{
+      const rows=list.map(a=>`<div class="log-row" data-action="${a.type}"><span class="log-who">${SHORT[a.seat]}</span>${a.type==='pass'?'<span class="round-pass">PASS · 不出</span>':`<span class="round-action-type">${a.combo.name}</span><div class="round-play-cards">${this.displayCards(a.cards,a.combo).map(c=>this.chipHTML(c)).join('')}</div>`}</div>`).join('');
+      return `<section class="log-trick"><div class="log-trick-title"><span>第 ${i+1} 輪 · ${SHORT[list[0].seat]}領出</span>${open&&i===tricks.length-1?'<small>進行中</small>':''}</div>${rows}</section>`;
+    }).reverse().join('')||'<span class="round-waiting">這一局還沒有人出牌</span>';
+  }
+  renderHand(){const hand=$('hand');hand.innerHTML='';this.round.hands[0].forEach((c,i)=>{const b=document.createElement('button');b.type='button';b.className='card'+(SUITS[c.suit].red?' red':'')+(this.selected.has(c.id)?' selected':'');b.style.zIndex=i+1;b.dataset.card=c.id;b.innerHTML=this.cardHTML(c,this.round.opening);b.setAttribute('aria-label',SUITS[c.suit].name+' '+c.label);b.setAttribute('aria-pressed',String(this.selected.has(c.id)));b.disabled=this.round.over;b.addEventListener('click',()=>{if(this.round.over)return;this.selected.has(c.id)?this.selected.delete(c.id):this.selected.add(c.id);this.tone(420,.035);this.refreshSelected();this.renderSelection();});hand.appendChild(b);});if(!this.round.hands[0].length)hand.innerHTML='<span style="color:#fde68a;font-weight:800">🎉 手牌出完了！</span>';}
+  refreshSelected(){document.querySelectorAll('#hand .card').forEach(b=>{const on=this.selected.has(b.dataset.card);b.classList.toggle('selected',on);b.setAttribute('aria-pressed',String(on));});}
+  selection(){const cards=this.round.hands[0].filter(c=>this.selected.has(c.id));const combo=BigTwo.classify(cards);let error='';if(this.round.passed[0])error='您已PASS，本輪不能再出牌，請等待下一輪。';else if(!cards.length)error='點選手牌，再按「出牌」';else if(!combo)error=cards.length===3?'本桌不允許單獨出三條':([1,2,5,13].includes(cards.length)?'這組牌不符合牌型，請重新選取':'請選單張、對子、五張牌型或13張一條龍');else if(this.round.opening&&!cards.some(c=>c.id==='C3'))error='第一手必須包含梅花 3';else if(this.round.lastPlay&&!BigTwo.beats(combo,this.round.lastPlay.combo))error=combo.type!==this.round.lastPlay.combo.type&&!['four','straightflush','dragon'].includes(combo.type)?`請出${this.round.lastPlay.combo.name}，或用更大的切牌牌型`:'這組牌壓不過桌面的牌';return {cards,combo,error};}
+  renderSelection(){const r=this.round,s=this.selection(),myTurn=r.turn===0&&!r.over&&!r.passed[0];const el=$('selectionInfo');el.className='selection-row';if(r.over){el.textContent='本局已結束，可以查看計分或開始下一局。';}else if(r.passed[0]){el.textContent='您已PASS，本輪不能再出牌，請等待下一輪。';}else if(!myTurn){el.textContent=s.cards.length?`已選 ${s.cards.length} 張 · 等待您的回合`:'等待電腦出牌，您也可以先選好手牌。';}else if(s.error){el.textContent=s.cards.length?s.error:(r.opening?'請選含 ♣3 的合法牌型':r.lastPlay?'選取同牌型接牌或切牌，也可按「不出」':'由您領出，單張或組合都可以');if(s.cards.length)el.classList.add('invalid');}else{el.textContent=`✓ ${s.combo.name} · ${s.cards.length} 張，可以出牌`;el.classList.add('valid');}$('playBtn').disabled=!myTurn||!!s.error;$('passBtn').disabled=!myTurn||!r.lastPlay;$('hintBtn').disabled=!myTurn;$('clearBtn').disabled=!this.selected.size;$('playBtn').textContent=s.cards.length?`出牌（${s.cards.length} 張）`:'出牌';}
+  clearSelection(){this.selected.clear();this.refreshSelected();this.renderSelection();}
+  playSelected(){if(this.modal||this.round.over||this.round.turn!==0||this.round.passed[0])return;const s=this.selection();if(s.error){this.toast(s.error);return;}this.performPlay(0,s.cards);}
+  performPlay(seat,cards){const combo=BigTwo.classify(cards);const newLead=!this.round.opening&&!this.round.lastPlay;const before=seat===0?this.snapshot():null;const out=this.round.play(seat,cards);if(!out.ok){this.toast(out.error);return false;}if(before)this.undoStack.push(before);if(newLead)this.lastActions=Array(4).fill(null);this.lastActions[seat]={type:'play',label:combo.name+' '+cards.map(c=>SUITS[c.suit].symbol+c.label).join(' ')};if(seat===0)this.selected.clear();this.hintKey='';this.tone(combo.size===5?740:560,.1);if(this.round.over){this.finish();return true;}this.render();this.scheduleAI();return true;}
+  pass(){if(this.modal||this.round.over||this.round.turn!==0||this.round.passed[0])return;if(!this.round.lastPlay){this.toast('輪到您自由領出，不能不出。');return;}this.performPass(0);}
+  performPass(seat){const before=seat===0?this.snapshot():null;const out=this.round.pass(seat);if(!out.ok){this.toast(out.error);return false;}if(before)this.undoStack.push(before);this.lastActions[seat]={type:'pass'};if(seat===0)this.selected.clear();this.hintKey='';this.tone(240,.06);if(!this.round.lastPlay){this.toast(`其他三家已PASS，由${SHORT[this.round.turn]}自由領出。`);}this.render();this.scheduleAI();return true;}
+  // 悔牌用：您每次出牌或不出之前，把牌局、四家最後的動作和已選的手牌記下來
+  snapshot(){return {round:this.round.clone(),lastActions:this.lastActions.slice(),selected:[...this.selected]};}
+  // 悔牌：回到您上一次出牌（或不出）之前，那之後電腦出的牌一起收回；可以連續按。一局結算之後不能悔牌。
+  // 電腦三家還沒出的牌會重新洗過（各家張數不變），所以不能靠悔牌偷看電腦的手牌。
+  undo(){
+    if(this.modal)return;
+    if(this.round.over){this.toast('這一局已經結算，不能悔牌了。');return;}
+    if(!this.undoStack.length){this.toast('目前沒有可以悔牌的步驟：這一局您還沒出過牌，也沒按過「不出」。');return;}
+    clearTimeout(this.timer);this.timer=null;
+    const s=this.undoStack.pop();this.round=s.round;this.lastActions=s.lastActions;this.selected=new Set(s.selected);this.hintIndex=0;this.hintKey='';
+    const hands=this.round.hands,pool=[1,2,3].flatMap(seat=>hands[seat]);
+    for(let i=pool.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[pool[i],pool[j]]=[pool[j],pool[i]];}
+    let used=0;for(const seat of [1,2,3]){const n=hands[seat].length;hands[seat]=BigTwo.sortCards(pool.slice(used,used+n));used+=n;}
+    this.render();this.tone(330,.09);this.toast('↶ 已悔牌，回到您出牌之前 · 電腦三家的手牌重新洗過');this.scheduleAI();
+  }
+  hint(){if(this.modal||this.round.over||this.round.turn!==0||this.round.passed[0])return;const r=this.round,key=r.hands[0].map(c=>c.id).join(',')+'|'+(r.lastPlay?r.lastPlay.cards.map(c=>c.id).join(','):'free');const moves=BigTwo.legalMoves(r.hands[0],r.lastPlay,r.opening);if(!moves.length){this.clearSelection();this.toast('目前沒有能壓過的牌，請按「不出」。');return;}if(key!==this.hintKey){this.hintKey=key;this.hintIndex=0;const recommended=BigTwo.chooseMove(r.hands[0],r.lastPlay,{round:r,seat:0});if(recommended){const ids=recommended.map(c=>c.id).sort().join(',');const idx=moves.findIndex(m=>m.cards.map(c=>c.id).sort().join(',')===ids);if(idx>0)moves.unshift(...moves.splice(idx,1));}this.hintMoves=recommended||!r.lastPlay?moves:[null,...moves];}const move=this.hintMoves[this.hintIndex%this.hintMoves.length];this.hintIndex++;if(!move){this.clearSelection();this.toast('建議：這輪先不出，請按「不出」· 再按提示可看能出的牌');return;}this.selected=new Set(move.cards.map(c=>c.id));this.refreshSelected();this.renderSelection();this.toast(`建議：${move.name} · 再按提示可換一組`);}
+  scheduleAI(){clearTimeout(this.timer);this.timer=null;if(this.modal||this.round.over||this.round.turn===0)return;const round=this.round,seat=round.turn;this.timer=setTimeout(()=>{this.timer=null;if(this.modal||this.round!==round||round.over||round.turn!==seat)return;const cards=BigTwo.chooseMove(round.hands[seat],round.lastPlay,{round,seat});if(cards&&cards.length)this.performPlay(seat,cards);else this.performPass(seat);},950);}
+  finish(){clearTimeout(this.timer);this.timer=null;this.result=this.round.scoreRound();this.stats.totals=this.stats.totals.map((n,i)=>n+this.result.deltas[i]);this.stats.played++;this.stats.history.push({winner:this.round.winner,deltas:this.result.deltas,number:this.stats.played});this.stats.history=this.stats.history.slice(-30);this.render();this.tone(this.round.winner===0?880:440,.3);this.showScore();}
+  showScore(){const r=this.round,ended=r.over;const totals=this.stats.totals;let html='';$('scoreTitle').textContent=ended?'🏆 本局結算':'🏆 累計計分板';$('scoreSubtitle').textContent=`已完成 ${this.stats.played} 局`;
+    if(ended)html+=`<div class="score-banner"><div class="trophy">${r.winner===0?'🏆':'👏'}</div><h3>${r.winner===0?'恭喜，您贏了！':SHORT[r.winner]+'獲得本局勝利'}</h3><p>先出完手牌，收下本局所有分數。</p></div>`;
+    html+='<table class="score-table"><thead><tr><th>玩家</th><th>剩餘手牌</th><th>本局</th><th>累計</th></tr></thead><tbody>';
+    for(let i=0;i<4;i++){const score=ended?this.result.deltas[i]:null;const multi=ended?this.result.multipliers[i]:1;html+=`<tr class="${ended&&r.winner===i?'winner':''}"><td>${ended&&r.winner===i?'👑 ':''}${NAMES[i]}</td><td>${r.hands[i].length} 張${ended&&multi>1?' ×'+multi:''}</td><td class="${score>0?'positive':score<0?'negative':''}">${score===null?'進行中':signed(score)}</td><td class="${totals[i]>0?'positive':totals[i]<0?'negative':''}">${signed(totals[i])}</td></tr>`;}html+='</tbody></table>';
+    if(ended){html+='<details class="leftover"><summary>查看各家剩餘手牌</summary>';for(let i=0;i<4;i++)html+=`<div class="leftover-row">${SHORT[i]}：${r.hands[i].map(c=>`<span class="mini${SUITS[c.suit].red?' red':''}">${SUITS[c.suit].symbol}${c.label}</span>`).join('')||'已出完'}</div>`;html+='</details>';}
+    if(this.stats.history.length){html+='<div class="history"><h3>最近戰績</h3>';for(const h of [...this.stats.history].reverse().slice(0,8)){html+=`<div class="history-row"><span>${SHORT[h.winner]}獲勝</span><span>${h.deltas.map((d,i)=>SHORT[i]+' '+signed(d)).join('　')}</span></div>`;}html+='</div>';}else html+='<p class="rule-small">完成第一局後，這裡就會出現戰績。</p>';
+    $('scoreBody').innerHTML=html;$('nextBtn').hidden=!ended;this.openDialog('scoreDialog');
+  }
+}
+// 累計分數只留在這次打開的頁面；以前的版本把戰績存在瀏覽器裡，清掉
+try{localStorage.removeItem('classic-bigtwo-v1');}catch(e){}
+window.game=new BigTwoApp();
+</script>
+<script>
+/* 手機和窄的橫畫面：牌桌放不下「當輪出牌 · 四家紀錄」，改放進「📋」按鈕打開的視窗（排在視窗裡的「已出的牌」和整局出牌順序中間）；畫面變大時放回牌桌原位 */
+(function(){
+  const record=document.querySelector('.round-record'),footer=document.querySelector('.table-footer'),body=document.getElementById('recordBody');
+  const small=matchMedia('(max-width:700px),(max-width:1000px) and (min-aspect-ratio:5/4)');
+  const place=()=>{if(small.matches){body.querySelector('.full-record').before(record);return;}footer.before(record);if(game.modal===body.parentElement)game.closeDialog();};
+  place();
+  small.addEventListener('change',place);
+})();
+</script>
+</body>
+</html>

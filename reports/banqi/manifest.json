@@ -1,0 +1,35 @@
+{
+  "baseline": "8e50d139bb7887cb2b1ae8efa7ea118c217d3440",
+  "pr1": "f983b60e155fcfb5b70421d7f8ab6edc7f1ca33a",
+  "environment": {
+    "node": "v20.20.2",
+    "platform": "linux",
+    "arch": "x64",
+    "kernel": "6.8.0-1054-gcp"
+  },
+  "notes": [
+    "Source hashes in all five measurement artifacts match the delivered HTML.",
+    "TAP paths normalized to <repo> for portability; trailing whitespace removed.",
+    "Compressed JSON retains full move traces."
+  ],
+  "sha256": {
+    "games/banqi.html": "9bff8bc10f752182739ed472ab61312b1330f3d899adfb0df0aa6e6ea2929717",
+    "tests/banqi-ai.test.cjs": "a4156489a017eb27eb13f7b569a7c34383adfd683beec7618ab70914eb1d3e04",
+    "tests/banqi/README.md": "c52bc817ecda96eddde5212f3bee682798f9822346100aadcd7bbf8128a8b150",
+    "tests/banqi/bench.cjs": "37350365a8edcd8efe79cc2b902f1541f48630c15e682f46356714fde647d133",
+    "tests/banqi/harness.cjs": "4ef1306ef79cddb14bfa94613f3c3d17c73f4ed2988ee9069eebf3a2d00edb74",
+    "tests/banqi/match.cjs": "a64ac09b40379bbb2dcb5c2acd0a617039d7253eff7a202c44877ff99d30fc23",
+    "tests/banqi/positions.cjs": "c2631f965ab341ed7f712cc6c72fa07602eda68dd228f0c5439a021bfbc5bf57",
+    "tests/banqi/summarize.cjs": "76574ab04be739ca561ceb23acd66280481cdffc8891462a0c8d6fc14739f86f",
+    "reports/banqi/README.md": "a574613cdb036badf4e927f63baaa5b8d0fbec4f2d49190d391d5657aae38b1d",
+    "reports/banqi/ablation-pressure.json.gz": "a16ff3e21317acf254477520f207c8978b8b3e1d4d3dc095eec3211aaf9246f9",
+    "reports/banqi/fixed.json": "90e396c2b12ab0199d74a796248b2b940ff165477b1455a3aaf7596833cbae45",
+    "reports/banqi/match-summary.txt": "194413fae77ad5a56953d414b317e31a8f34440b0939423813817d168a4e89f3",
+    "reports/banqi/matches-1000ms.json.gz": "b43013941b162a022920d7f12719068a2eb384f58246cf35ea6c34e5f38fe8d7",
+    "reports/banqi/matches-8000nodes.json.gz": "4dd4e0b51338c478090bc60a36b5b975cdcbca68bcd0d64880b736b742c9836e",
+    "reports/banqi/tests-baseline.tap": "641b4d35e36b0ae6409435dbaef70ed43ed297f311bffd82c77f4c2683fe9323",
+    "reports/banqi/tests-current.tap": "1be2921a48d958c36948bddb6c8503cb5359f1c2b0f47a69f743ef0ed3c327ce",
+    "reports/banqi/tests-pr1.tap": "addb4473c55f94b3cb6315303d0f95c0c1e12556a18de54adf7ca0211477e99e",
+    "reports/banqi/timed.json": "c947ba6a7147a6a90958cab5b31b69488140ce13ab0978603830e398119bc5b2"
+  }
+}

@@ -1,0 +1,173 @@
+{
+  "previousHash": "9bff8bc10f752182739ed472ab61312b1330f3d899adfb0df0aa6e6ea2929717",
+  "currentHash": "05f81e88bab84a99516c9dab775e3bd89fc6ccf69487f9affdd34d18eb202834",
+  "positions": 3927,
+  "exactScores": true,
+  "exactDangerMasks": true,
+  "search": [
+    {
+      "id": "pressure",
+      "score": 96.06000476190475,
+      "nodes": 1287
+    },
+    {
+      "id": "safe_pressure",
+      "score": 117.76384999999999,
+      "nodes": 1228
+    },
+    {
+      "id": "pawn_danger",
+      "score": 12.639199999999988,
+      "nodes": 1220
+    },
+    {
+      "id": "cannon_danger",
+      "score": -41.1703714285714,
+      "nodes": 2017
+    },
+    {
+      "id": "recapture_danger",
+      "score": -125.50359999999998,
+      "nodes": 2078
+    },
+    {
+      "id": "last_counter",
+      "score": -322.27333333333337,
+      "nodes": 428
+    },
+    {
+      "id": "hidden_backup",
+      "score": -157.30213333333336,
+      "nodes": 486
+    },
+    {
+      "id": "last_king",
+      "score": -5.824933333333335,
+      "nodes": 599
+    },
+    {
+      "id": "last_target_trade",
+      "score": 129.2732,
+      "nodes": 247
+    },
+    {
+      "id": "cannon_shot",
+      "score": 164.216,
+      "nodes": 60
+    },
+    {
+      "id": "cannon_screen",
+      "score": 105.79628571428573,
+      "nodes": 228
+    },
+    {
+      "id": "forced_trade",
+      "score": -146.2752,
+      "nodes": 79
+    },
+    {
+      "id": "major_exchange",
+      "score": 113.9724,
+      "nodes": 123
+    },
+    {
+      "id": "pawn_king",
+      "score": -35.927485714285716,
+      "nodes": 20
+    },
+    {
+      "id": "few_piece",
+      "score": 284.0428,
+      "nodes": 179
+    },
+    {
+      "id": "long_pursuit",
+      "score": 278.01022857142857,
+      "nodes": 75
+    },
+    {
+      "id": "opening",
+      "score": 0.06100000000000061,
+      "nodes": 141
+    },
+    {
+      "id": "middlegame",
+      "score": 107.28999999999999,
+      "nodes": 4979
+    }
+  ],
+  "timing": [
+    {
+      "round": 0,
+      "engine": "previous",
+      "ms": 146.48827800000004,
+      "checksum": 35371.43764304624
+    },
+    {
+      "round": 0,
+      "engine": "current",
+      "ms": 140.7319490000001,
+      "checksum": 35371.43764304624
+    },
+    {
+      "round": 1,
+      "engine": "current",
+      "ms": 64.98328900000001,
+      "checksum": 35371.43764304624
+    },
+    {
+      "round": 1,
+      "engine": "previous",
+      "ms": 67.4369200000001,
+      "checksum": 35371.43764304624
+    },
+    {
+      "round": 2,
+      "engine": "previous",
+      "ms": 60.61674900000003,
+      "checksum": 35371.43764304624
+    },
+    {
+      "round": 2,
+      "engine": "current",
+      "ms": 58.25538900000015,
+      "checksum": 35371.43764304624
+    },
+    {
+      "round": 3,
+      "engine": "current",
+      "ms": 55.61323900000002,
+      "checksum": 35371.43764304624
+    },
+    {
+      "round": 3,
+      "engine": "previous",
+      "ms": 59.17070899999999,
+      "checksum": 35371.43764304624
+    },
+    {
+      "round": 4,
+      "engine": "previous",
+      "ms": 64.09534899999994,
+      "checksum": 35371.43764304624
+    },
+    {
+      "round": 4,
+      "engine": "current",
+      "ms": 56.86689999999999,
+      "checksum": 35371.43764304624
+    },
+    {
+      "round": 5,
+      "engine": "current",
+      "ms": 57.462849000000006,
+      "checksum": 35371.43764304624
+    },
+    {
+      "round": 5,
+      "engine": "previous",
+      "ms": 58.368019000000004,
+      "checksum": 35371.43764304624
+    }
+  ]
+}

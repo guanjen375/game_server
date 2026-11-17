@@ -1,0 +1,992 @@
+[
+  {
+    "experiment": "ordinary quiet evasions, ordered",
+    "config": {
+      "ms": 150,
+      "depth": 12,
+      "nodes": 20000,
+      "seeds": [
+        137
+      ],
+      "maxPlies": 260,
+      "opponent": "27136d6",
+      "production": true,
+      "minimumIteration": false,
+      "independentReveals": true,
+      "corpus": "/tmp/banqi-round2/corpus.json.gz",
+      "noise": 0.25,
+      "margin": 1,
+      "nodeVersion": "v20.20.2"
+    },
+    "sources": {
+      "current": "fcad3cf364a3785eb54ab14e441bc3bb6023c1db1eefc7e1322da6890348a3b8",
+      "opponent": "9bff8bc10f752182739ed472ab61312b1330f3d899adfb0df0aa6e6ea2929717"
+    },
+    "outcomes": {
+      "baseline": 6,
+      "current": 2
+    },
+    "games": [
+      {
+        "id": "s11-p0",
+        "seed": 137,
+        "currentSide": 0,
+        "outcome": {
+          "winner": 1,
+          "reason": "eliminate/stalemate",
+          "engine": "baseline"
+        }
+      },
+      {
+        "id": "s11-p0",
+        "seed": 137,
+        "currentSide": 1,
+        "outcome": {
+          "winner": 0,
+          "reason": "eliminate/stalemate",
+          "engine": "baseline"
+        }
+      },
+      {
+        "id": "s11-p24",
+        "seed": 137,
+        "currentSide": 0,
+        "outcome": {
+          "winner": 1,
+          "reason": "eliminate/stalemate",
+          "engine": "baseline"
+        }
+      },
+      {
+        "id": "s11-p24",
+        "seed": 137,
+        "currentSide": 1,
+        "outcome": {
+          "winner": 0,
+          "reason": "eliminate/stalemate",
+          "engine": "baseline"
+        }
+      },
+      {
+        "id": "s23-p0",
+        "seed": 137,
+        "currentSide": 0,
+        "outcome": {
+          "winner": 0,
+          "reason": "points",
+          "engine": "current"
+        }
+      },
+      {
+        "id": "s23-p0",
+        "seed": 137,
+        "currentSide": 1,
+        "outcome": {
+          "winner": 1,
+          "reason": "eliminate/stalemate",
+          "engine": "current"
+        }
+      },
+      {
+        "id": "s23-p24",
+        "seed": 137,
+        "currentSide": 0,
+        "outcome": {
+          "winner": 1,
+          "reason": "points",
+          "engine": "baseline"
+        }
+      },
+      {
+        "id": "s23-p24",
+        "seed": 137,
+        "currentSide": 1,
+        "outcome": {
+          "winner": 0,
+          "reason": "points",
+          "engine": "baseline"
+        }
+      }
+    ]
+  },
+  {
+    "experiment": "evasion warmup, second reveal at blocked root",
+    "config": {
+      "ms": 150,
+      "depth": 12,
+      "nodes": 20000,
+      "seeds": [
+        137
+      ],
+      "maxPlies": 260,
+      "opponent": "27136d6",
+      "production": true,
+      "minimumIteration": false,
+      "independentReveals": true,
+      "corpus": "/tmp/banqi-round2/corpus.json.gz",
+      "noise": 0.25,
+      "margin": 1,
+      "nodeVersion": "v20.20.2"
+    },
+    "sources": {
+      "current": "88b2a9396507703faa49c691c1f96c562d10d6f5dc816d4b6a1e8f416afd843d",
+      "opponent": "9bff8bc10f752182739ed472ab61312b1330f3d899adfb0df0aa6e6ea2929717"
+    },
+    "outcomes": {
+      "baseline": 8
+    },
+    "games": [
+      {
+        "id": "s11-p0",
+        "seed": 137,
+        "currentSide": 0,
+        "outcome": {
+          "winner": 1,
+          "reason": "eliminate/stalemate",
+          "engine": "baseline"
+        }
+      },
+      {
+        "id": "s11-p0",
+        "seed": 137,
+        "currentSide": 1,
+        "outcome": {
+          "winner": 0,
+          "reason": "eliminate/stalemate",
+          "engine": "baseline"
+        }
+      },
+      {
+        "id": "s11-p24",
+        "seed": 137,
+        "currentSide": 0,
+        "outcome": {
+          "winner": 1,
+          "reason": "eliminate/stalemate",
+          "engine": "baseline"
+        }
+      },
+      {
+        "id": "s11-p24",
+        "seed": 137,
+        "currentSide": 1,
+        "outcome": {
+          "winner": 0,
+          "reason": "eliminate/stalemate",
+          "engine": "baseline"
+        }
+      },
+      {
+        "id": "s23-p0",
+        "seed": 137,
+        "currentSide": 0,
+        "outcome": {
+          "winner": 1,
+          "reason": "eliminate/stalemate",
+          "engine": "baseline"
+        }
+      },
+      {
+        "id": "s23-p0",
+        "seed": 137,
+        "currentSide": 1,
+        "outcome": {
+          "winner": 0,
+          "reason": "eliminate/stalemate",
+          "engine": "baseline"
+        }
+      },
+      {
+        "id": "s23-p24",
+        "seed": 137,
+        "currentSide": 0,
+        "outcome": {
+          "winner": 1,
+          "reason": "eliminate/stalemate",
+          "engine": "baseline"
+        }
+      },
+      {
+        "id": "s23-p24",
+        "seed": 137,
+        "currentSide": 1,
+        "outcome": {
+          "winner": 0,
+          "reason": "points",
+          "engine": "baseline"
+        }
+      }
+    ]
+  },
+  {
+    "experiment": "selective quiet evasions",
+    "config": {
+      "ms": 150,
+      "depth": 12,
+      "nodes": 20000,
+      "seeds": [
+        137
+      ],
+      "maxPlies": 260,
+      "opponent": "27136d6",
+      "production": true,
+      "minimumIteration": false,
+      "independentReveals": true,
+      "corpus": "/tmp/banqi-round2/corpus.json.gz",
+      "noise": 0.25,
+      "margin": 1,
+      "nodeVersion": "v20.20.2"
+    },
+    "sources": {
+      "current": "b43f5c1f069ab72bd6a61c64c2cd1b5afaa6bd0b0baa350f8ff8c76298025857",
+      "opponent": "9bff8bc10f752182739ed472ab61312b1330f3d899adfb0df0aa6e6ea2929717"
+    },
+    "outcomes": {
+      "baseline": 6,
+      "current": 2
+    },
+    "games": [
+      {
+        "id": "s11-p0",
+        "seed": 137,
+        "currentSide": 0,
+        "outcome": {
+          "winner": 1,
+          "reason": "eliminate/stalemate",
+          "engine": "baseline"
+        }
+      },
+      {
+        "id": "s11-p0",
+        "seed": 137,
+        "currentSide": 1,
+        "outcome": {
+          "winner": 1,
+          "reason": "eliminate/stalemate",
+          "engine": "current"
+        }
+      },
+      {
+        "id": "s11-p24",
+        "seed": 137,
+        "currentSide": 0,
+        "outcome": {
+          "winner": 0,
+          "reason": "eliminate/stalemate",
+          "engine": "current"
+        }
+      },
+      {
+        "id": "s11-p24",
+        "seed": 137,
+        "currentSide": 1,
+        "outcome": {
+          "winner": 0,
+          "reason": "eliminate/stalemate",
+          "engine": "baseline"
+        }
+      },
+      {
+        "id": "s23-p0",
+        "seed": 137,
+        "currentSide": 0,
+        "outcome": {
+          "winner": 1,
+          "reason": "eliminate/stalemate",
+          "engine": "baseline"
+        }
+      },
+      {
+        "id": "s23-p0",
+        "seed": 137,
+        "currentSide": 1,
+        "outcome": {
+          "winner": 0,
+          "reason": "points",
+          "engine": "baseline"
+        }
+      },
+      {
+        "id": "s23-p24",
+        "seed": 137,
+        "currentSide": 0,
+        "outcome": {
+          "winner": 1,
+          "reason": "eliminate/stalemate",
+          "engine": "baseline"
+        }
+      },
+      {
+        "id": "s23-p24",
+        "seed": 137,
+        "currentSide": 1,
+        "outcome": {
+          "winner": 0,
+          "reason": "eliminate/stalemate",
+          "engine": "baseline"
+        }
+      }
+    ]
+  },
+  {
+    "experiment": "previous principal move ordering, no ordinary evasions",
+    "config": {
+      "ms": 150,
+      "depth": 12,
+      "nodes": 20000,
+      "seeds": [
+        137
+      ],
+      "maxPlies": 260,
+      "opponent": "27136d6",
+      "production": true,
+      "minimumIteration": false,
+      "independentReveals": true,
+      "corpus": "/tmp/banqi-round2/corpus.json.gz",
+      "noise": 0.25,
+      "margin": 1,
+      "nodeVersion": "v20.20.2"
+    },
+    "sources": {
+      "current": "849ad1af63f73d1962660b2a02dc89ce81eeadb49acd32ed42d0059736f793ce",
+      "opponent": "9bff8bc10f752182739ed472ab61312b1330f3d899adfb0df0aa6e6ea2929717"
+    },
+    "outcomes": {
+      "baseline": 4,
+      "current": 4
+    },
+    "games": [
+      {
+        "id": "s11-p0",
+        "seed": 137,
+        "currentSide": 0,
+        "outcome": {
+          "winner": 1,
+          "reason": "points",
+          "engine": "baseline"
+        }
+      },
+      {
+        "id": "s11-p0",
+        "seed": 137,
+        "currentSide": 1,
+        "outcome": {
+          "winner": 1,
+          "reason": "eliminate/stalemate",
+          "engine": "current"
+        }
+      },
+      {
+        "id": "s11-p24",
+        "seed": 137,
+        "currentSide": 0,
+        "outcome": {
+          "winner": 0,
+          "reason": "eliminate/stalemate",
+          "engine": "current"
+        }
+      },
+      {
+        "id": "s11-p24",
+        "seed": 137,
+        "currentSide": 1,
+        "outcome": {
+          "winner": 0,
+          "reason": "eliminate/stalemate",
+          "engine": "baseline"
+        }
+      },
+      {
+        "id": "s23-p0",
+        "seed": 137,
+        "currentSide": 0,
+        "outcome": {
+          "winner": 0,
+          "reason": "eliminate/stalemate",
+          "engine": "current"
+        }
+      },
+      {
+        "id": "s23-p0",
+        "seed": 137,
+        "currentSide": 1,
+        "outcome": {
+          "winner": 0,
+          "reason": "points",
+          "engine": "baseline"
+        }
+      },
+      {
+        "id": "s23-p24",
+        "seed": 137,
+        "currentSide": 0,
+        "outcome": {
+          "winner": 0,
+          "reason": "eliminate/stalemate",
+          "engine": "current"
+        }
+      },
+      {
+        "id": "s23-p24",
+        "seed": 137,
+        "currentSide": 1,
+        "outcome": {
+          "winner": 0,
+          "reason": "eliminate/stalemate",
+          "engine": "baseline"
+        }
+      }
+    ]
+  },
+  {
+    "experiment": "public-pool frontier estimate",
+    "config": {
+      "ms": 150,
+      "depth": 12,
+      "nodes": 20000,
+      "seeds": [
+        137
+      ],
+      "maxPlies": 260,
+      "opponent": "27136d6",
+      "production": true,
+      "minimumIteration": false,
+      "independentReveals": true,
+      "corpus": "/tmp/banqi-round2/corpus.json.gz",
+      "noise": 0.25,
+      "margin": 1,
+      "nodeVersion": "v20.20.2"
+    },
+    "sources": {
+      "current": "fa922ca9c8aa3615cfbd9fc99e23ce6ba421dbfd70bf487d87fd2629a96182e3",
+      "opponent": "9bff8bc10f752182739ed472ab61312b1330f3d899adfb0df0aa6e6ea2929717"
+    },
+    "outcomes": {
+      "current": 4,
+      "baseline": 4
+    },
+    "games": [
+      {
+        "id": "s11-p0",
+        "seed": 137,
+        "currentSide": 0,
+        "outcome": {
+          "winner": 0,
+          "reason": "eliminate/stalemate",
+          "engine": "current"
+        }
+      },
+      {
+        "id": "s11-p0",
+        "seed": 137,
+        "currentSide": 1,
+        "outcome": {
+          "winner": 0,
+          "reason": "eliminate/stalemate",
+          "engine": "baseline"
+        }
+      },
+      {
+        "id": "s11-p24",
+        "seed": 137,
+        "currentSide": 0,
+        "outcome": {
+          "winner": 0,
+          "reason": "eliminate/stalemate",
+          "engine": "current"
+        }
+      },
+      {
+        "id": "s11-p24",
+        "seed": 137,
+        "currentSide": 1,
+        "outcome": {
+          "winner": 1,
+          "reason": "eliminate/stalemate",
+          "engine": "current"
+        }
+      },
+      {
+        "id": "s23-p0",
+        "seed": 137,
+        "currentSide": 0,
+        "outcome": {
+          "winner": 1,
+          "reason": "eliminate/stalemate",
+          "engine": "baseline"
+        }
+      },
+      {
+        "id": "s23-p0",
+        "seed": 137,
+        "currentSide": 1,
+        "outcome": {
+          "winner": 0,
+          "reason": "eliminate/stalemate",
+          "engine": "baseline"
+        }
+      },
+      {
+        "id": "s23-p24",
+        "seed": 137,
+        "currentSide": 0,
+        "outcome": {
+          "winner": 0,
+          "reason": "eliminate/stalemate",
+          "engine": "current"
+        }
+      },
+      {
+        "id": "s23-p24",
+        "seed": 137,
+        "currentSide": 1,
+        "outcome": {
+          "winner": 0,
+          "reason": "eliminate/stalemate",
+          "engine": "baseline"
+        }
+      }
+    ]
+  },
+  {
+    "experiment": "frontier scaled by empty space",
+    "config": {
+      "ms": 150,
+      "depth": 12,
+      "nodes": 20000,
+      "seeds": [
+        137
+      ],
+      "maxPlies": 260,
+      "opponent": "27136d6",
+      "production": true,
+      "minimumIteration": false,
+      "independentReveals": true,
+      "corpus": "/tmp/banqi-round2/corpus.json.gz",
+      "noise": 0.25,
+      "margin": 1,
+      "nodeVersion": "v20.20.2"
+    },
+    "sources": {
+      "current": "900fd3b055eb2389f364717c847362be3fec9fad91ca80d0b25840c806dc3f2a",
+      "opponent": "9bff8bc10f752182739ed472ab61312b1330f3d899adfb0df0aa6e6ea2929717"
+    },
+    "outcomes": {
+      "current": 6,
+      "baseline": 2
+    },
+    "games": [
+      {
+        "id": "s11-p0",
+        "seed": 137,
+        "currentSide": 0,
+        "outcome": {
+          "winner": 0,
+          "reason": "points",
+          "engine": "current"
+        }
+      },
+      {
+        "id": "s11-p0",
+        "seed": 137,
+        "currentSide": 1,
+        "outcome": {
+          "winner": 0,
+          "reason": "eliminate/stalemate",
+          "engine": "baseline"
+        }
+      },
+      {
+        "id": "s11-p24",
+        "seed": 137,
+        "currentSide": 0,
+        "outcome": {
+          "winner": 0,
+          "reason": "eliminate/stalemate",
+          "engine": "current"
+        }
+      },
+      {
+        "id": "s11-p24",
+        "seed": 137,
+        "currentSide": 1,
+        "outcome": {
+          "winner": 1,
+          "reason": "eliminate/stalemate",
+          "engine": "current"
+        }
+      },
+      {
+        "id": "s23-p0",
+        "seed": 137,
+        "currentSide": 0,
+        "outcome": {
+          "winner": 0,
+          "reason": "eliminate/stalemate",
+          "engine": "current"
+        }
+      },
+      {
+        "id": "s23-p0",
+        "seed": 137,
+        "currentSide": 1,
+        "outcome": {
+          "winner": 1,
+          "reason": "eliminate/stalemate",
+          "engine": "current"
+        }
+      },
+      {
+        "id": "s23-p24",
+        "seed": 137,
+        "currentSide": 0,
+        "outcome": {
+          "winner": 0,
+          "reason": "eliminate/stalemate",
+          "engine": "current"
+        }
+      },
+      {
+        "id": "s23-p24",
+        "seed": 137,
+        "currentSide": 1,
+        "outcome": {
+          "winner": 0,
+          "reason": "eliminate/stalemate",
+          "engine": "baseline"
+        }
+      }
+    ]
+  },
+  {
+    "experiment": "second reveal at forced no-move nodes",
+    "config": {
+      "ms": 150,
+      "depth": 12,
+      "nodes": 20000,
+      "seeds": [
+        137
+      ],
+      "maxPlies": 260,
+      "opponent": "27136d6",
+      "production": true,
+      "minimumIteration": false,
+      "independentReveals": true,
+      "corpus": "/tmp/banqi-round2/corpus.json.gz",
+      "noise": 0.25,
+      "margin": 1,
+      "nodeVersion": "v20.20.2"
+    },
+    "sources": {
+      "current": "edf0a265f23ae0f46d381a8c90cf8d8b46f51cc9a2544d516394cafdf62830c6",
+      "opponent": "9bff8bc10f752182739ed472ab61312b1330f3d899adfb0df0aa6e6ea2929717"
+    },
+    "outcomes": {
+      "baseline": 4,
+      "current": 3,
+      "points": 1
+    },
+    "games": [
+      {
+        "id": "s11-p0",
+        "seed": 137,
+        "currentSide": 0,
+        "outcome": {
+          "winner": 1,
+          "reason": "points",
+          "engine": "baseline"
+        }
+      },
+      {
+        "id": "s11-p0",
+        "seed": 137,
+        "currentSide": 1,
+        "outcome": {
+          "winner": 1,
+          "reason": "eliminate/stalemate",
+          "engine": "current"
+        }
+      },
+      {
+        "id": "s11-p24",
+        "seed": 137,
+        "currentSide": 0,
+        "outcome": {
+          "winner": 0,
+          "reason": "eliminate/stalemate",
+          "engine": "current"
+        }
+      },
+      {
+        "id": "s11-p24",
+        "seed": 137,
+        "currentSide": 1,
+        "outcome": {
+          "winner": 0,
+          "reason": "eliminate/stalemate",
+          "engine": "baseline"
+        }
+      },
+      {
+        "id": "s23-p0",
+        "seed": 137,
+        "currentSide": 0,
+        "outcome": {
+          "winner": 1,
+          "reason": "eliminate/stalemate",
+          "engine": "baseline"
+        }
+      },
+      {
+        "id": "s23-p0",
+        "seed": 137,
+        "currentSide": 1,
+        "outcome": {
+          "winner": null,
+          "reason": "points",
+          "engine": null
+        }
+      },
+      {
+        "id": "s23-p24",
+        "seed": 137,
+        "currentSide": 0,
+        "outcome": {
+          "winner": 0,
+          "reason": "eliminate/stalemate",
+          "engine": "current"
+        }
+      },
+      {
+        "id": "s23-p24",
+        "seed": 137,
+        "currentSide": 1,
+        "outcome": {
+          "winner": 0,
+          "reason": "eliminate/stalemate",
+          "engine": "baseline"
+        }
+      }
+    ]
+  },
+  {
+    "experiment": "PVS and history ordering",
+    "config": {
+      "ms": 150,
+      "depth": 12,
+      "nodes": 20000,
+      "seeds": [
+        137
+      ],
+      "maxPlies": 260,
+      "opponent": "27136d6",
+      "production": true,
+      "minimumIteration": false,
+      "independentReveals": true,
+      "corpus": "/tmp/banqi-round2/corpus.json.gz",
+      "noise": 0.25,
+      "margin": 1,
+      "nodeVersion": "v20.20.2"
+    },
+    "sources": {
+      "current": "09c0ab08e66a0cf6c31cb5f3217220988e2cfa943d20f06cb57bfb19e3cd9ff9",
+      "opponent": "9bff8bc10f752182739ed472ab61312b1330f3d899adfb0df0aa6e6ea2929717"
+    },
+    "outcomes": {
+      "current": 6,
+      "baseline": 2
+    },
+    "games": [
+      {
+        "id": "s11-p0",
+        "seed": 137,
+        "currentSide": 0,
+        "outcome": {
+          "winner": 0,
+          "reason": "eliminate/stalemate",
+          "engine": "current"
+        }
+      },
+      {
+        "id": "s11-p0",
+        "seed": 137,
+        "currentSide": 1,
+        "outcome": {
+          "winner": 1,
+          "reason": "eliminate/stalemate",
+          "engine": "current"
+        }
+      },
+      {
+        "id": "s11-p24",
+        "seed": 137,
+        "currentSide": 0,
+        "outcome": {
+          "winner": 0,
+          "reason": "eliminate/stalemate",
+          "engine": "current"
+        }
+      },
+      {
+        "id": "s11-p24",
+        "seed": 137,
+        "currentSide": 1,
+        "outcome": {
+          "winner": 0,
+          "reason": "eliminate/stalemate",
+          "engine": "baseline"
+        }
+      },
+      {
+        "id": "s23-p0",
+        "seed": 137,
+        "currentSide": 0,
+        "outcome": {
+          "winner": 0,
+          "reason": "eliminate/stalemate",
+          "engine": "current"
+        }
+      },
+      {
+        "id": "s23-p0",
+        "seed": 137,
+        "currentSide": 1,
+        "outcome": {
+          "winner": 1,
+          "reason": "eliminate/stalemate",
+          "engine": "current"
+        }
+      },
+      {
+        "id": "s23-p24",
+        "seed": 137,
+        "currentSide": 0,
+        "outcome": {
+          "winner": 0,
+          "reason": "eliminate/stalemate",
+          "engine": "current"
+        }
+      },
+      {
+        "id": "s23-p24",
+        "seed": 137,
+        "currentSide": 1,
+        "outcome": {
+          "winner": 0,
+          "reason": "eliminate/stalemate",
+          "engine": "baseline"
+        }
+      }
+    ]
+  },
+  {
+    "experiment": "PVS without root flip bonus",
+    "config": {
+      "ms": 150,
+      "depth": 12,
+      "nodes": 20000,
+      "seeds": [
+        137
+      ],
+      "maxPlies": 260,
+      "opponent": "27136d6",
+      "production": true,
+      "minimumIteration": false,
+      "independentReveals": true,
+      "corpus": "/tmp/banqi-round2/corpus.json.gz",
+      "noise": 0.25,
+      "margin": 1,
+      "nodeVersion": "v20.20.2"
+    },
+    "sources": {
+      "current": "3ba2d2460351641b084c42c96f3fbbd202b65624aab1cdec4c222a5a4d069e8f",
+      "opponent": "9bff8bc10f752182739ed472ab61312b1330f3d899adfb0df0aa6e6ea2929717"
+    },
+    "outcomes": {
+      "current": 5,
+      "baseline": 3
+    },
+    "games": [
+      {
+        "id": "s11-p0",
+        "seed": 137,
+        "currentSide": 0,
+        "outcome": {
+          "winner": 0,
+          "reason": "eliminate/stalemate",
+          "engine": "current"
+        }
+      },
+      {
+        "id": "s11-p0",
+        "seed": 137,
+        "currentSide": 1,
+        "outcome": {
+          "winner": 1,
+          "reason": "eliminate/stalemate",
+          "engine": "current"
+        }
+      },
+      {
+        "id": "s11-p24",
+        "seed": 137,
+        "currentSide": 0,
+        "outcome": {
+          "winner": 0,
+          "reason": "points",
+          "engine": "current"
+        }
+      },
+      {
+        "id": "s11-p24",
+        "seed": 137,
+        "currentSide": 1,
+        "outcome": {
+          "winner": 1,
+          "reason": "eliminate/stalemate",
+          "engine": "current"
+        }
+      },
+      {
+        "id": "s23-p0",
+        "seed": 137,
+        "currentSide": 0,
+        "outcome": {
+          "winner": 1,
+          "reason": "eliminate/stalemate",
+          "engine": "baseline"
+        }
+      },
+      {
+        "id": "s23-p0",
+        "seed": 137,
+        "currentSide": 1,
+        "outcome": {
+          "winner": 0,
+          "reason": "points",
+          "engine": "baseline"
+        }
+      },
+      {
+        "id": "s23-p24",
+        "seed": 137,
+        "currentSide": 0,
+        "outcome": {
+          "winner": 0,
+          "reason": "eliminate/stalemate",
+          "engine": "current"
+        }
+      },
+      {
+        "id": "s23-p24",
+        "seed": 137,
+        "currentSide": 1,
+        "outcome": {
+          "winner": 0,
+          "reason": "eliminate/stalemate",
+          "engine": "baseline"
+        }
+      }
+    ]
+  }
+]

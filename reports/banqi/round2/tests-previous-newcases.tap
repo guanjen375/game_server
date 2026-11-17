@@ -1,0 +1,167 @@
+TAP version 13
+# Subtest: keep a forced points win instead of resetting for a pawn: color=0, mirror=false
+not ok 1 - keep a forced points win instead of resetting for a pawn: color=0, mirror=false
+  ---
+  duration_ms: 47.131059
+  location: '/home/pokedavid375/game_server/tests/banqi-middlegame.test.cjs:9:5'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    + actual - expected
+
+    + 'capture'
+    - 'move'
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 'move'
+  actual: 'capture'
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (/home/pokedavid375/game_server/tests/banqi-middlegame.test.cjs:13:16)
+    Test.runInAsyncScope (node:async_hooks:206:9)
+    Test.run (node:internal/test_runner/test:796:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:526:18)
+    node:internal/test_runner/harness:255:12
+    node:internal/process/task_queues:140:7
+    AsyncResource.runInAsyncScope (node:async_hooks:206:9)
+    AsyncResource.runMicrotask (node:internal/process/task_queues:137:8)
+  ...
+# Subtest: keep a forced points win instead of resetting for a pawn: color=0, mirror=true
+not ok 2 - keep a forced points win instead of resetting for a pawn: color=0, mirror=true
+  ---
+  duration_ms: 26.181449
+  location: '/home/pokedavid375/game_server/tests/banqi-middlegame.test.cjs:9:5'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    + actual - expected
+
+    + 'capture'
+    - 'move'
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 'move'
+  actual: 'capture'
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (/home/pokedavid375/game_server/tests/banqi-middlegame.test.cjs:13:16)
+    Test.runInAsyncScope (node:async_hooks:206:9)
+    Test.run (node:internal/test_runner/test:796:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:526:18)
+    Test.postRun (node:internal/test_runner/test:889:19)
+    Test.run (node:internal/test_runner/test:835:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:526:7)
+  ...
+# Subtest: keep a forced points win instead of resetting for a pawn: color=1, mirror=false
+not ok 3 - keep a forced points win instead of resetting for a pawn: color=1, mirror=false
+  ---
+  duration_ms: 73.696719
+  location: '/home/pokedavid375/game_server/tests/banqi-middlegame.test.cjs:9:5'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    + actual - expected
+
+    + 'capture'
+    - 'move'
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 'move'
+  actual: 'capture'
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (/home/pokedavid375/game_server/tests/banqi-middlegame.test.cjs:13:16)
+    Test.runInAsyncScope (node:async_hooks:206:9)
+    Test.run (node:internal/test_runner/test:796:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:526:18)
+    Test.postRun (node:internal/test_runner/test:889:19)
+    Test.run (node:internal/test_runner/test:835:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:526:7)
+  ...
+# Subtest: keep a forced points win instead of resetting for a pawn: color=1, mirror=true
+not ok 4 - keep a forced points win instead of resetting for a pawn: color=1, mirror=true
+  ---
+  duration_ms: 80.647418
+  location: '/home/pokedavid375/game_server/tests/banqi-middlegame.test.cjs:9:5'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    + actual - expected
+
+    + 'capture'
+    - 'move'
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 'move'
+  actual: 'capture'
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (/home/pokedavid375/game_server/tests/banqi-middlegame.test.cjs:13:16)
+    Test.runInAsyncScope (node:async_hooks:206:9)
+    Test.run (node:internal/test_runner/test:796:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:526:18)
+    Test.postRun (node:internal/test_runner/test:889:19)
+    Test.run (node:internal/test_runner/test:835:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:526:7)
+  ...
+# Subtest: a quiet evasion at the leaf uses the actual 50-ply points result
+not ok 5 - a quiet evasion at the leaf uses the actual 50-ply points result
+  ---
+  duration_ms: 42.56047
+  location: '/home/pokedavid375/game_server/tests/banqi-middlegame.test.cjs:27:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    + actual - expected
+
+    + -266.7392
+    - 99999
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 99999
+  actual: -266.7392
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (/home/pokedavid375/game_server/tests/banqi-middlegame.test.cjs:34:12)
+    Test.runInAsyncScope (node:async_hooks:206:9)
+    Test.run (node:internal/test_runner/test:796:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:526:18)
+    Test.postRun (node:internal/test_runner/test:889:19)
+    Test.run (node:internal/test_runner/test:835:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:526:7)
+  ...
+# Subtest: quiet clock extensions restore the board on completion and abort
+not ok 6 - quiet clock extensions restore the board on completion and abort
+  ---
+  duration_ms: 41.955999
+  location: '/home/pokedavid375/game_server/tests/banqi-middlegame.test.cjs:40:1'
+  failureType: 'testCodeFailure'
+  error: 'The added quiet extension was actually reached'
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: '=='
+  stack: |-
+    TestContext.<anonymous> (/home/pokedavid375/game_server/tests/banqi-middlegame.test.cjs:47:27)
+    Test.runInAsyncScope (node:async_hooks:206:9)
+    Test.run (node:internal/test_runner/test:796:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:526:18)
+    Test.postRun (node:internal/test_runner/test:889:19)
+    Test.run (node:internal/test_runner/test:835:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:526:7)
+  ...
+# Subtest: reveal candidate sets are invariant under color swaps and both reflections
+ok 7 - reveal candidate sets are invariant under color swaps and both reflections
+  ---
+  duration_ms: 44.776689
+  ...
+1..7
+# tests 7
+# suites 0
+# pass 1
+# fail 6
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 537.235329

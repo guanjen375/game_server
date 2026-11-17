@@ -1,0 +1,2182 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>經典黑白棋 Reversi - 網頁黑白棋遊戲</title>
+    <!-- 引入 Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 引入 Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&family=Noto+Serif+TC:wght@700;900&display=swap" rel="stylesheet">
+    <style>
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        :root {
+            /* 畫面可見高度：手機瀏覽器的網址列與工具列會蓋住 100vh 的底部，支援時改用 100dvh */
+            --app-h: 100vh;
+            /* 棋盤格大小：依視窗寬高自動縮放 */
+            --cell: max(28px, min(calc((100vw - 56px) / 8), calc((var(--app-h) - 320px) / 8), 72px));
+        }
+        @supports (height: 100dvh) {
+            :root { --app-h: 100dvh; }
+        }
+        @media (min-width: 640px) {
+            :root { --cell: max(34px, min(calc((100vw - 80px) / 8), calc((var(--app-h) - 360px) / 8), 88px)); }
+        }
+        @media (min-width: 1024px) {
+            :root { --cell: max(40px, min(calc((100vw - 600px) / 8), calc((var(--app-h) - 150px) / 8), 92px)); }
+        }
+        /* 棋盤格大小依棋盤區實際剩下的寬高計算，不會被上下面板擠出畫面（座標與木框共 38px） */
+        @supports (height: 1cqh) {
+            .area-board { container-type: size; --cell: max(24px, min(calc((100cqw - 38px) / 8), calc((100cqh - 38px) / 8), 76px)); }
+            @media (min-width: 640px) {
+                .area-board { --cell: max(30px, min(calc((100cqw - 38px) / 8), calc((100cqh - 38px) / 8), 88px)); }
+            }
+            @media (min-width: 1024px) {
+                .area-board { --cell: max(36px, min(calc((100cqw - 38px) / 8), calc((100cqh - 38px) / 8), 96px)); }
+            }
+        }
+        body {
+            font-family: 'Noto Sans TC', sans-serif;
+            background-color: #072b18;
+            height: var(--app-h);
+            overflow: hidden;
+            touch-action: manipulation;
+        }
+        /* 彈窗最大高度同樣以可見高度為準 */
+        .modal-h-88 { max-height: 88vh; max-height: 88dvh; }
+        .modal-h-90 { max-height: 90vh; max-height: 90dvh; }
+        /* 手機橫放時畫面太矮，放不下整個遊戲：提示轉成直向 */
+        .rotate-hint { display: none; }
+        @media (orientation: landscape) and (max-height: 500px) and (pointer: coarse) {
+            .rotate-hint { display: flex; }
+        }
+
+        /* 經典綠色絨布棋桌背景 */
+        .felt-table {
+            background: radial-gradient(circle at 50% 45%, #196c3e 0%, #0e4b28 60%, #072915 100%);
+            box-shadow: inset 0 0 80px rgba(0, 0, 0, 0.75);
+            position: relative;
+        }
+        .felt-table::before {
+            content: "";
+            position: absolute;
+            inset: 12px;
+            border: 2px solid rgba(251, 191, 36, 0.18);
+            border-radius: 24px;
+            pointer-events: none;
+        }
+
+        /* 版面：小螢幕上下排列；大螢幕左側玩家、中間棋盤、右側資訊 */
+        .rv-layout {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr);
+            grid-template-rows: auto minmax(0, 1fr) auto;
+            grid-template-areas: "north" "board" "south";
+        }
+        @media (min-width: 1024px) {
+            .rv-layout {
+                grid-template-columns: 15rem minmax(0, 1fr) 15rem;
+                grid-template-rows: minmax(0, 1fr) minmax(0, 1fr);
+                grid-template-areas: "north board info" "south board log";
+            }
+            .area-north { align-self: start; }
+            .area-south { align-self: end; }
+            .area-info { align-self: start; }
+        }
+        .area-north { grid-area: north; }
+        .area-south { grid-area: south; }
+        .area-board { grid-area: board; }
+        .area-info { grid-area: info; }
+        .area-log { grid-area: log; }
+
+        /* 棋盤：木框＋綠色棋面 */
+        .rv-frame {
+            padding: 6px;
+            border-radius: 18px;
+            background: linear-gradient(145deg, #7a4a22 0%, #5b3416 45%, #3d220d 100%);
+            border: 1px solid rgba(251, 191, 36, 0.45);
+            box-shadow: 0 18px 40px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 220, 160, 0.25), inset 0 -2px 6px rgba(0, 0, 0, 0.4);
+        }
+        .rv-board {
+            position: relative;
+            display: grid;
+            grid-template-columns: repeat(8, var(--cell));
+            grid-template-rows: repeat(8, var(--cell));
+            border: 3px solid #2b1608;
+            border-radius: 6px;
+            background: radial-gradient(circle at 50% 40%, #2a9d5c 0%, #1f8049 55%, #17663a 100%);
+            box-shadow: inset 0 0 18px rgba(0, 0, 0, 0.35);
+        }
+        .rv-cell {
+            position: relative;
+            width: var(--cell);
+            height: var(--cell);
+            border-right: 1px solid rgba(0, 0, 0, 0.42);
+            border-bottom: 1px solid rgba(0, 0, 0, 0.42);
+            transition: background-color 0.15s ease;
+        }
+        .rv-cell:nth-child(8n) { border-right: none; }
+        .rv-cell:nth-child(n+57) { border-bottom: none; }
+        .rv-cell.playable { cursor: pointer; }
+        /* 只在有滑鼠的裝置加上移過去的底色（平板點過的格子不會卡在變色狀態） */
+        @media (hover: hover) {
+            .rv-cell.playable:hover { background-color: rgba(255, 255, 255, 0.08); }
+        }
+        /* 棋盤上的四個星位 */
+        .rv-star {
+            position: absolute;
+            width: 7px;
+            height: 7px;
+            margin: -4px 0 0 -4px;
+            border-radius: 50%;
+            background: rgba(0, 0, 0, 0.55);
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        /* 棋盤座標 */
+        .coord {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 11px;
+            font-weight: 700;
+            color: rgba(253, 230, 138, 0.7);
+        }
+        .coord-col { width: var(--cell); height: 16px; }
+        .coord-row { width: 16px; height: var(--cell); }
+
+        /* 可下位置：金色小點 */
+        .rv-cell.show-dot::before {
+            content: "";
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            width: calc(var(--cell) * 0.22);
+            height: calc(var(--cell) * 0.22);
+            margin: calc(var(--cell) * -0.11) 0 0 calc(var(--cell) * -0.11);
+            border-radius: 50%;
+            background: radial-gradient(circle, #fde047 0%, #f59e0b 75%);
+            box-shadow: 0 0 8px rgba(251, 191, 36, 0.85);
+            animation: dotPulse 0.9s infinite alternate;
+            pointer-events: none;
+        }
+        @keyframes dotPulse {
+            0% { transform: scale(0.8); opacity: 0.75; }
+            100% { transform: scale(1.1); opacity: 1; }
+        }
+        /* 滑鼠移到可下位置：半透明的預覽棋子 */
+        .rv-cell.preview-black::before,
+        .rv-cell.preview-white::before {
+            content: "";
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            width: calc(var(--cell) * 0.82);
+            height: calc(var(--cell) * 0.82);
+            margin: calc(var(--cell) * -0.41) 0 0 calc(var(--cell) * -0.41);
+            border-radius: 50%;
+            opacity: 0.5;
+            animation: none;
+            box-shadow: none;
+            pointer-events: none;
+        }
+        .rv-cell.preview-black::before { background: radial-gradient(circle at 35% 30%, #6b7280 0%, #111827 60%, #000 100%); }
+        .rv-cell.preview-white::before { background: radial-gradient(circle at 35% 30%, #ffffff 0%, #e2e8f0 60%, #94a3b8 100%); }
+        /* 走棋提示：藍色光圈 */
+        .rv-cell.hint::before {
+            content: "";
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            width: calc(var(--cell) * 0.5);
+            height: calc(var(--cell) * 0.5);
+            margin: calc(var(--cell) * -0.25) 0 0 calc(var(--cell) * -0.25);
+            border-radius: 50%;
+            opacity: 1;
+            background: radial-gradient(circle, #7dd3fc 0%, #0ea5e9 70%);
+            animation: hintPulse 0.9s infinite alternate;
+            pointer-events: none;
+        }
+        @keyframes hintPulse {
+            0% { box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.6), 0 0 8px rgba(56, 189, 248, 0.6); transform: scale(0.9); }
+            100% { box-shadow: 0 0 0 5px rgba(125, 211, 252, 0.9), 0 0 22px rgba(56, 189, 248, 0.95); transform: scale(1.05); }
+        }
+        /* 上一手：棋子中央的紅點 */
+        .rv-cell.last::after {
+            content: "";
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            width: calc(var(--cell) * 0.16);
+            height: calc(var(--cell) * 0.16);
+            margin: calc(var(--cell) * -0.08) 0 0 calc(var(--cell) * -0.08);
+            border-radius: 50%;
+            background: #f43f5e;
+            box-shadow: 0 0 6px rgba(244, 63, 94, 0.9);
+            z-index: 4;
+            pointer-events: none;
+        }
+
+        /* 棋子：一面黑、一面白，以 3D 翻面切換 */
+        .disc {
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            width: calc(var(--cell) * 0.82);
+            height: calc(var(--cell) * 0.82);
+            margin: calc(var(--cell) * -0.41) 0 0 calc(var(--cell) * -0.41);
+            perspective: 500px;
+            pointer-events: none;
+            z-index: 2;
+        }
+        .disc-inner {
+            position: absolute;
+            inset: 0;
+            transform-style: preserve-3d;
+            -webkit-transform-style: preserve-3d;
+            transition: transform 0.5s cubic-bezier(0.3, 0.7, 0.3, 1);
+            transition-delay: var(--delay, 0s);
+        }
+        .disc.white .disc-inner { transform: rotateY(180deg); }
+        .disc.instant .disc-inner { transition: none; }
+        .disc-face {
+            position: absolute;
+            inset: 0;
+            border-radius: 50%;
+            backface-visibility: hidden;
+            -webkit-backface-visibility: hidden;
+        }
+        .face-black {
+            background: radial-gradient(circle at 35% 30%, #6b7280 0%, #1f2937 38%, #030712 100%);
+            box-shadow: 0 3px 0 #000, 0 6px 10px rgba(0, 0, 0, 0.55), inset 0 1px 1px rgba(255, 255, 255, 0.25);
+        }
+        .face-white {
+            transform: rotateY(180deg);
+            background: radial-gradient(circle at 35% 30%, #ffffff 0%, #f1f5f9 45%, #cbd5e1 100%);
+            box-shadow: 0 3px 0 #8b9bb0, 0 6px 10px rgba(0, 0, 0, 0.45), inset 0 -1px 2px rgba(0, 0, 0, 0.15);
+        }
+        .disc.drop { animation: discDrop 0.3s cubic-bezier(0.2, 0.9, 0.3, 1.25) both; }
+        @keyframes discDrop {
+            0% { transform: translateY(-30%) scale(1.35); opacity: 0; }
+            60% { opacity: 1; }
+            100% { transform: none; opacity: 1; }
+        }
+        .disc.lift { animation: discLift 0.5s ease-in-out both; animation-delay: var(--delay, 0s); }
+        @keyframes discLift {
+            0%, 100% { transform: none; }
+            45% { transform: translateY(-16%) scale(1.12); }
+        }
+        /* 滑鼠預覽時，會被翻面的棋子 */
+        .disc.will-flip::after {
+            content: "";
+            position: absolute;
+            inset: -3px;
+            border-radius: 50%;
+            border: 2px dashed #fbbf24;
+            box-shadow: 0 0 10px rgba(251, 191, 36, 0.6);
+        }
+
+        /* 迷你棋子（面板、棋譜、規則說明） */
+        .mini-disc {
+            display: inline-block;
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            flex-shrink: 0;
+            vertical-align: middle;
+        }
+        .mini-disc.black {
+            background: radial-gradient(circle at 35% 30%, #6b7280 0%, #111827 55%, #000 100%);
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.6), inset 0 0 0 1px rgba(255, 255, 255, 0.18);
+        }
+        .mini-disc.white {
+            background: radial-gradient(circle at 35% 30%, #ffffff 0%, #e2e8f0 60%, #94a3b8 100%);
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+        }
+        .mini-disc.lg { width: 22px; height: 22px; }
+        .logo-disc {
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #f8fafc 50%, #111827 50%);
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5), inset 0 0 0 1.5px rgba(0, 0, 0, 0.35);
+        }
+        .count-pop { animation: popIn 0.3s cubic-bezier(0.18, 0.89, 0.32, 1.28); }
+        @keyframes popIn {
+            0% { transform: scale(1.5); }
+            100% { transform: scale(1); }
+        }
+
+        /* 子數對比條 */
+        .ratio-bar {
+            display: flex;
+            height: 14px;
+            border-radius: 999px;
+            overflow: hidden;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            background: rgba(0, 0, 0, 0.3);
+        }
+        .ratio-black { background: linear-gradient(180deg, #4b5563, #030712); transition: width 0.4s ease; }
+        .ratio-white { background: linear-gradient(180deg, #ffffff, #cbd5e1); transition: width 0.4s ease; }
+
+        /* 輪到該玩家的呼吸光環 */
+        .active-turn-ring {
+            box-shadow: 0 0 0 2px #fbbf24, 0 0 18px rgba(251, 191, 36, 0.65);
+            animation: turnGlow 1.3s infinite alternate;
+        }
+        @keyframes turnGlow {
+            0% { box-shadow: 0 0 0 2px #fbbf24, 0 0 10px rgba(251, 191, 36, 0.4); }
+            100% { box-shadow: 0 0 0 3px #fde047, 0 0 22px rgba(251, 191, 36, 0.85); }
+        }
+
+        /* 浮動特效文字 */
+        .floating-banner {
+            animation: floatUpFade 1.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+        @keyframes floatUpFade {
+            0% { transform: translate(-50%, 10px) scale(0.7); opacity: 0; }
+            20% { transform: translate(-50%, -8px) scale(1.08); opacity: 1; }
+            80% { transform: translate(-50%, -22px) scale(1); opacity: 1; }
+            100% { transform: translate(-50%, -38px) scale(0.95); opacity: 0; }
+        }
+
+        /* 自訂捲軸 */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(251, 191, 36, 0.5);
+            border-radius: 4px;
+        }
+        @media (prefers-reduced-motion: reduce) {
+            .disc-inner { transition: none; }
+            .disc.drop, .disc.lift { animation: none; }
+        }
+    </style>
+</head>
+<body class="w-screen flex flex-col justify-between felt-table text-white select-none">
+
+    <!-- 頂部導覽與資訊列（手機上縮成兩行：圖示與按鈕一行、狀態一行） -->
+    <header class="w-full px-3 sm:px-6 py-1.5 sm:py-2 bg-black/45 backdrop-blur-md border-b border-white/10 flex flex-wrap items-center justify-between gap-x-2 gap-y-1.5 sm:gap-2 z-30">
+        <div class="flex items-center gap-2 sm:gap-3">
+            <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center shadow-md">
+                <span class="logo-disc"></span>
+            </div>
+            <div>
+                <h1 class="text-base sm:text-lg font-black tracking-wide text-amber-300 flex items-center gap-2">
+                    <span class="hidden sm:inline">經典黑白棋</span>
+                    <span id="roundBadge" class="text-xs font-bold px-2 py-0.5 rounded-full bg-emerald-800/90 text-emerald-200 border border-emerald-500/40">
+                        第 1 局
+                    </span>
+                </h1>
+                <p class="text-[11px] text-emerald-200/80 hidden sm:block">黑子先下 · 夾住對方的棋子就翻成自己的顏色 · 沒地方下就跳過 · 雙方都不能下時，子多的獲勝</p>
+            </div>
+        </div>
+
+        <!-- 中央狀態提示條 -->
+        <div class="order-3 sm:order-none mx-auto sm:mx-0 flex items-center gap-2 bg-emerald-950/80 border border-emerald-600/40 px-3 py-1 rounded-full shadow-inner">
+            <span class="text-xs text-emerald-300 font-medium">目前：</span>
+            <span id="moveCounter" class="text-xs sm:text-sm font-extrabold text-amber-300">第 1 手</span>
+            <span class="text-white/20">|</span>
+            <span class="mini-disc black"></span>
+            <span id="headerBlack" class="text-xs sm:text-sm font-extrabold text-white tabular-nums">2</span>
+            <span class="text-xs text-emerald-300 font-bold">:</span>
+            <span id="headerWhite" class="text-xs sm:text-sm font-extrabold text-white tabular-nums">2</span>
+            <span class="mini-disc white"></span>
+            <span class="text-white/20 hidden sm:inline">|</span>
+            <span class="text-xs text-emerald-300 font-medium hidden sm:inline">空格：</span>
+            <span id="emptyCounter" class="text-xs sm:text-sm font-extrabold text-white hidden sm:inline">60</span>
+        </div>
+
+        <!-- 右側功能按鈕列 -->
+        <div class="order-2 sm:order-none flex items-center gap-1 sm:gap-2">
+            <button onclick="game.showHint()" class="px-2 sm:px-2.5 py-1.5 rounded-lg bg-sky-600/80 hover:bg-sky-500 active:scale-95 text-xs font-bold transition flex items-center gap-1 shadow">
+                <span>💡</span><span class="hidden md:inline">走棋提示</span>
+            </button>
+            <button onclick="game.undo()" class="px-2 sm:px-2.5 py-1.5 rounded-lg bg-emerald-800/80 hover:bg-emerald-700 active:scale-95 text-xs font-bold transition flex items-center gap-1 border border-emerald-600/40">
+                <span>↩️</span><span class="hidden md:inline">悔棋</span>
+            </button>
+            <button onclick="game.toggleSound()" class="px-2 sm:px-2.5 py-1.5 rounded-lg bg-emerald-800/80 hover:bg-emerald-700 active:scale-95 text-xs font-bold transition flex items-center gap-1 border border-emerald-600/40">
+                <span id="soundIcon">🔊</span><span class="hidden md:inline">音效</span>
+            </button>
+            <button onclick="game.openScoreModal(false)" class="px-2 sm:px-2.5 py-1.5 rounded-lg bg-emerald-800/80 hover:bg-emerald-700 active:scale-95 text-xs font-bold transition flex items-center gap-1 border border-emerald-600/40">
+                <span>📊</span><span class="hidden sm:inline">戰績板</span>
+            </button>
+            <button onclick="game.openRulesModal()" class="px-2 sm:px-2.5 py-1.5 rounded-lg bg-amber-500/90 hover:bg-amber-400 text-slate-950 active:scale-95 text-xs font-black transition flex items-center gap-1 shadow">
+                <span>📖</span><span class="hidden sm:inline">規則說明</span>
+            </button>
+            <button onclick="game.confirmRestartMatch()" class="px-2 sm:px-2.5 py-1.5 rounded-lg bg-rose-600/85 hover:bg-rose-500 active:scale-95 text-xs font-bold transition flex items-center gap-1 shadow">
+                <span>🔄</span><span class="hidden sm:inline">重新開始</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- 棋桌主要遊戲區 -->
+    <main class="rv-layout relative flex-1 min-h-0 w-full max-w-7xl mx-auto p-2 sm:p-4 gap-2 lg:gap-3 overflow-hidden">
+
+        <!-- 上方（大螢幕：左上）：北方玩家 -->
+        <div class="area-north z-20 flex justify-center">
+            <div id="panel-north" class="relative w-full max-w-xl lg:max-w-none bg-slate-900/75 backdrop-blur-md border border-white/15 rounded-2xl px-3.5 py-1.5 sm:py-2 transition-all duration-300">
+                <div class="flex items-center justify-between gap-2">
+                    <div class="flex items-center gap-2 min-w-0">
+                        <div id="avatar-north" class="w-8 h-8 rounded-full bg-indigo-500/30 border border-indigo-400 flex items-center justify-center text-base shrink-0">🧔</div>
+                        <div class="min-w-0">
+                            <div class="flex items-center gap-1.5 flex-wrap">
+                                <span id="name-north" class="font-bold text-xs sm:text-sm text-white">電腦 · 阿財</span>
+                                <span id="color-north" class="text-[10px] px-1.5 py-0.5 rounded-full font-black border bg-slate-100 text-slate-900 border-white/60">白子</span>
+                            </div>
+                            <div id="sub-north" class="text-[11px] text-emerald-300 truncate">電腦難度：普通</div>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-1.5 shrink-0">
+                        <span id="disc-north" class="mini-disc lg white"></span>
+                        <span id="count-north" class="inline-block text-xl sm:text-2xl font-black text-amber-300 tabular-nums w-8 text-right">2</span>
+                    </div>
+                </div>
+                <span id="turn-badge-north" class="hidden absolute -top-2.5 right-3 text-[10px] px-2 py-0.5 rounded-full bg-amber-400 text-slate-950 font-black shadow">思考中...</span>
+                <div class="mt-1.5 hidden sm:flex items-center justify-between gap-2 text-[11px] bg-black/30 px-2 py-1 rounded-lg">
+                    <span class="text-slate-300">戰績 <strong id="record-north" class="text-amber-300">0勝 0敗 0和</strong></span>
+                    <span class="text-slate-400">可下 <strong id="mob-north" class="text-white">0</strong> 處</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- 中央棋盤 -->
+        <div class="area-board relative min-h-0 flex items-center justify-center">
+            <div id="boardWrap" class="rv-frame relative">
+                <div class="flex" style="padding-left: 19px;">
+                    <div id="colLabels" class="flex"></div>
+                </div>
+                <div class="flex">
+                    <div id="rowLabels" class="flex flex-col" style="padding-top: 3px;"></div>
+                    <div id="board" class="rv-board"></div>
+                </div>
+                <!-- 中央動態提示橫幅（跳過、提示、勝負訊息） -->
+                <div id="centerToastContainer" class="absolute inset-0 pointer-events-none z-40"></div>
+            </div>
+        </div>
+
+        <!-- 下方（大螢幕：左下）：南方玩家 -->
+        <div class="area-south z-20 flex justify-center">
+            <div id="panel-south" class="relative w-full max-w-xl lg:max-w-none bg-slate-900/80 backdrop-blur-md border border-white/15 rounded-2xl px-3.5 py-1.5 sm:py-2 transition-all duration-300">
+                <div class="flex items-center justify-between gap-2">
+                    <div class="flex items-center gap-2 min-w-0">
+                        <div id="avatar-south" class="w-8 h-8 rounded-full bg-emerald-500/30 border border-emerald-400 flex items-center justify-center text-base shrink-0">😎</div>
+                        <div class="min-w-0">
+                            <div class="flex items-center gap-1.5 flex-wrap">
+                                <span id="name-south" class="font-black text-sm text-white">您（玩家）</span>
+                                <span id="color-south" class="text-[10px] px-1.5 py-0.5 rounded-full font-black border bg-slate-950 text-white border-white/40">黑子</span>
+                            </div>
+                            <div id="sub-south" class="text-[11px] text-emerald-300 truncate">本局：進行中</div>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-1.5 shrink-0">
+                        <span id="disc-south" class="mini-disc lg black"></span>
+                        <span id="count-south" class="inline-block text-xl sm:text-2xl font-black text-amber-300 tabular-nums w-8 text-right">2</span>
+                    </div>
+                </div>
+                <span id="turn-badge-south" class="hidden absolute -top-3 right-3 text-xs px-2 py-0.5 rounded-full bg-amber-400 text-slate-950 font-black animate-bounce shadow">輪到您了！</span>
+                <div class="mt-1.5 hidden sm:flex items-center justify-between gap-2 text-[11px] bg-black/30 px-2 py-1 rounded-lg">
+                    <span class="text-slate-300">戰績 <strong id="record-south" class="text-amber-300">0勝 0敗 0和</strong></span>
+                    <span class="text-slate-400">可下 <strong id="mob-south" class="text-white">0</strong> 處</span>
+                </div>
+                <!-- 操作提示列 -->
+                <div id="actionHint" class="w-full mt-1.5 pt-1.5 border-t border-white/10 text-[11px] sm:text-xs text-emerald-200/90 leading-snug">
+                    點有金色小點的格子下子，夾住的對方棋子會翻成自己的顏色。
+                </div>
+            </div>
+        </div>
+
+        <!-- 右上（大螢幕）：子數對比 -->
+        <div class="area-info hidden lg:block z-20">
+            <div class="bg-slate-900/75 backdrop-blur-md border border-white/15 rounded-2xl p-3">
+                <div class="text-xs font-black text-amber-300 mb-2 flex items-center justify-between">
+                    <span>📈 子數對比</span>
+                    <span id="infoEmpty" class="text-[10px] text-slate-400 font-medium">空格 60</span>
+                </div>
+                <div class="flex items-center justify-between text-base font-black mb-1.5 tabular-nums">
+                    <span class="flex items-center gap-1.5"><span class="mini-disc lg black"></span><span id="infoBlack">2</span></span>
+                    <span class="flex items-center gap-1.5"><span id="infoWhite">2</span><span class="mini-disc lg white"></span></span>
+                </div>
+                <div class="ratio-bar">
+                    <div id="ratioBlack" class="ratio-black" style="width: 50%;"></div>
+                    <div id="ratioWhite" class="ratio-white" style="width: 50%;"></div>
+                </div>
+                <div class="mt-2 grid grid-cols-2 gap-1.5 text-[11px]">
+                    <div class="bg-black/30 rounded-lg px-2 py-1 text-slate-300">黑可下 <b id="infoMobBlack" class="text-white">4</b> 處</div>
+                    <div class="bg-black/30 rounded-lg px-2 py-1 text-slate-300 text-right">白可下 <b id="infoMobWhite" class="text-white">4</b> 處</div>
+                </div>
+                <div class="mt-2 text-[11px] text-slate-400 leading-relaxed">角落的棋子不會再被翻面，搶角很重要；角還空著的時候，角旁邊的格子要小心下。</div>
+            </div>
+        </div>
+
+        <!-- 右下（大螢幕）：棋譜 -->
+        <div class="area-log hidden lg:flex flex-col min-h-0 z-20">
+            <div class="flex-1 min-h-0 flex flex-col bg-slate-900/75 backdrop-blur-md border border-white/15 rounded-2xl p-3">
+                <div class="text-xs font-black text-amber-300 mb-2 flex items-center justify-between">
+                    <span>📜 棋譜</span>
+                    <span id="logCount" class="text-[10px] text-slate-400 font-medium">0 手</span>
+                </div>
+                <div id="moveLog" class="flex-1 min-h-0 overflow-y-auto space-y-1 text-[11px] pr-1"></div>
+            </div>
+        </div>
+    </main>
+
+    <!-- 手機橫放時的提示（只在高度很矮的觸控螢幕顯示） -->
+    <div class="rotate-hint fixed inset-0 z-[100] flex-col items-center justify-center gap-2 bg-[#072b18] text-center px-6">
+        <div class="text-5xl">📱</div>
+        <div class="text-lg font-black text-amber-300">請把手機轉成直向</div>
+        <div class="text-xs text-emerald-200/80">橫向畫面太矮，放不下整個遊戲畫面</div>
+    </div>
+
+    <!-- 彈窗 1：規則說明 Modal -->
+    <div id="rulesModal" class="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
+        <div class="bg-slate-900 border border-emerald-500/40 rounded-3xl max-w-2xl w-full modal-h-88 flex flex-col shadow-2xl overflow-hidden">
+            <div class="px-6 py-4 bg-gradient-to-r from-emerald-900 to-slate-900 border-b border-white/10 flex items-center justify-between">
+                <h2 class="text-lg sm:text-xl font-black text-amber-300 flex items-center gap-2">
+                    <span>📖</span> 黑白棋規則說明
+                </h2>
+                <button onclick="game.closeRulesModal()" class="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white font-bold">✕</button>
+            </div>
+            <div class="p-6 overflow-y-auto space-y-5 text-sm text-slate-200 leading-relaxed">
+                <div>
+                    <h3 class="text-amber-400 font-black text-base mb-1.5">一、基本玩法</h3>
+                    <ul class="list-disc pl-5 space-y-1 text-slate-300">
+                        <li>棋盤 8 × 8 共 64 格。開局時中央交叉擺好黑、白各 2 子，<strong>黑子先下</strong>，之後雙方輪流下。</li>
+                        <li><strong>夾住就翻面：</strong>新下的棋子和自己原有的棋子，要把對方的棋子夾在中間（橫、直、斜共八個方向都算，中間不能有空格），被夾住的對方棋子全部翻成自己的顏色。</li>
+                        <li><strong>每一手至少要翻到一顆：</strong>翻不到任何棋子的格子不能下；同時夾住好幾個方向時，每個方向都會翻。</li>
+                        <li><strong>沒地方下就跳過：</strong>輪到的一方完全沒有能下的格子時，這一手跳過（Pass），換對方繼續下；只要有地方能下，就不能跳過。</li>
+                    </ul>
+                </div>
+
+                <div>
+                    <h3 class="text-amber-400 font-black text-base mb-1.5">二、勝負</h3>
+                    <ul class="list-disc pl-5 space-y-1 text-slate-300">
+                        <li>雙方都沒有地方可以下時（通常是棋盤下滿），遊戲結束。</li>
+                        <li><strong>棋子多的一方獲勝</strong>；黑白一樣多就是和局。</li>
+                    </ul>
+                </div>
+
+                <div>
+                    <h3 class="text-amber-400 font-black text-base mb-1.5">三、小技巧</h3>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                        <div class="bg-amber-950/50 border border-amber-500/40 rounded-xl p-3">
+                            <div class="font-black text-amber-300">🏰 搶角落</div>
+                            <div class="text-xs text-slate-300 mt-0.5">角落的棋子夾不到，永遠不會被翻面，還能從角沿著邊慢慢擴張。</div>
+                        </div>
+                        <div class="bg-rose-950/50 border border-rose-500/40 rounded-xl p-3">
+                            <div class="font-black text-rose-300">⚠️ 角旁邊要小心</div>
+                            <div class="text-xs text-slate-300 mt-0.5">角還空著時，下在角旁邊的三格（尤其斜對角那格），很容易讓對方搶到角。</div>
+                        </div>
+                        <div class="bg-slate-800/60 border border-white/10 rounded-xl p-3">
+                            <div class="font-black text-amber-200">🎯 讓對方沒地方下</div>
+                            <div class="text-xs text-slate-300 mt-0.5">前半盤不必急著翻最多子。讓自己能下的地方多、對方能下的地方少，對方就只能下壞位置。</div>
+                        </div>
+                        <div class="bg-slate-800/60 border border-white/10 rounded-xl p-3">
+                            <div class="font-black text-amber-200">🔄 局勢翻轉很快</div>
+                            <div class="text-xs text-slate-300 mt-0.5">一手就可能翻掉一大片，子數暫時落後不代表會輸，最後下滿時子多才算贏。</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 對戰設定 -->
+                <div class="bg-slate-800/90 border border-amber-400/30 rounded-xl p-3.5">
+                    <div class="text-xs font-black text-amber-300 mb-2">⚙️ 對戰設定（模式、難度、可下位置立即套用，先手順序於下一局生效）</div>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        <label class="block">
+                            <span class="block text-[11px] text-slate-400 mb-1">對戰模式</span>
+                            <select data-setting="mode" onchange="game.setSetting('mode', this.value)" class="w-full bg-slate-950 border border-white/20 rounded-lg px-2.5 py-1.5 text-xs font-bold text-white focus:outline-none focus:border-amber-400">
+                                <option value="ai">🤖 人機對戰</option>
+                                <option value="pvp">👥 雙人同機對戰</option>
+                            </select>
+                        </label>
+                        <label class="block">
+                            <span class="block text-[11px] text-slate-400 mb-1">電腦難度</span>
+                            <select data-setting="difficulty" onchange="game.setSetting('difficulty', this.value)" class="w-full bg-slate-950 border border-white/20 rounded-lg px-2.5 py-1.5 text-xs font-bold text-white focus:outline-none focus:border-amber-400">
+                                <option value="easy">簡單（小美）</option>
+                                <option value="normal">普通（阿財）</option>
+                                <option value="hard">困難（老王）</option>
+                            </select>
+                        </label>
+                        <label class="block">
+                            <span class="block text-[11px] text-slate-400 mb-1">先手順序（先下的執黑子）</span>
+                            <select data-setting="firstMove" onchange="game.setSetting('firstMove', this.value)" class="w-full bg-slate-950 border border-white/20 rounded-lg px-2.5 py-1.5 text-xs font-bold text-white focus:outline-none focus:border-amber-400">
+                                <option value="alternate">每局輪流先手</option>
+                                <option value="south">南方先手（您／玩家一）</option>
+                                <option value="north">北方先手（電腦／玩家二）</option>
+                                <option value="random">隨機決定</option>
+                            </select>
+                        </label>
+                        <label class="block">
+                            <span class="block text-[11px] text-slate-400 mb-1">可下位置</span>
+                            <select data-setting="showMoves" onchange="game.setSetting('showMoves', this.value)" class="w-full bg-slate-950 border border-white/20 rounded-lg px-2.5 py-1.5 text-xs font-bold text-white focus:outline-none focus:border-amber-400">
+                                <option value="on">🟡 用金色小點標出來</option>
+                                <option value="off">🙈 不標出來（自己找）</option>
+                            </select>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="bg-slate-800/80 border border-white/10 rounded-xl p-3.5 text-xs text-slate-300">
+                    💡 <strong>貼心防呆設計：</strong>輪到您時，能下的格子會出現金色小點；用滑鼠時，移到格子上會先預覽下下去的樣子，會被翻面的棋子會亮起金色虛線圈。棋子中央的紅點是上一手下的位置。點擊上方「走棋提示」可獲得電腦的建議；下錯了也能「悔棋」。
+                </div>
+            </div>
+            <div class="px-6 py-3.5 bg-slate-950 border-t border-white/10 flex justify-end">
+                <button onclick="game.closeRulesModal()" class="px-6 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-sm transition">
+                    我知道了，回到棋局
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 彈窗 2：每局結算 / 戰績板 Modal -->
+    <div id="scoreModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
+        <div class="bg-slate-900 border border-amber-400/40 rounded-3xl max-w-3xl w-full modal-h-90 flex flex-col shadow-2xl overflow-hidden">
+            <div class="px-6 py-4 bg-gradient-to-r from-amber-900/60 via-slate-900 to-emerald-900/60 border-b border-white/10 flex items-center justify-between">
+                <div>
+                    <h2 id="scoreModalTitle" class="text-lg sm:text-xl font-black text-amber-300 flex items-center gap-2">
+                        🏆 本局結算
+                    </h2>
+                    <p id="scoreModalSubtitle" class="text-xs text-slate-300 mt-0.5">雙方子數與累計戰績</p>
+                </div>
+                <button onclick="game.closeScoreModal()" class="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white font-bold">✕</button>
+            </div>
+
+            <div class="p-4 sm:p-6 overflow-y-auto space-y-4">
+                <!-- 對戰設定快速切換列 -->
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 bg-slate-950/80 border border-amber-400/30 rounded-xl px-3.5 py-2.5">
+                    <span class="text-xs font-black text-amber-300 whitespace-nowrap flex items-center gap-1.5">
+                        <span>⚙️</span> 對戰設定：
+                    </span>
+                    <div class="flex-1 grid grid-cols-2 gap-2">
+                        <select data-setting="mode" onchange="game.setSetting('mode', this.value)" class="bg-slate-900 border border-white/20 rounded-lg px-2.5 py-1.5 text-xs font-bold text-white focus:outline-none focus:border-amber-400">
+                            <option value="ai">🤖 人機對戰</option>
+                            <option value="pvp">👥 雙人同機對戰</option>
+                        </select>
+                        <select data-setting="difficulty" onchange="game.setSetting('difficulty', this.value)" class="bg-slate-900 border border-white/20 rounded-lg px-2.5 py-1.5 text-xs font-bold text-white focus:outline-none focus:border-amber-400">
+                            <option value="easy">電腦難度：簡單（小美）</option>
+                            <option value="normal">電腦難度：普通（阿財）</option>
+                            <option value="hard">電腦難度：困難（老王）</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- 本局雙方結算明細表 -->
+                <div class="overflow-x-auto rounded-2xl border border-white/10 bg-slate-950/60">
+                    <table class="w-full text-left border-collapse text-xs sm:text-sm">
+                        <thead>
+                            <tr class="bg-slate-800/90 text-slate-300 border-b border-white/10">
+                                <th class="py-2.5 px-3 whitespace-nowrap font-bold">玩家</th>
+                                <th class="py-2.5 px-3 whitespace-nowrap font-bold">棋色</th>
+                                <th class="py-2.5 px-3 whitespace-nowrap font-bold text-right">子數</th>
+                                <th class="py-2.5 px-3 whitespace-nowrap font-bold text-right">本局</th>
+                                <th class="py-2.5 px-3 whitespace-nowrap font-bold text-right">累計戰績</th>
+                            </tr>
+                        </thead>
+                        <tbody id="scoreTableBody" class="divide-y divide-white/10">
+                            <!-- JS 動態填入 -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- 歷史局數紀錄 -->
+                <div class="bg-slate-950/50 rounded-2xl p-3.5 border border-white/10">
+                    <div class="text-xs font-bold text-amber-300 mb-2 flex items-center justify-between">
+                        <span>📜 歷局對戰紀錄</span>
+                        <span id="historyCountText" class="text-slate-400">已完成 0 局</span>
+                    </div>
+                    <div id="roundHistoryContainer" class="max-h-36 overflow-y-auto text-xs text-slate-300 space-y-1">
+                        <div class="text-slate-500 italic py-2 text-center">尚無歷史對戰紀錄</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="px-6 py-3.5 bg-slate-950 border-t border-white/10 flex flex-wrap items-center justify-between gap-2">
+                <button onclick="game.confirmRestartMatch()" class="px-4 py-2 rounded-xl bg-rose-600/80 hover:bg-rose-500 text-white font-bold text-xs sm:text-sm transition">
+                    🔄 重置戰績重新開始
+                </button>
+                <div class="flex items-center gap-2">
+                    <button onclick="game.closeScoreModal()" class="px-5 py-2 rounded-xl bg-slate-700 hover:bg-slate-600 text-white font-bold text-xs sm:text-sm transition">
+                        關閉視窗
+                    </button>
+                    <button id="btnNextRound" onclick="game.startNextRound()" class="px-6 py-2 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 font-black text-xs sm:text-sm shadow-lg transition">
+                        ▶️ 開始下一局
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 彈窗 3：確認重新開始 Modal（取代原生 confirm） -->
+    <div id="confirmModal" class="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
+        <div class="bg-slate-900 border border-rose-500/40 rounded-2xl max-w-sm w-full p-5 shadow-2xl text-center">
+            <div class="w-12 h-12 rounded-full bg-rose-500/20 border border-rose-400/40 text-2xl flex items-center justify-center mx-auto mb-3">
+                🔄
+            </div>
+            <h3 class="text-lg font-black text-white mb-1">確定要重新開始嗎？</h3>
+            <p class="text-xs text-slate-300 mb-5">這將會清空雙方的累計戰績與歷史局數，並重新開始第 1 局。</p>
+            <div class="flex items-center justify-center gap-3">
+                <button onclick="game.closeConfirmModal()" class="flex-1 py-2 rounded-xl bg-slate-700 hover:bg-slate-600 text-xs font-bold text-white transition">
+                    取消
+                </button>
+                <button onclick="game.resetFullMatch()" class="flex-1 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-xs font-black text-white shadow transition">
+                    確定重置
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        /**
+         * Web Audio API 合成音效系統（無須外部音檔，確保單檔離線/線上皆可順暢發聲）
+         */
+        class SoundManager {
+            constructor() {
+                this.enabled = true;
+                this.ctx = null;
+            }
+
+            init() {
+                if (!this.ctx) {
+                    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+                    if (AudioCtx) this.ctx = new AudioCtx();
+                }
+                if (this.ctx && this.ctx.state === 'suspended') {
+                    this.ctx.resume();
+                }
+            }
+
+            playTone(freq, type = 'sine', duration = 0.1, delay = 0, vol = 0.12) {
+                this.playSweep(freq, freq, type, duration, delay, vol);
+            }
+
+            playSweep(fromFreq, toFreq, type = 'sine', duration = 0.12, delay = 0, vol = 0.1) {
+                if (!this.enabled) return;
+                try {
+                    this.init();
+                    if (!this.ctx) return;
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    const t0 = this.ctx.currentTime + delay;
+                    osc.type = type;
+                    osc.frequency.setValueAtTime(fromFreq, t0);
+                    if (toFreq !== fromFreq) osc.frequency.exponentialRampToValueAtTime(toFreq, t0 + duration);
+                    gain.gain.setValueAtTime(vol, t0);
+                    gain.gain.exponentialRampToValueAtTime(0.001, t0 + duration);
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start(t0);
+                    osc.stop(t0 + duration);
+                } catch (e) {}
+            }
+
+            playPlace() {
+                // 棋子落在棋盤上的清脆聲
+                this.playTone(300, 'triangle', 0.06, 0, 0.18);
+                this.playTone(180, 'sine', 0.07, 0.012, 0.12);
+            }
+
+            playFlip(delay = 0) {
+                // 棋子翻面的輕快聲
+                this.playSweep(720, 1080, 'sine', 0.05, delay, 0.06);
+            }
+
+            playSelect() {
+                this.playTone(720, 'sine', 0.04, 0, 0.07);
+            }
+
+            playPass() {
+                [523.25, 392].forEach((n, idx) => this.playTone(n, 'triangle', 0.16, idx * 0.12, 0.1));
+            }
+
+            playInvalid() {
+                this.playTone(140, 'square', 0.09, 0, 0.08);
+            }
+
+            playWin() {
+                const notes = [523.25, 659.25, 783.99, 1046.5, 1318.5, 1567.98];
+                notes.forEach((n, idx) => this.playTone(n, 'triangle', 0.22, idx * 0.08, 0.18));
+            }
+
+            playLose() {
+                [392, 349.23, 311.13, 261.63].forEach((n, idx) => this.playTone(n, 'triangle', 0.24, idx * 0.14, 0.14));
+            }
+
+            playDraw() {
+                [440, 523.25, 440].forEach((n, idx) => this.playTone(n, 'sine', 0.2, idx * 0.12, 0.12));
+            }
+        }
+
+        /**
+         * 黑白棋規則常數
+         * 棋盤 8 × 8 共 64 格，以 Int8Array 表示：0 = 空格、1 = 黑子、2 = 白子
+         * 格子編號 sq = 列 × 8 + 行：a1 在左上角、h1 在右上角、h8 在右下角
+         */
+        const SIZE = 8, SQUARES = 64;
+        const EMPTY = 0, BLACK = 1, WHITE = 2;
+        const COLOR_NAMES = ['', '黑子', '白子'];
+        const FILES = 'abcdefgh';
+        const INF = 1e9;
+        const DISC_SCORE = 10000;   // 終局時每多一子的分數（遠大於局面評估，必勝的走法一定優先）
+        const sqName = sq => FILES[sq & 7] + ((sq >> 3) + 1);
+
+        // 預先計算每一格的相鄰格，與往八個方向的射線（只留長度 ≥ 2 的方向，短於 2 格不可能夾到棋子）
+        const NEIGHBORS = [];
+        const RAYS = [];
+        (() => {
+            const dirs = [[-1, -1], [-1, 0], [-1, 1], [0, -1], [0, 1], [1, -1], [1, 0], [1, 1]];
+            for (let sq = 0; sq < SQUARES; sq++) {
+                const r = sq >> 3, c = sq & 7;
+                const nbs = [], rays = [];
+                for (const [dr, dc] of dirs) {
+                    const ray = [];
+                    for (let nr = r + dr, nc = c + dc; nr >= 0 && nr < SIZE && nc >= 0 && nc < SIZE; nr += dr, nc += dc) {
+                        ray.push(nr * SIZE + nc);
+                    }
+                    if (ray.length) nbs.push(ray[0]);
+                    if (ray.length >= 2) rays.push(ray);
+                }
+                NEIGHBORS.push(nbs);
+                RAYS.push(rays);
+            }
+        })();
+
+        /**
+         * 黑白棋規則引擎：開局、判斷能不能下、下子翻面
+         */
+        const Engine = {
+            createBoard() {
+                const b = new Int8Array(SQUARES);
+                b[27] = WHITE;   // d4
+                b[28] = BLACK;   // e4
+                b[35] = BLACK;   // d5
+                b[36] = WHITE;   // e5
+                return b;
+            },
+
+            /**
+             * color 方能不能下在 sq：至少要在一個方向夾住對方的棋子
+             */
+            isLegal(b, sq, color) {
+                if (b[sq] !== EMPTY) return false;
+                const opp = 3 - color, rays = RAYS[sq];
+                for (let d = 0; d < rays.length; d++) {
+                    const ray = rays[d];
+                    if (b[ray[0]] !== opp) continue;
+                    for (let i = 1; i < ray.length; i++) {
+                        const v = b[ray[i]];
+                        if (v === color) return true;
+                        if (v !== opp) break;
+                    }
+                }
+                return false;
+            },
+
+            /**
+             * color 方所有能下的格子寫入 out，回傳數量
+             */
+            genMoves(b, color, out) {
+                let n = 0;
+                for (let sq = 0; sq < SQUARES; sq++) {
+                    if (b[sq] === EMPTY && this.isLegal(b, sq, color)) out[n++] = sq;
+                }
+                return n;
+            },
+
+            countMoves(b, color) {
+                let n = 0;
+                for (let sq = 0; sq < SQUARES; sq++) {
+                    if (b[sq] === EMPTY && this.isLegal(b, sq, color)) n++;
+                }
+                return n;
+            },
+
+            hasMoves(b, color) {
+                for (let sq = 0; sq < SQUARES; sq++) {
+                    if (b[sq] === EMPTY && this.isLegal(b, sq, color)) return true;
+                }
+                return false;
+            },
+
+            legalMoves(b, color) {
+                const moves = [];
+                for (let sq = 0; sq < SQUARES; sq++) {
+                    if (b[sq] === EMPTY && this.isLegal(b, sq, color)) moves.push(sq);
+                }
+                return moves;
+            },
+
+            /**
+             * color 方下在 sq：被夾住的對方棋子全部翻面，翻面的格子依序寫入 flips[start...]，
+             * 回傳翻了幾子（0 = 不能下，棋盤不變）
+             */
+            play(b, sq, color, flips, start) {
+                const opp = 3 - color, rays = RAYS[sq];
+                let n = start;
+                for (let d = 0; d < rays.length; d++) {
+                    const ray = rays[d];
+                    if (b[ray[0]] !== opp) continue;
+                    let i = 1;
+                    while (i < ray.length && b[ray[i]] === opp) i++;
+                    if (i < ray.length && b[ray[i]] === color) {
+                        for (let j = 0; j < i; j++) {
+                            b[ray[j]] = color;
+                            flips[n++] = ray[j];
+                        }
+                    }
+                }
+                if (n > start) b[sq] = color;
+                return n - start;
+            },
+
+            /**
+             * 還原 play：拿掉 sq 的棋子，flips[start ... start + count) 翻回對方的顏色
+             */
+            unplay(b, sq, color, flips, start, count) {
+                const opp = 3 - color;
+                b[sq] = EMPTY;
+                for (let i = start; i < start + count; i++) b[flips[i]] = opp;
+            },
+
+            /**
+             * 下在 sq 會翻哪些格子（畫面預覽與動畫用；不能下時回傳空陣列）
+             */
+            flipsOf(b, sq, color) {
+                if (b[sq] !== EMPTY) return [];
+                const buf = new Int8Array(SQUARES);
+                const n = this.play(b.slice(), sq, color, buf, 0);
+                return Array.from(buf.subarray(0, n));
+            },
+
+            countDiscs(b) {
+                let black = 0, white = 0;
+                for (let sq = 0; sq < SQUARES; sq++) {
+                    if (b[sq] === BLACK) black++;
+                    else if (b[sq] === WHITE) white++;
+                }
+                return { black, white, empty: SQUARES - black - white };
+            }
+        };
+
+        /**
+         * 電腦用的位置分數：角最好；角旁邊的格子在角還空著時另外扣分（見 evaluate）
+         */
+        const SQUARE_WEIGHTS = new Int8Array([
+            20, -3, 11,  8,  8, 11, -3, 20,
+            -3, -7, -4,  1,  1, -4, -7, -3,
+            11, -4,  2,  2,  2,  2, -4, 11,
+             8,  1,  2, -3, -3,  2,  1,  8,
+             8,  1,  2, -3, -3,  2,  1,  8,
+            11, -4,  2,  2,  2,  2, -4, 11,
+            -3, -7, -4,  1,  1, -4, -7, -3,
+            20, -3, 11,  8,  8, 11, -3, 20
+        ]);
+        const CORNERS = [0, 7, 56, 63];
+        // 每個角旁邊的 C 格（同一條邊上）與 X 格（斜對角）
+        const C_SQUARES = [[1, 8], [6, 15], [48, 57], [55, 62]];
+        const X_SQUARES = [9, 14, 49, 54];
+        // 殘局算到底時試下的順序：位置分數高的先試
+        const EMPTY_ORDER = Array.from({ length: SQUARES }, (_, sq) => sq)
+            .sort((a, b) => SQUARE_WEIGHTS[b] - SQUARE_WEIGHTS[a]);
+        const LIST_HEAD = SQUARES;
+
+        /**
+         * 黑白棋電腦：局面評估、中盤搜尋、殘局算到底
+         */
+        const ReversiAI = {
+            // greedy：像剛學會的新手，挑翻得多的格子下；depth：固定往下算幾手；exact：剩幾格空格以內直接算到底；
+            // noise：隨機擾動（越大越常下錯）；randomRate：隨手亂下的機率；
+            // deep：在 timeMs 內一層一層往下算；margin：跟最好的一步差這麼多以內的走法隨機挑一步
+            LEVELS: {
+                easy:   { greedy: true, noise: 2.5, randomRate: 0.2 },
+                normal: { depth: 2, exact: 6, noise: 120 },
+                hard:   { deep: true, timeMs: 1000, exact: 18, margin: 2 },
+                hint:   { deep: true, timeMs: 600,  exact: 16, margin: 0 }
+            },
+            WEIGHTS: { corner: 200, cSquare: -25, xSquare: -60, mobility: 80, frontier: 75, discs: 10, squares: 0.1 },
+            _ctx: null,
+
+            getContext(timeMs) {
+                if (!this._ctx) {
+                    this._ctx = {
+                        moves: Array.from({ length: 128 }, () => new Int8Array(64)),
+                        keys: Array.from({ length: 128 }, () => new Int32Array(64)),
+                        flips: new Int8Array(2048),
+                        next: new Int8Array(SQUARES + 1),
+                        prev: new Int8Array(SQUARES + 1)
+                    };
+                }
+                const ctx = this._ctx;
+                ctx.nodes = 0;
+                ctx.aborted = false;
+                ctx.start = performance.now();
+                ctx.deadline = ctx.start + timeMs;
+                return ctx;
+            },
+
+            /**
+             * 局面評估（以輪到 color 方下的角度，正分對 color 有利）
+             * 角、角旁邊的 C／X 格、雙方能下的地方（行動力）、靠空格的棋子（邊界子，越少越好）、子數與位置分數
+             */
+            evaluate(b, color) {
+                const opp = 3 - color, W = this.WEIGHTS;
+                let my = 0, op = 0, myFront = 0, opFront = 0, squares = 0;
+                for (let sq = 0; sq < SQUARES; sq++) {
+                    const v = b[sq];
+                    if (v === EMPTY) continue;
+                    let front = 0;
+                    const nbs = NEIGHBORS[sq];
+                    for (let k = 0; k < nbs.length; k++) {
+                        if (b[nbs[k]] === EMPTY) {
+                            front = 1;
+                            break;
+                        }
+                    }
+                    if (v === color) {
+                        my++;
+                        myFront += front;
+                        squares += SQUARE_WEIGHTS[sq];
+                    } else {
+                        op++;
+                        opFront += front;
+                        squares -= SQUARE_WEIGHTS[sq];
+                    }
+                }
+                const myMob = Engine.countMoves(b, color), opMob = Engine.countMoves(b, opp);
+                if (myMob + opMob === 0) return (my - op) * DISC_SCORE;
+
+                let score = 0;
+                for (let k = 0; k < 4; k++) {
+                    const v = b[CORNERS[k]];
+                    if (v === color) score += W.corner;
+                    else if (v === opp) score -= W.corner;
+                    else {
+                        const x = b[X_SQUARES[k]];
+                        if (x === color) score += W.xSquare;
+                        else if (x === opp) score -= W.xSquare;
+                        for (const c of C_SQUARES[k]) {
+                            if (b[c] === color) score += W.cSquare;
+                            else if (b[c] === opp) score -= W.cSquare;
+                        }
+                    }
+                }
+                score += W.mobility * (myMob - opMob) / (myMob + opMob);
+                if (myFront + opFront) score += W.frontier * (opFront - myFront) / (myFront + opFront);
+                score += W.discs * (my - op) / (my + op);
+                return score + W.squares * squares;
+            },
+
+            discDiff(b, color) {
+                let diff = 0;
+                for (let sq = 0; sq < SQUARES; sq++) {
+                    const v = b[sq];
+                    if (v === color) diff++;
+                    else if (v !== EMPTY) diff--;
+                }
+                return diff;
+            },
+
+            /**
+             * 排序走法：位置分數高的先試；剩餘深度夠時，讓對方能下的地方越少的越先試
+             */
+            orderMoves(b, color, moves, n, keys, depth, sp, ctx) {
+                const opp = 3 - color;
+                for (let i = 0; i < n; i++) {
+                    const sq = moves[i];
+                    let key = SQUARE_WEIGHTS[sq] * 16;
+                    if (depth >= 3) {
+                        const cnt = Engine.play(b, sq, color, ctx.flips, sp);
+                        key -= Engine.countMoves(b, opp) * 32;
+                        Engine.unplay(b, sq, color, ctx.flips, sp, cnt);
+                    }
+                    keys[i] = key;
+                }
+                for (let i = 1; i < n; i++) {
+                    const m = moves[i], k = keys[i];
+                    let j = i - 1;
+                    while (j >= 0 && keys[j] < k) {
+                        moves[j + 1] = moves[j];
+                        keys[j + 1] = keys[j];
+                        j--;
+                    }
+                    moves[j + 1] = m;
+                    keys[j + 1] = k;
+                }
+            },
+
+            /**
+             * 中盤搜尋（negamax + alpha-beta）：回傳輪到 color 方時的局面分數
+             * sp：翻面紀錄 ctx.flips 目前用到的位置；passed：上一手對方是否跳過
+             */
+            search(b, color, depth, alpha, beta, ply, passed, sp, ctx) {
+                if ((++ctx.nodes & 1023) === 0 && performance.now() > ctx.deadline) ctx.aborted = true;
+                if (ctx.aborted) return 0;
+                if (depth <= 0) return this.evaluate(b, color);
+                const opp = 3 - color;
+                const moves = ctx.moves[ply];
+                const n = Engine.genMoves(b, color, moves);
+                if (n === 0) {
+                    if (passed) return this.discDiff(b, color) * DISC_SCORE;
+                    return -this.search(b, opp, depth, -beta, -alpha, ply + 1, true, sp, ctx);
+                }
+                if (n > 1) this.orderMoves(b, color, moves, n, ctx.keys[ply], depth, sp, ctx);
+                let best = -INF;
+                for (let i = 0; i < n; i++) {
+                    const sq = moves[i];
+                    const cnt = Engine.play(b, sq, color, ctx.flips, sp);
+                    const v = -this.search(b, opp, depth - 1, -beta, -alpha, ply + 1, false, sp + cnt, ctx);
+                    Engine.unplay(b, sq, color, ctx.flips, sp, cnt);
+                    if (ctx.aborted) return 0;
+                    if (v > best) {
+                        best = v;
+                        if (v > alpha) {
+                            alpha = v;
+                            if (alpha >= beta) break;
+                        }
+                    }
+                }
+                return best;
+            },
+
+            /**
+             * 殘局算到底：回傳雙方都下完時 color 方比對方多幾子（負數 = 輸）
+             * 空格用雙向鏈結串列（ctx.next / ctx.prev）記錄，empties 是空格數
+             */
+            solve(b, color, alpha, beta, empties, ply, passed, sp, ctx) {
+                if ((++ctx.nodes & 2047) === 0 && performance.now() > ctx.deadline) ctx.aborted = true;
+                if (ctx.aborted) return 0;
+                if (empties === 0) return this.discDiff(b, color);
+                const opp = 3 - color, next = ctx.next, prev = ctx.prev, flips = ctx.flips;
+                let best = -INF;
+
+                if (empties > 6) {
+                    // 空格多時：先試讓對方能下的地方最少的走法，最快剪掉不必算的分支
+                    const moves = ctx.moves[ply], keys = ctx.keys[ply];
+                    let n = 0;
+                    for (let sq = next[LIST_HEAD]; sq !== LIST_HEAD; sq = next[sq]) {
+                        const cnt = Engine.play(b, sq, color, flips, sp);
+                        if (!cnt) continue;
+                        let replies = 0;
+                        for (let s = next[LIST_HEAD]; s !== LIST_HEAD; s = next[s]) {
+                            if (s !== sq && Engine.isLegal(b, s, opp)) replies++;
+                        }
+                        Engine.unplay(b, sq, color, flips, sp, cnt);
+                        let j = n++;
+                        const key = replies * 64 - SQUARE_WEIGHTS[sq];
+                        while (j > 0 && keys[j - 1] > key) {
+                            moves[j] = moves[j - 1];
+                            keys[j] = keys[j - 1];
+                            j--;
+                        }
+                        moves[j] = sq;
+                        keys[j] = key;
+                    }
+                    for (let i = 0; i < n; i++) {
+                        const sq = moves[i];
+                        const cnt = Engine.play(b, sq, color, flips, sp);
+                        next[prev[sq]] = next[sq];
+                        prev[next[sq]] = prev[sq];
+                        const v = -this.solve(b, opp, -beta, -alpha, empties - 1, ply + 1, false, sp + cnt, ctx);
+                        next[prev[sq]] = sq;
+                        prev[next[sq]] = sq;
+                        Engine.unplay(b, sq, color, flips, sp, cnt);
+                        if (ctx.aborted) return 0;
+                        if (v > best) {
+                            best = v;
+                            if (v > alpha) {
+                                alpha = v;
+                                if (alpha >= beta) return best;
+                            }
+                        }
+                    }
+                } else {
+                    for (let sq = next[LIST_HEAD]; sq !== LIST_HEAD; sq = next[sq]) {
+                        const cnt = Engine.play(b, sq, color, flips, sp);
+                        if (!cnt) continue;
+                        next[prev[sq]] = next[sq];
+                        prev[next[sq]] = prev[sq];
+                        const v = -this.solve(b, opp, -beta, -alpha, empties - 1, ply + 1, false, sp + cnt, ctx);
+                        next[prev[sq]] = sq;
+                        prev[next[sq]] = sq;
+                        Engine.unplay(b, sq, color, flips, sp, cnt);
+                        if (ctx.aborted) return 0;
+                        if (v > best) {
+                            best = v;
+                            if (v > alpha) {
+                                alpha = v;
+                                if (alpha >= beta) return best;
+                            }
+                        }
+                    }
+                }
+
+                if (best === -INF) {
+                    // 沒地方下：對方也不能下就結束，否則這手跳過
+                    if (passed) return this.discDiff(b, color);
+                    return -this.solve(b, opp, -beta, -alpha, empties, ply + 1, true, sp, ctx);
+                }
+                return best;
+            },
+
+            initEmpties(b, ctx) {
+                const next = ctx.next, prev = ctx.prev;
+                let last = LIST_HEAD, empties = 0;
+                for (const sq of EMPTY_ORDER) {
+                    if (b[sq] !== EMPTY) continue;
+                    next[last] = sq;
+                    prev[sq] = last;
+                    last = sq;
+                    empties++;
+                }
+                next[last] = LIST_HEAD;
+                prev[LIST_HEAD] = last;
+                return empties;
+            },
+
+            /**
+             * 根節點：依 order 的順序算每一步。跟目前最好的一步差 margin 以內的走法都算出準確分數，
+             * 其他走法只知道比最好的差（分數是上限），回傳依分數由高到低排序的 [{ sq, score }]；時間到回傳 null
+             */
+            searchRoot(b, color, order, depth, margin, ctx) {
+                const opp = 3 - color, out = [];
+                let best = -INF;
+                for (const sq of order) {
+                    const cnt = Engine.play(b, sq, color, ctx.flips, 0);
+                    const v = -this.search(b, opp, depth - 1, -INF, -(best - margin - 1), 1, false, cnt, ctx);
+                    Engine.unplay(b, sq, color, ctx.flips, 0, cnt);
+                    if (ctx.aborted) return null;
+                    out.push({ sq, score: v });
+                    if (v > best) best = v;
+                }
+                return out.sort((x, y) => y.score - x.score);
+            },
+
+            /**
+             * 根節點算到底：分數是最後多幾子；和最好的一步同分的走法都算出準確分數
+             */
+            solveRoot(b, color, order, ctx) {
+                const empties = this.initEmpties(b, ctx);
+                const opp = 3 - color, next = ctx.next, prev = ctx.prev, out = [];
+                let best = -INF;
+                for (const sq of order) {
+                    const cnt = Engine.play(b, sq, color, ctx.flips, 0);
+                    next[prev[sq]] = next[sq];
+                    prev[next[sq]] = prev[sq];
+                    const v = -this.solve(b, opp, -INF, -(best - 1), empties - 1, 1, false, cnt, ctx);
+                    next[prev[sq]] = sq;
+                    prev[next[sq]] = sq;
+                    Engine.unplay(b, sq, color, ctx.flips, 0, cnt);
+                    if (ctx.aborted) return null;
+                    out.push({ sq, score: v });
+                    if (v > best) best = v;
+                }
+                return out.sort((x, y) => y.score - x.score);
+            },
+
+            /**
+             * 為 color 方選一步，回傳格子編號（沒地方下回傳 -1）
+             */
+            chooseMove(board, color, levelName) {
+                const lv = this.LEVELS[levelName] || this.LEVELS.normal;
+                const b = board.slice();
+                const moves = Engine.legalMoves(b, color);
+                if (moves.length <= 1) return moves.length ? moves[0] : -1;
+                const pick = arr => arr[Math.floor(Math.random() * arr.length)];
+
+                // 簡單：偶爾隨手下一步
+                if (lv.randomRate && Math.random() < lv.randomRate) return pick(moves);
+
+                // 簡單：挑翻得多的格子（加上隨機），不太懂角的重要
+                if (lv.greedy) {
+                    let bestSq = moves[0], bestScore = -INF;
+                    for (const sq of moves) {
+                        const sc = Engine.flipsOf(b, sq, color).length + Math.random() * lv.noise;
+                        if (sc > bestScore) {
+                            bestScore = sc;
+                            bestSq = sq;
+                        }
+                    }
+                    return bestSq;
+                }
+
+                let empties = 0;
+                for (let sq = 0; sq < SQUARES; sq++) if (b[sq] === EMPTY) empties++;
+                const order = moves.slice().sort((x, y) => SQUARE_WEIGHTS[y] - SQUARE_WEIGHTS[x]);
+
+                if (lv.deep) {
+                    const { list, exact } = this.searchDeep(b, color, order, empties, lv);
+                    const best = list[0].score;
+                    return pick(list.filter(m => (exact ? m.score === best : m.score >= best - lv.margin)).map(m => m.sq));
+                }
+
+                const ctx = this.getContext(5000);
+                if (empties <= lv.exact) {
+                    const list = this.solveRoot(b, color, order, ctx);
+                    if (list) return pick(list.filter(m => m.score === list[0].score).map(m => m.sq));
+                }
+                // 固定深度：每一步都用完整的範圍算出準確分數，再加上隨機擾動
+                const opp = 3 - color;
+                let bestSq = order[0], bestScore = -INF;
+                for (const sq of order) {
+                    const cnt = Engine.play(b, sq, color, ctx.flips, 0);
+                    const v = -this.search(b, opp, lv.depth - 1, -INF, INF, 1, false, cnt, ctx);
+                    Engine.unplay(b, sq, color, ctx.flips, 0, cnt);
+                    const sc = v + (Math.random() * 2 - 1) * lv.noise;
+                    if (sc > bestScore) {
+                        bestScore = sc;
+                        bestSq = sq;
+                    }
+                }
+                return bestSq;
+            },
+
+            /**
+             * 困難／提示：在時間內一層一層往下算；空格夠少時再試著算到底（算完才採用）
+             */
+            searchDeep(b, color, order, empties, lv) {
+                const ctx = this.getContext(lv.timeMs);
+                const tryExact = empties <= lv.exact;
+                const midBudget = tryExact ? lv.timeMs * 0.3 : lv.timeMs;
+                let list = order.map(sq => ({ sq, score: 0 }));
+                for (let depth = 1; depth <= empties; depth++) {
+                    const res = this.searchRoot(b, color, list.map(m => m.sq), depth, lv.margin, ctx);
+                    if (!res) break;
+                    list = res;
+                    // 下一層通常要花好幾倍的時間：已用掉一半以上就不再加深
+                    if (performance.now() - ctx.start > midBudget * 0.45) break;
+                }
+                if (tryExact) {
+                    ctx.aborted = false;
+                    const exactList = this.solveRoot(b, color, list.map(m => m.sq), ctx);
+                    if (exactList) return { list: exactList, exact: true };
+                }
+                return { list, exact: false };
+            }
+        };
+
+        // 電腦角色（與暗棋、象棋相同）
+        const AI_PERSONAS = {
+            easy:   { name: '小美', avatar: '👩', ring: 'bg-pink-500/30 border-pink-400', label: '簡單' },
+            normal: { name: '阿財', avatar: '🧔', ring: 'bg-indigo-500/30 border-indigo-400', label: '普通' },
+            hard:   { name: '老王', avatar: '👴', ring: 'bg-amber-500/30 border-amber-400', label: '困難' }
+        };
+
+        /**
+         * 黑白棋主遊戲控制器
+         */
+        class ReversiGame {
+            constructor() {
+                this.sound = new SoundManager();
+                this.SEATS = ['south', 'north'];
+                this.PLAYERS = {
+                    south: { id: 'south', name: '您（玩家）', short: '您', isAI: false, color: BLACK, record: { win: 0, lose: 0, draw: 0 } },
+                    north: { id: 'north', name: '電腦 · 阿財', short: '阿財', isAI: true, color: WHITE, record: { win: 0, lose: 0, draw: 0 } }
+                };
+                this.settings = { mode: 'ai', difficulty: 'normal', firstMove: 'alternate', showMoves: 'on' };
+
+                this.roundNumber = 1;
+                this.board = Engine.createBoard();
+                this.turn = 'south';
+                this.moveNumber = 1;
+                this.lastMove = null;
+                this.hint = -1;
+                this.hoverSq = -1;
+                this.pendingAnim = null;
+                this.instantRender = true;
+                this.gameOver = false;
+                this.result = null;
+                this.aiTimer = null;
+                this.undoStack = [];
+                this.moveLog = [];
+                this.roundHistory = [];
+                this.cellEls = [];
+                this.discEls = [];
+                this.shownCounts = { south: 2, north: 2 };
+            }
+
+            /**
+             * 初始化並啟動第一局
+             */
+            init() {
+                this.loadSettings();
+                this.buildBoard();
+                this.applyMode();
+                this.syncSettingControls();
+                document.addEventListener('keydown', e => this.onKeyDown(e));
+                this.startRound();
+            }
+
+            other(seat) {
+                return seat === 'south' ? 'north' : 'south';
+            }
+
+            seatOf(color) {
+                return this.PLAYERS.south.color === color ? 'south' : 'north';
+            }
+
+            isHumanTurn() {
+                return !this.gameOver && !this.PLAYERS[this.turn].isAI;
+            }
+
+            // 訊息裡怎麼稱呼這一方：人機對戰時玩家叫「您」
+            who(seat) {
+                return this.settings.mode === 'ai' && seat === 'south' ? '您' : `【${this.PLAYERS[seat].name}】`;
+            }
+
+            loadSettings() {
+                try {
+                    const saved = JSON.parse(localStorage.getItem('reversi_settings') || 'null');
+                    if (saved && typeof saved === 'object') {
+                        if (['ai', 'pvp'].includes(saved.mode)) this.settings.mode = saved.mode;
+                        if (AI_PERSONAS[saved.difficulty]) this.settings.difficulty = saved.difficulty;
+                        if (['alternate', 'south', 'north', 'random'].includes(saved.firstMove)) this.settings.firstMove = saved.firstMove;
+                        if (['on', 'off'].includes(saved.showMoves)) this.settings.showMoves = saved.showMoves;
+                    }
+                } catch (e) {}
+            }
+
+            saveSettings() {
+                try {
+                    localStorage.setItem('reversi_settings', JSON.stringify(this.settings));
+                } catch (e) {}
+            }
+
+            syncSettingControls() {
+                document.querySelectorAll('[data-setting]').forEach(el => {
+                    el.value = this.settings[el.dataset.setting];
+                });
+            }
+
+            /**
+             * 套用對戰模式與電腦角色到雙方面板
+             */
+            applyMode() {
+                const north = this.PLAYERS.north, south = this.PLAYERS.south;
+                const persona = AI_PERSONAS[this.settings.difficulty];
+                const avatar = document.getElementById('avatar-north');
+                if (this.settings.mode === 'pvp') {
+                    north.isAI = false;
+                    north.name = '玩家二';
+                    north.short = '玩家二';
+                    south.name = '玩家一';
+                    south.short = '玩家一';
+                    avatar.textContent = '🧑';
+                    avatar.className = 'w-8 h-8 rounded-full border flex items-center justify-center text-base shrink-0 bg-sky-500/30 border-sky-400';
+                    document.getElementById('sub-north').textContent = '雙人同機對戰';
+                } else {
+                    north.isAI = true;
+                    north.name = `電腦 · ${persona.name}`;
+                    north.short = persona.name;
+                    south.name = '您（玩家）';
+                    south.short = '您';
+                    avatar.textContent = persona.avatar;
+                    avatar.className = `w-8 h-8 rounded-full border flex items-center justify-center text-base shrink-0 ${persona.ring}`;
+                    document.getElementById('sub-north').textContent = `電腦難度：${persona.label}`;
+                }
+            }
+
+            /**
+             * 切換設定（對戰模式、電腦難度、先手順序、可下位置）
+             */
+            setSetting(key, value) {
+                if (this.settings[key] === value) return;
+                this.settings[key] = value;
+                this.saveSettings();
+                this.syncSettingControls();
+                if (key === 'firstMove') {
+                    this.showCenterBanner('🎲 先手順序將於下一局生效', 'bg-slate-800 text-amber-300');
+                    return;
+                }
+                if (key === 'showMoves') {
+                    this.showCenterBanner(value === 'on' ? '🟡 已用金色小點標出可下位置' : '🙈 已隱藏可下位置', 'bg-slate-800 text-amber-300');
+                    this.renderBoard();
+                    this.updateActionHint();
+                    return;
+                }
+                this.applyMode();
+                if (key === 'mode') {
+                    if (!this.PLAYERS[this.turn].isAI) this.cancelAI();
+                    this.undoStack = [];
+                    this.showCenterBanner(value === 'pvp' ? '👥 已切換為雙人同機對戰' : '🤖 已切換為人機對戰', 'bg-sky-500 text-slate-950');
+                } else {
+                    const persona = AI_PERSONAS[value];
+                    this.showCenterBanner(`🤖 電腦難度：${persona.label}（${persona.name}）`, 'bg-sky-500 text-slate-950');
+                }
+                this.hint = -1;
+                this.renderAll();
+                this.scheduleAI(800);
+            }
+
+            /**
+             * 開始新的一局：中央交叉擺好黑白各 2 子，先手方執黑
+             */
+            startRound() {
+                this.cancelAI();
+                this.board = Engine.createBoard();
+                this.moveNumber = 1;
+                this.lastMove = null;
+                this.hint = -1;
+                this.hoverSq = -1;
+                this.pendingAnim = null;
+                this.instantRender = true;
+                this.gameOver = false;
+                this.result = null;
+                this.undoStack = [];
+                this.moveLog = [];
+
+                const fm = this.settings.firstMove;
+                const starter = (fm === 'south' || fm === 'north') ? fm
+                    : fm === 'random' ? (Math.random() < 0.5 ? 'south' : 'north')
+                    : (this.roundNumber % 2 === 1 ? 'south' : 'north');
+                this.PLAYERS[starter].color = BLACK;
+                this.PLAYERS[this.other(starter)].color = WHITE;
+                this.turn = starter;
+
+                this.renderAll();
+                this.showCenterBanner(`⚫ 第 ${this.roundNumber} 局開始！由【${this.PLAYERS[starter].name}】執黑先下`, 'bg-amber-400 text-slate-950');
+                this.scheduleAI(1300);
+            }
+
+            cancelAI() {
+                if (this.aiTimer) {
+                    clearTimeout(this.aiTimer);
+                    this.aiTimer = null;
+                }
+            }
+
+            /**
+             * 若輪到電腦，延遲一下再下（讓玩家看清楚上一手的翻面動畫）
+             */
+            scheduleAI(delay = 700) {
+                if (this.gameOver || !this.PLAYERS[this.turn].isAI) return;
+                this.cancelAI();
+                this.aiTimer = setTimeout(() => {
+                    this.aiTimer = null;
+                    this.executeAITurn();
+                }, delay);
+            }
+
+            executeAITurn() {
+                if (this.gameOver) return;
+                const seat = this.turn, player = this.PLAYERS[seat];
+                if (!player.isAI) return;
+                const sq = ReversiAI.chooseMove(this.board, player.color, this.settings.difficulty);
+                if (sq >= 0) this.performMove(seat, sq);
+            }
+
+            /**
+             * 下一手：翻面、記錄、換對方；對方沒地方下就跳過，雙方都不能下就結算
+             */
+            performMove(seat, sq) {
+                const player = this.PLAYERS[seat], color = player.color;
+                const flips = Engine.flipsOf(this.board, sq, color);
+                if (!flips.length) return false;
+                if (!player.isAI) this.pushUndo();
+
+                this.hint = -1;
+                this.board[sq] = color;
+                for (const f of flips) this.board[f] = color;
+                this.lastMove = { sq, color };
+                this.pendingAnim = { sq, flips };
+                this.moveLog.push({ n: this.moveNumber, seat, color, sq, flips: flips.length });
+                this.moveNumber++;
+
+                // 落子聲，接著依距離一圈一圈的翻面聲
+                this.sound.playPlace();
+                const rings = new Set(flips.map(f => this.distance(sq, f)));
+                for (const d of [...rings].sort((a, b) => a - b).slice(0, 7)) this.sound.playFlip(0.3 + (d - 1) * 0.07);
+
+                const next = this.other(seat), nextColor = this.PLAYERS[next].color;
+                let passed = null;
+                if (Engine.hasMoves(this.board, nextColor)) {
+                    this.turn = next;
+                } else if (Engine.hasMoves(this.board, color)) {
+                    this.turn = seat;
+                    passed = next;
+                    this.moveLog.push({ pass: true, seat: next, color: nextColor });
+                } else {
+                    this.turn = next;
+                    this.finishRound();
+                    return true;
+                }
+
+                this.renderAll();
+                if (passed) {
+                    setTimeout(() => {
+                        this.sound.playPass();
+                        this.showCenterBanner(`🙅 ${this.who(passed)}沒有地方可以下，這一手跳過，換${this.who(seat)}繼續下`, 'bg-slate-800 text-amber-300');
+                    }, 450);
+                }
+                this.scheduleAI(passed ? 1700 : 750);
+                return true;
+            }
+
+            distance(a, b) {
+                return Math.max(Math.abs((a >> 3) - (b >> 3)), Math.abs((a & 7) - (b & 7)));
+            }
+
+            /**
+             * 本局結束：比子數、更新戰績、播放音效並彈出結算板
+             */
+            finishRound() {
+                this.gameOver = true;
+                this.cancelAI();
+                const { black, white, empty } = Engine.countDiscs(this.board);
+                const winnerSeat = black > white ? this.seatOf(BLACK) : white > black ? this.seatOf(WHITE) : null;
+                const reasonText = empty === 0 ? '棋盤下滿'
+                    : (black === 0 || white === 0) ? `${black === 0 ? '黑' : '白'}子全被翻光`
+                    : '雙方都沒有地方可以下';
+                this.result = { winner: winnerSeat, black, white, reasonText };
+
+                if (winnerSeat) {
+                    this.PLAYERS[winnerSeat].record.win++;
+                    this.PLAYERS[this.other(winnerSeat)].record.lose++;
+                } else {
+                    this.SEATS.forEach(seat => this.PLAYERS[seat].record.draw++);
+                }
+                this.roundHistory.unshift({
+                    round: this.roundNumber,
+                    winner: winnerSeat,
+                    black,
+                    white,
+                    reasonText,
+                    colors: { south: this.PLAYERS.south.color, north: this.PLAYERS.north.color },
+                    names: { south: this.PLAYERS.south.name, north: this.PLAYERS.north.name }
+                });
+                this.renderAll();
+
+                const scoreText = `黑 ${black} : 白 ${white}`;
+                setTimeout(() => {
+                    if (!this.gameOver) return;
+                    if (!winnerSeat) {
+                        this.sound.playDraw();
+                        this.showCenterBanner(`🤝 ${scoreText}，本局和局！`, 'bg-slate-800 text-amber-300');
+                    } else if (this.settings.mode === 'ai' && winnerSeat === 'north') {
+                        this.sound.playLose();
+                        this.showCenterBanner(`😵 【${this.PLAYERS.north.name}】獲勝（${scoreText}）`, 'bg-rose-600 text-white');
+                    } else {
+                        this.sound.playWin();
+                        this.showCenterBanner(`🏆 恭喜！【${this.PLAYERS[winnerSeat].name}】獲勝（${scoreText}）`, 'bg-amber-400 text-slate-950');
+                    }
+                }, 650);
+                setTimeout(() => {
+                    if (this.gameOver) this.openScoreModal(true);
+                }, 2300);
+            }
+
+            onCellClick(sq) {
+                if (this.gameOver) return;
+                if (!this.isHumanTurn()) {
+                    this.showCenterBanner(`⏳ 【${this.PLAYERS[this.turn].name}】正在思考，請稍等`, 'bg-slate-800 text-amber-300');
+                    return;
+                }
+                if (this.board[sq] !== EMPTY) return;
+                const color = this.PLAYERS[this.turn].color;
+                if (!Engine.isLegal(this.board, sq, color)) {
+                    this.sound.playInvalid();
+                    this.showCenterBanner(`🚫 ${sqName(sq)} 不能下：要和自己的棋子夾住對方的棋子才能下`, 'bg-slate-800 text-amber-300');
+                    return;
+                }
+                this.performMove(this.turn, sq);
+            }
+
+            onKeyDown(e) {
+                if (e.key !== 'Escape') return;
+                const open = ['confirmModal', 'scoreModal', 'rulesModal']
+                    .map(id => document.getElementById(id))
+                    .find(el => !el.classList.contains('hidden'));
+                if (open) {
+                    open.classList.add('hidden');
+                    open.classList.remove('flex');
+                }
+            }
+
+            /**
+             * 滑鼠移到格子上：預覽下下去的樣子（只在有滑鼠的裝置）
+             */
+            setHover(sq) {
+                if (this.hoverSq === sq) return;
+                this.hoverSq = sq;
+                this.renderPreview();
+            }
+
+            renderPreview() {
+                for (let sq = 0; sq < SQUARES; sq++) {
+                    this.cellEls[sq].classList.remove('preview-black', 'preview-white');
+                    if (this.discEls[sq]) this.discEls[sq].classList.remove('will-flip');
+                }
+                const sq = this.hoverSq;
+                if (sq < 0 || !this.isHumanTurn() || this.board[sq] !== EMPTY) return;
+                const color = this.PLAYERS[this.turn].color;
+                const flips = Engine.flipsOf(this.board, sq, color);
+                if (!flips.length) return;
+                this.cellEls[sq].classList.add(color === BLACK ? 'preview-black' : 'preview-white');
+                for (const f of flips) {
+                    if (this.discEls[f]) this.discEls[f].classList.add('will-flip');
+                }
+            }
+
+            /**
+             * 顯示走棋提示（以電腦的思考結果建議玩家）
+             */
+            showHint() {
+                if (!this.isHumanTurn()) {
+                    this.showCenterBanner(this.gameOver ? '🏁 本局已結束' : '⏳ 請等待輪到您的回合再使用提示', 'bg-slate-800 text-amber-300');
+                    return;
+                }
+                const color = this.PLAYERS[this.turn].color;
+                const sq = ReversiAI.chooseMove(this.board, color, 'hint');
+                if (sq < 0) return;
+                this.hint = sq;
+                this.renderBoard();
+                this.sound.playSelect();
+                const n = Engine.flipsOf(this.board, sq, color).length;
+                this.showCenterBanner(`💡 建議：下在 ${sqName(sq)}（可以翻 ${n} 子）`, 'bg-sky-500 text-slate-950');
+            }
+
+            /**
+             * 悔棋：每次玩家下子前保存快照；人機對戰時一次退回到您上一步之前
+             */
+            pushUndo() {
+                this.undoStack.push({
+                    board: this.board.slice(),
+                    turn: this.turn,
+                    moveNumber: this.moveNumber,
+                    logLength: this.moveLog.length,
+                    lastMove: this.lastMove
+                });
+                if (this.undoStack.length > 100) this.undoStack.shift();
+            }
+
+            undo() {
+                if (this.gameOver) {
+                    this.showCenterBanner('🏁 本局已結束，無法悔棋', 'bg-slate-800 text-amber-300');
+                    return;
+                }
+                if (!this.undoStack.length) {
+                    this.showCenterBanner('⛔ 目前沒有可以悔棋的步驟', 'bg-slate-800 text-amber-300');
+                    return;
+                }
+                this.cancelAI();
+                const snap = this.undoStack.pop();
+                this.board = snap.board;
+                this.turn = snap.turn;
+                this.moveNumber = snap.moveNumber;
+                this.moveLog.length = snap.logLength;
+                this.lastMove = snap.lastMove;
+                this.hint = -1;
+                this.pendingAnim = null;
+                this.instantRender = true;
+                this.renderAll();
+                this.sound.playSelect();
+                this.showCenterBanner('↩️ 已悔棋', 'bg-sky-500 text-slate-950');
+                this.scheduleAI(800);
+            }
+
+            /**
+             * 建立 64 個棋盤格、四個星位與座標
+             */
+            buildBoard() {
+                const board = document.getElementById('board');
+                board.innerHTML = '';
+                this.cellEls = [];
+                this.discEls = new Array(SQUARES).fill(null);
+                for (let sq = 0; sq < SQUARES; sq++) {
+                    const cell = document.createElement('div');
+                    cell.className = 'rv-cell';
+                    cell.addEventListener('click', () => this.onCellClick(sq));
+                    // 只有滑鼠移過去才預覽；手指點的時候不預覽
+                    cell.addEventListener('pointerenter', e => {
+                        if (e.pointerType === 'mouse') this.setHover(sq);
+                    });
+                    cell.addEventListener('pointerleave', e => {
+                        if (e.pointerType === 'mouse') this.setHover(-1);
+                    });
+                    board.appendChild(cell);
+                    this.cellEls.push(cell);
+                }
+                for (const [r, c] of [[2, 2], [2, 6], [6, 2], [6, 6]]) {
+                    const star = document.createElement('div');
+                    star.className = 'rv-star';
+                    star.style.left = `calc(var(--cell) * ${c})`;
+                    star.style.top = `calc(var(--cell) * ${r})`;
+                    board.appendChild(star);
+                }
+                document.getElementById('colLabels').innerHTML = [...FILES].map(f => `<div class="coord coord-col">${f}</div>`).join('');
+                document.getElementById('rowLabels').innerHTML = [1, 2, 3, 4, 5, 6, 7, 8].map(r => `<div class="coord coord-row">${r}</div>`).join('');
+            }
+
+            renderAll() {
+                this.renderBoard();
+                this.renderHeader();
+                this.renderPanels();
+                this.renderInfo();
+                this.renderLog();
+                this.updateActionHint();
+            }
+
+            /**
+             * 渲染棋盤：棋子（新下的落下、被夾住的依距離翻面）、可下位置、提示與上一手標記
+             */
+            renderBoard() {
+                const b = this.board, human = this.isHumanTurn();
+                const color = this.PLAYERS[this.turn].color;
+                const showDots = human && this.settings.showMoves === 'on';
+                const anim = this.instantRender ? null : this.pendingAnim;
+                this.pendingAnim = null;
+                this.instantRender = false;
+                const lm = this.lastMove;
+
+                for (let sq = 0; sq < SQUARES; sq++) {
+                    const cell = this.cellEls[sq], v = b[sq];
+                    const legal = human && v === EMPTY && Engine.isLegal(b, sq, color);
+                    cell.classList.toggle('playable', legal);
+                    cell.classList.toggle('show-dot', legal && showDots);
+                    cell.classList.toggle('hint', sq === this.hint);
+                    cell.classList.toggle('last', !!lm && lm.sq === sq);
+                    this.syncDisc(sq, v, anim);
+                }
+                this.renderPreview();
+            }
+
+            /**
+             * 讓格子上的棋子和棋盤狀態一致；有 anim 時播放落子與翻面動畫，否則直接換顏色
+             */
+            syncDisc(sq, v, anim) {
+                let disc = this.discEls[sq];
+                if (v === EMPTY) {
+                    if (disc) {
+                        disc.remove();
+                        this.discEls[sq] = null;
+                    }
+                    return;
+                }
+                if (!disc) {
+                    disc = document.createElement('div');
+                    disc.className = v === WHITE ? 'disc white' : 'disc';
+                    disc.innerHTML = '<div class="disc-inner"><div class="disc-face face-black"></div><div class="disc-face face-white"></div></div>';
+                    disc.dataset.color = v;
+                    this.cellEls[sq].appendChild(disc);
+                    this.discEls[sq] = disc;
+                    if (anim && anim.sq === sq) {
+                        disc.classList.add('drop');
+                        disc.addEventListener('animationend', () => disc.classList.remove('drop'), { once: true });
+                    }
+                    return;
+                }
+                if (Number(disc.dataset.color) === v) return;
+                disc.dataset.color = v;
+                if (anim && anim.flips.includes(sq)) {
+                    disc.style.setProperty('--delay', `${0.12 + (this.distance(anim.sq, sq) - 1) * 0.07}s`);
+                    disc.classList.remove('lift');
+                    void disc.offsetWidth;
+                    disc.classList.add('lift');
+                    disc.addEventListener('animationend', e => {
+                        if (e.target === disc) disc.classList.remove('lift');
+                    }, { once: true });
+                    disc.classList.toggle('white', v === WHITE);
+                } else {
+                    // 悔棋或重新開始：直接換顏色，不播翻面動畫
+                    disc.style.setProperty('--delay', '0s');
+                    disc.classList.add('instant');
+                    disc.classList.toggle('white', v === WHITE);
+                    void disc.offsetWidth;
+                    disc.classList.remove('instant');
+                }
+            }
+
+            /**
+             * 更新頂部狀態列：局數、手數、雙方子數、空格數
+             */
+            renderHeader() {
+                const { black, white, empty } = Engine.countDiscs(this.board);
+                document.getElementById('roundBadge').textContent = `第 ${this.roundNumber} 局`;
+                document.getElementById('moveCounter').textContent = this.gameOver ? `共 ${this.moveNumber - 1} 手` : `第 ${this.moveNumber} 手`;
+                document.getElementById('headerBlack').textContent = black;
+                document.getElementById('headerWhite').textContent = white;
+                document.getElementById('emptyCounter').textContent = empty;
+            }
+
+            /**
+             * 渲染雙方面板（棋色、子數、可下位置數、戰績、回合光環）
+             */
+            renderPanels() {
+                const counts = Engine.countDiscs(this.board);
+                for (const seat of this.SEATS) {
+                    const p = this.PLAYERS[seat];
+                    const isTurn = !this.gameOver && this.turn === seat;
+                    document.getElementById(`panel-${seat}`).classList.toggle('active-turn-ring', isTurn);
+                    document.getElementById(`name-${seat}`).textContent = p.name;
+
+                    const chip = document.getElementById(`color-${seat}`);
+                    chip.textContent = COLOR_NAMES[p.color];
+                    chip.className = `text-[10px] px-1.5 py-0.5 rounded-full font-black border ${
+                        p.color === BLACK ? 'bg-slate-950 text-white border-white/40' : 'bg-slate-100 text-slate-900 border-white/60'
+                    }`;
+                    document.getElementById(`disc-${seat}`).className = `mini-disc lg ${p.color === BLACK ? 'black' : 'white'}`;
+
+                    const n = p.color === BLACK ? counts.black : counts.white;
+                    const countEl = document.getElementById(`count-${seat}`);
+                    countEl.textContent = n;
+                    if (n !== this.shownCounts[seat]) {
+                        this.shownCounts[seat] = n;
+                        countEl.classList.remove('count-pop');
+                        void countEl.offsetWidth;
+                        countEl.classList.add('count-pop');
+                    }
+                    document.getElementById(`mob-${seat}`).textContent = this.gameOver ? 0 : Engine.countMoves(this.board, p.color);
+                    document.getElementById(`record-${seat}`).textContent = `${p.record.win}勝 ${p.record.lose}敗 ${p.record.draw}和`;
+
+                    const badge = document.getElementById(`turn-badge-${seat}`);
+                    badge.classList.toggle('hidden', !isTurn);
+                    badge.textContent = p.isAI ? '思考中...' : (this.settings.mode === 'pvp' ? '輪到你了！' : '輪到您了！');
+                }
+
+                const status = document.getElementById('sub-south');
+                if (!this.gameOver) {
+                    status.textContent = '本局：進行中';
+                    status.className = 'text-[11px] text-emerald-300 truncate';
+                } else if (!this.result.winner) {
+                    status.textContent = '本局：和局';
+                    status.className = 'text-[11px] font-black text-amber-300 truncate';
+                } else {
+                    const won = this.result.winner === 'south';
+                    status.textContent = `本局：${won ? '勝利' : '落敗'}`;
+                    status.className = `text-[11px] font-black truncate ${won ? 'text-emerald-400' : 'text-rose-400'}`;
+                }
+            }
+
+            /**
+             * 大螢幕右上：子數對比條與雙方可下位置數
+             */
+            renderInfo() {
+                const { black, white, empty } = Engine.countDiscs(this.board);
+                document.getElementById('infoBlack').textContent = black;
+                document.getElementById('infoWhite').textContent = white;
+                document.getElementById('infoEmpty').textContent = `空格 ${empty}`;
+                const total = black + white || 1;
+                document.getElementById('ratioBlack').style.width = `${(black / total) * 100}%`;
+                document.getElementById('ratioWhite').style.width = `${(white / total) * 100}%`;
+                document.getElementById('infoMobBlack').textContent = this.gameOver ? 0 : Engine.countMoves(this.board, BLACK);
+                document.getElementById('infoMobWhite').textContent = this.gameOver ? 0 : Engine.countMoves(this.board, WHITE);
+            }
+
+            renderLog() {
+                const el = document.getElementById('moveLog');
+                document.getElementById('logCount').textContent = `${this.moveNumber - 1} 手`;
+                if (!this.moveLog.length) {
+                    el.innerHTML = '<div class="text-slate-500 italic py-2 text-center">尚無下子紀錄</div>';
+                    return;
+                }
+                el.innerHTML = this.moveLog.slice().reverse().map(e => {
+                    const disc = `<span class="mini-disc ${e.color === BLACK ? 'black' : 'white'}"></span>`;
+                    if (e.pass) {
+                        return `<div class="flex items-center gap-1.5 bg-black/25 rounded-md px-2 py-1 border border-amber-500/30" title="${this.PLAYERS[e.seat].name}">
+                            <span class="w-6 shrink-0"></span>${disc}
+                            <span class="text-amber-200/90 leading-snug">沒地方下，跳過</span>
+                        </div>`;
+                    }
+                    return `<div class="flex items-center gap-1.5 bg-black/25 rounded-md px-2 py-1 border border-transparent" title="${this.PLAYERS[e.seat].name}">
+                        <span class="text-slate-500 w-6 text-right shrink-0">${e.n}.</span>${disc}
+                        <span class="text-slate-200 leading-snug"><b class="text-amber-200">${sqName(e.sq)}</b> 翻 ${e.flips} 子</span>
+                    </div>`;
+                }).join('');
+            }
+
+            /**
+             * 下方操作提示列
+             */
+            updateActionHint() {
+                const el = document.getElementById('actionHint');
+                const player = this.PLAYERS[this.turn];
+                let text;
+                if (this.gameOver) {
+                    text = '本局已結束，請在戰績板查看結算，或點擊「開始下一局」。';
+                } else if (player.isAI) {
+                    text = `【${player.name}】正在思考下一步……`;
+                } else {
+                    const pvp = this.settings.mode === 'pvp';
+                    const who = pvp ? `【${player.name}】` : '您';
+                    const mine = COLOR_NAMES[player.color], theirs = COLOR_NAMES[3 - player.color];
+                    const where = this.settings.showMoves === 'on' ? '點有金色小點的格子下子' : '找一格能夾住對方棋子的空格下子';
+                    text = `輪到${who}（${mine}）：${where}，夾住的${theirs}會翻成${mine}。`;
+                }
+                el.textContent = text;
+            }
+
+            /**
+             * 在棋盤中央顯示動態提示橫幅（同時出現多則時自動往下排）
+             */
+            showCenterBanner(text, colorClasses = 'bg-amber-400 text-slate-950') {
+                const container = document.getElementById('centerToastContainer');
+                if (!container) return;
+                const banner = document.createElement('div');
+                banner.className = `floating-banner absolute left-1/2 w-max max-w-[88vw] text-center px-4 py-1.5 rounded-full font-black text-xs sm:text-sm shadow-xl sm:whitespace-nowrap border border-white/30 ${colorClasses}`;
+                banner.style.top = `calc(50% - 18px + ${container.childElementCount * 38}px)`;
+                banner.textContent = text;
+                container.appendChild(banner);
+                setTimeout(() => banner.remove(), 1650);
+            }
+
+            /**
+             * 開啟規則說明彈窗
+             */
+            openRulesModal() {
+                const modal = document.getElementById('rulesModal');
+                modal.classList.remove('hidden');
+                modal.classList.add('flex');
+            }
+
+            closeRulesModal() {
+                const modal = document.getElementById('rulesModal');
+                modal.classList.add('hidden');
+                modal.classList.remove('flex');
+            }
+
+            /**
+             * 開啟戰績板彈窗
+             * @param {boolean} isEndOfRound 是否為本局結束時自動彈出
+             */
+            openScoreModal(isEndOfRound = false) {
+                const modal = document.getElementById('scoreModal');
+                const titleEl = document.getElementById('scoreModalTitle');
+                const subEl = document.getElementById('scoreModalSubtitle');
+                const nextBtn = document.getElementById('btnNextRound');
+                const counts = Engine.countDiscs(this.board);
+
+                if (this.gameOver) {
+                    const r = this.result;
+                    titleEl.textContent = `🏆 第 ${this.roundNumber} 局結算`;
+                    subEl.textContent = r.winner
+                        ? `【${this.PLAYERS[r.winner].name}】獲勝 · 黑 ${r.black} : 白 ${r.white} · ${r.reasonText}`
+                        : `和局 · 黑 ${r.black} : 白 ${r.white} · ${r.reasonText}`;
+                    nextBtn.classList.remove('hidden');
+                } else {
+                    titleEl.textContent = `📊 第 ${this.roundNumber} 局即時戰況與戰績板`;
+                    subEl.textContent = `目前進行至第 ${this.moveNumber} 手 · 黑 ${counts.black} : 白 ${counts.white} · 空格 ${counts.empty}`;
+                    nextBtn.classList.add('hidden');
+                }
+
+                // 渲染雙方結算明細
+                document.getElementById('scoreTableBody').innerHTML = this.SEATS.map(seat => {
+                    const p = this.PLAYERS[seat];
+                    const colorChip = `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-black ${
+                        p.color === BLACK ? 'bg-slate-950 text-white border border-white/30' : 'bg-slate-100 text-slate-900'
+                    }"><span class="mini-disc ${p.color === BLACK ? 'black' : 'white'}"></span>${COLOR_NAMES[p.color]}</span>`;
+                    const n = p.color === BLACK ? counts.black : counts.white;
+                    let resultText = '進行中', resultColor = 'text-slate-200';
+                    if (this.gameOver) {
+                        if (!this.result.winner) { resultText = '🤝 和局'; resultColor = 'text-amber-300'; }
+                        else if (this.result.winner === seat) { resultText = '🏆 勝'; resultColor = 'text-emerald-400'; }
+                        else { resultText = '敗'; resultColor = 'text-rose-400'; }
+                    }
+                    return `
+                        <tr class="${seat === 'south' ? 'bg-emerald-950/35' : ''} hover:bg-white/5">
+                            <td class="py-3 px-3 font-black text-white whitespace-nowrap">${p.name}</td>
+                            <td class="py-3 px-3 whitespace-nowrap">${colorChip}</td>
+                            <td class="py-3 px-3 text-right font-black text-white">${n}</td>
+                            <td class="py-3 px-3 text-right font-black whitespace-nowrap ${resultColor}">${resultText}</td>
+                            <td class="py-3 px-3 text-right font-black text-amber-300 whitespace-nowrap">${p.record.win}勝 ${p.record.lose}敗 ${p.record.draw}和</td>
+                        </tr>
+                    `;
+                }).join('');
+
+                // 渲染歷史局數紀錄
+                document.getElementById('historyCountText').textContent = `已完成 ${this.roundHistory.length} 局`;
+                const histContainer = document.getElementById('roundHistoryContainer');
+                if (!this.roundHistory.length) {
+                    histContainer.innerHTML = '<div class="text-slate-500 italic py-2 text-center">尚無歷史對戰紀錄</div>';
+                } else {
+                    const colorTag = c => `<span class="mini-disc ${c === BLACK ? 'black' : 'white'}"></span>`;
+                    histContainer.innerHTML = this.roundHistory.map(h => `
+                        <div class="flex flex-wrap items-center justify-between gap-2 bg-slate-900/90 px-3 py-1.5 rounded-lg border border-white/5">
+                            <span class="font-bold text-amber-300">第 ${h.round} 局</span>
+                            <span class="text-slate-400 flex items-center gap-1">${h.names.south} ${colorTag(h.colors.south)} vs ${h.names.north} ${colorTag(h.colors.north)}</span>
+                            <span class="${!h.winner ? 'text-amber-300' : h.winner === 'south' ? 'text-emerald-400' : 'text-rose-400'} font-bold">
+                                ${h.winner ? `【${h.names[h.winner]}】勝` : '和局'} · 黑 ${h.black} : 白 ${h.white}
+                            </span>
+                        </div>
+                    `).join('');
+                }
+
+                modal.classList.remove('hidden');
+                modal.classList.add('flex');
+            }
+
+            closeScoreModal() {
+                const modal = document.getElementById('scoreModal');
+                modal.classList.add('hidden');
+                modal.classList.remove('flex');
+            }
+
+            /**
+             * 進入下一局
+             */
+            startNextRound() {
+                this.closeScoreModal();
+                this.roundNumber++;
+                this.startRound();
+            }
+
+            /**
+             * 彈出重新開始確認視窗
+             */
+            confirmRestartMatch() {
+                const modal = document.getElementById('confirmModal');
+                modal.classList.remove('hidden');
+                modal.classList.add('flex');
+            }
+
+            closeConfirmModal() {
+                const modal = document.getElementById('confirmModal');
+                modal.classList.add('hidden');
+                modal.classList.remove('flex');
+            }
+
+            /**
+             * 重置整場比賽與雙方戰績
+             */
+            resetFullMatch() {
+                this.closeConfirmModal();
+                this.closeScoreModal();
+                this.roundNumber = 1;
+                this.roundHistory = [];
+                for (const seat of this.SEATS) {
+                    this.PLAYERS[seat].record = { win: 0, lose: 0, draw: 0 };
+                }
+                this.startRound();
+            }
+
+            /**
+             * 切換音效開關
+             */
+            toggleSound() {
+                this.sound.enabled = !this.sound.enabled;
+                document.getElementById('soundIcon').textContent = this.sound.enabled ? '🔊' : '🔇';
+                this.showCenterBanner(
+                    this.sound.enabled ? '🔊 遊戲音效已開啟' : '🔇 遊戲音效已靜音',
+                    'bg-slate-800 text-white'
+                );
+            }
+        }
+
+        // 建立全域遊戲實例並於視窗載入後啟動
+        const game = new ReversiGame();
+        window.onload = function () {
+            game.init();
+        };
+    </script>
+</body>
+</html>

@@ -1,0 +1,763 @@
+TAP version 13
+# Subtest: confined-guard pressure: color=0, mirror=false, vertical=false
+not ok 1 - confined-guard pressure: color=0, mirror=false, vertical=false
+  ---
+  duration_ms: 47.668179
+  location: '<repo>/tests/banqi-ai.test.cjs:12:5'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+
+    'flip' !== 'move'
+
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 'move'
+  actual: 'flip'
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (<repo>/tests/banqi-ai.test.cjs:15:16)
+    Test.runInAsyncScope (node:async_hooks:206:9)
+    Test.run (node:internal/test_runner/test:796:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:526:18)
+    node:internal/test_runner/harness:255:12
+    node:internal/process/task_queues:140:7
+    AsyncResource.runInAsyncScope (node:async_hooks:206:9)
+    AsyncResource.runMicrotask (node:internal/process/task_queues:137:8)
+  ...
+# Subtest: save last cannon: color=0, mirror=false, vertical=false
+not ok 2 - save last cannon: color=0, mirror=false, vertical=false
+  ---
+  duration_ms: 114.650887
+  location: '<repo>/tests/banqi-ai.test.cjs:23:5'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    + actual - expected
+
+    + 'capture'
+    - 'move'
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 'move'
+  actual: 'capture'
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (<repo>/tests/banqi-ai.test.cjs:26:16)
+    Test.runInAsyncScope (node:async_hooks:206:9)
+    Test.run (node:internal/test_runner/test:796:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:526:18)
+    Test.postRun (node:internal/test_runner/test:889:19)
+    Test.run (node:internal/test_runner/test:835:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:526:7)
+  ...
+# Subtest: confined-guard pressure: color=0, mirror=false, vertical=true
+not ok 3 - confined-guard pressure: color=0, mirror=false, vertical=true
+  ---
+  duration_ms: 30.538539
+  location: '<repo>/tests/banqi-ai.test.cjs:12:5'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+
+    'flip' !== 'move'
+
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 'move'
+  actual: 'flip'
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (<repo>/tests/banqi-ai.test.cjs:15:16)
+    Test.runInAsyncScope (node:async_hooks:206:9)
+    Test.run (node:internal/test_runner/test:796:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:526:18)
+    Test.postRun (node:internal/test_runner/test:889:19)
+    Test.run (node:internal/test_runner/test:835:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:526:7)
+  ...
+# Subtest: save last cannon: color=0, mirror=false, vertical=true
+not ok 4 - save last cannon: color=0, mirror=false, vertical=true
+  ---
+  duration_ms: 107.578268
+  location: '<repo>/tests/banqi-ai.test.cjs:23:5'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    + actual - expected
+
+    + 'capture'
+    - 'move'
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 'move'
+  actual: 'capture'
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (<repo>/tests/banqi-ai.test.cjs:26:16)
+    Test.runInAsyncScope (node:async_hooks:206:9)
+    Test.run (node:internal/test_runner/test:796:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:526:18)
+    Test.postRun (node:internal/test_runner/test:889:19)
+    Test.run (node:internal/test_runner/test:835:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:526:7)
+  ...
+# Subtest: confined-guard pressure: color=0, mirror=true, vertical=false
+not ok 5 - confined-guard pressure: color=0, mirror=true, vertical=false
+  ---
+  duration_ms: 29.195769
+  location: '<repo>/tests/banqi-ai.test.cjs:12:5'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+
+    'flip' !== 'move'
+
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 'move'
+  actual: 'flip'
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (<repo>/tests/banqi-ai.test.cjs:15:16)
+    Test.runInAsyncScope (node:async_hooks:206:9)
+    Test.run (node:internal/test_runner/test:796:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:526:18)
+    Test.postRun (node:internal/test_runner/test:889:19)
+    Test.run (node:internal/test_runner/test:835:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:526:7)
+  ...
+# Subtest: save last cannon: color=0, mirror=true, vertical=false
+not ok 6 - save last cannon: color=0, mirror=true, vertical=false
+  ---
+  duration_ms: 109.302957
+  location: '<repo>/tests/banqi-ai.test.cjs:23:5'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    + actual - expected
+
+    + 'capture'
+    - 'move'
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 'move'
+  actual: 'capture'
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (<repo>/tests/banqi-ai.test.cjs:26:16)
+    Test.runInAsyncScope (node:async_hooks:206:9)
+    Test.run (node:internal/test_runner/test:796:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:526:18)
+    Test.postRun (node:internal/test_runner/test:889:19)
+    Test.run (node:internal/test_runner/test:835:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:526:7)
+  ...
+# Subtest: confined-guard pressure: color=0, mirror=true, vertical=true
+not ok 7 - confined-guard pressure: color=0, mirror=true, vertical=true
+  ---
+  duration_ms: 32.56802
+  location: '<repo>/tests/banqi-ai.test.cjs:12:5'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+
+    'flip' !== 'move'
+
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 'move'
+  actual: 'flip'
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (<repo>/tests/banqi-ai.test.cjs:15:16)
+    Test.runInAsyncScope (node:async_hooks:206:9)
+    Test.run (node:internal/test_runner/test:796:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:526:18)
+    Test.postRun (node:internal/test_runner/test:889:19)
+    Test.run (node:internal/test_runner/test:835:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:526:7)
+  ...
+# Subtest: save last cannon: color=0, mirror=true, vertical=true
+not ok 8 - save last cannon: color=0, mirror=true, vertical=true
+  ---
+  duration_ms: 109.178247
+  location: '<repo>/tests/banqi-ai.test.cjs:23:5'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    + actual - expected
+
+    + 'capture'
+    - 'move'
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 'move'
+  actual: 'capture'
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (<repo>/tests/banqi-ai.test.cjs:26:16)
+    Test.runInAsyncScope (node:async_hooks:206:9)
+    Test.run (node:internal/test_runner/test:796:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:526:18)
+    Test.postRun (node:internal/test_runner/test:889:19)
+    Test.run (node:internal/test_runner/test:835:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:526:7)
+  ...
+# Subtest: confined-guard pressure: color=1, mirror=false, vertical=false
+not ok 9 - confined-guard pressure: color=1, mirror=false, vertical=false
+  ---
+  duration_ms: 31.645329
+  location: '<repo>/tests/banqi-ai.test.cjs:12:5'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+
+    'flip' !== 'move'
+
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 'move'
+  actual: 'flip'
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (<repo>/tests/banqi-ai.test.cjs:15:16)
+    Test.runInAsyncScope (node:async_hooks:206:9)
+    Test.run (node:internal/test_runner/test:796:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:526:18)
+    Test.postRun (node:internal/test_runner/test:889:19)
+    Test.run (node:internal/test_runner/test:835:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:526:7)
+  ...
+# Subtest: save last cannon: color=1, mirror=false, vertical=false
+not ok 10 - save last cannon: color=1, mirror=false, vertical=false
+  ---
+  duration_ms: 115.313718
+  location: '<repo>/tests/banqi-ai.test.cjs:23:5'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    + actual - expected
+
+    + 'capture'
+    - 'move'
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 'move'
+  actual: 'capture'
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (<repo>/tests/banqi-ai.test.cjs:26:16)
+    Test.runInAsyncScope (node:async_hooks:206:9)
+    Test.run (node:internal/test_runner/test:796:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:526:18)
+    Test.postRun (node:internal/test_runner/test:889:19)
+    Test.run (node:internal/test_runner/test:835:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:526:7)
+  ...
+# Subtest: confined-guard pressure: color=1, mirror=false, vertical=true
+not ok 11 - confined-guard pressure: color=1, mirror=false, vertical=true
+  ---
+  duration_ms: 29.55546
+  location: '<repo>/tests/banqi-ai.test.cjs:12:5'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+
+    'flip' !== 'move'
+
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 'move'
+  actual: 'flip'
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (<repo>/tests/banqi-ai.test.cjs:15:16)
+    Test.runInAsyncScope (node:async_hooks:206:9)
+    Test.run (node:internal/test_runner/test:796:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:526:18)
+    Test.postRun (node:internal/test_runner/test:889:19)
+    Test.run (node:internal/test_runner/test:835:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:526:7)
+  ...
+# Subtest: save last cannon: color=1, mirror=false, vertical=true
+not ok 12 - save last cannon: color=1, mirror=false, vertical=true
+  ---
+  duration_ms: 113.518577
+  location: '<repo>/tests/banqi-ai.test.cjs:23:5'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    + actual - expected
+
+    + 'capture'
+    - 'move'
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 'move'
+  actual: 'capture'
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (<repo>/tests/banqi-ai.test.cjs:26:16)
+    Test.runInAsyncScope (node:async_hooks:206:9)
+    Test.run (node:internal/test_runner/test:796:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:526:18)
+    Test.postRun (node:internal/test_runner/test:889:19)
+    Test.run (node:internal/test_runner/test:835:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:526:7)
+  ...
+# Subtest: confined-guard pressure: color=1, mirror=true, vertical=false
+not ok 13 - confined-guard pressure: color=1, mirror=true, vertical=false
+  ---
+  duration_ms: 35.963469
+  location: '<repo>/tests/banqi-ai.test.cjs:12:5'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+
+    'flip' !== 'move'
+
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 'move'
+  actual: 'flip'
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (<repo>/tests/banqi-ai.test.cjs:15:16)
+    Test.runInAsyncScope (node:async_hooks:206:9)
+    Test.run (node:internal/test_runner/test:796:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:526:18)
+    Test.postRun (node:internal/test_runner/test:889:19)
+    Test.run (node:internal/test_runner/test:835:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:526:7)
+  ...
+# Subtest: save last cannon: color=1, mirror=true, vertical=false
+not ok 14 - save last cannon: color=1, mirror=true, vertical=false
+  ---
+  duration_ms: 101.494268
+  location: '<repo>/tests/banqi-ai.test.cjs:23:5'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    + actual - expected
+
+    + 'capture'
+    - 'move'
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 'move'
+  actual: 'capture'
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (<repo>/tests/banqi-ai.test.cjs:26:16)
+    Test.runInAsyncScope (node:async_hooks:206:9)
+    Test.run (node:internal/test_runner/test:796:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:526:18)
+    Test.postRun (node:internal/test_runner/test:889:19)
+    Test.run (node:internal/test_runner/test:835:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:526:7)
+  ...
+# Subtest: confined-guard pressure: color=1, mirror=true, vertical=true
+not ok 15 - confined-guard pressure: color=1, mirror=true, vertical=true
+  ---
+  duration_ms: 35.427319
+  location: '<repo>/tests/banqi-ai.test.cjs:12:5'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+
+    'flip' !== 'move'
+
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 'move'
+  actual: 'flip'
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (<repo>/tests/banqi-ai.test.cjs:15:16)
+    Test.runInAsyncScope (node:async_hooks:206:9)
+    Test.run (node:internal/test_runner/test:796:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:526:18)
+    Test.postRun (node:internal/test_runner/test:889:19)
+    Test.run (node:internal/test_runner/test:835:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:526:7)
+  ...
+# Subtest: save last cannon: color=1, mirror=true, vertical=true
+not ok 16 - save last cannon: color=1, mirror=true, vertical=true
+  ---
+  duration_ms: 111.922307
+  location: '<repo>/tests/banqi-ai.test.cjs:23:5'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    + actual - expected
+
+    + 'capture'
+    - 'move'
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 'move'
+  actual: 'capture'
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (<repo>/tests/banqi-ai.test.cjs:26:16)
+    Test.runInAsyncScope (node:async_hooks:206:9)
+    Test.run (node:internal/test_runner/test:796:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:526:18)
+    Test.postRun (node:internal/test_runner/test:889:19)
+    Test.run (node:internal/test_runner/test:835:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:526:7)
+  ...
+# Subtest: avoid known threat pawn_danger, color=0
+ok 17 - avoid known threat pawn_danger, color=0
+  ---
+  duration_ms: 104.172708
+  ...
+# Subtest: avoid known threat pawn_danger, color=1
+ok 18 - avoid known threat pawn_danger, color=1
+  ---
+  duration_ms: 124.109587
+  ...
+# Subtest: avoid known threat cannon_danger, color=0
+ok 19 - avoid known threat cannon_danger, color=0
+  ---
+  duration_ms: 169.956006
+  ...
+# Subtest: avoid known threat cannon_danger, color=1
+ok 20 - avoid known threat cannon_danger, color=1
+  ---
+  duration_ms: 178.158235
+  ...
+# Subtest: avoid known threat recapture_danger, color=0
+ok 21 - avoid known threat recapture_danger, color=0
+  ---
+  duration_ms: 152.602516
+  ...
+# Subtest: avoid known threat recapture_danger, color=1
+ok 22 - avoid known threat recapture_danger, color=1
+  ---
+  duration_ms: 135.486707
+  ...
+# Subtest: pressure generalizes to rank 1 vs 9
+ok 23 - pressure generalizes to rank 1 vs 9
+  ---
+  duration_ms: 12.819279
+  ...
+# Subtest: pressure generalizes to rank 2 vs 10
+ok 24 - pressure generalizes to rank 2 vs 10
+  ---
+  duration_ms: 25.6255
+  ...
+# Subtest: pressure generalizes to rank 4 vs 12
+not ok 25 - pressure generalizes to rank 4 vs 12
+  ---
+  duration_ms: 37.711469
+  location: '<repo>/tests/banqi-ai.test.cjs:45:5'
+  failureType: 'testCodeFailure'
+  error: |-
+    The expression evaluated to a falsy value:
+
+      assert.ok(sameMove(decide(api, st, 0).action, 'b2', 'b3'))
+
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: '=='
+  stack: |-
+    TestContext.<anonymous> (<repo>/tests/banqi-ai.test.cjs:48:16)
+    Test.runInAsyncScope (node:async_hooks:206:9)
+    Test.run (node:internal/test_runner/test:796:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:526:18)
+    Test.postRun (node:internal/test_runner/test:889:19)
+    Test.run (node:internal/test_runner/test:835:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:526:7)
+  ...
+# Subtest: after a defensive pawn reveal, retreat when taking the guard would trap the king
+ok 26 - after a defensive pawn reveal, retreat when taking the guard would trap the king
+  ---
+  duration_ms: 47.269938
+  ...
+# Subtest: the default normal level also escapes the pawn trap at its two-ply horizon
+not ok 27 - the default normal level also escapes the pawn trap at its two-ply horizon
+  ---
+  duration_ms: 17.44503
+  location: '<repo>/tests/banqi-ai.test.cjs:71:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    The expression evaluated to a falsy value:
+
+      assert.ok(!sameMove(action, 'b3', 'a3'))
+
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: '=='
+  stack: |-
+    TestContext.<anonymous> (<repo>/tests/banqi-ai.test.cjs:77:12)
+    Test.runInAsyncScope (node:async_hooks:206:9)
+    Test.run (node:internal/test_runner/test:796:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:526:18)
+    Test.postRun (node:internal/test_runner/test:889:19)
+    Test.run (node:internal/test_runner/test:835:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:526:7)
+  ...
+# Subtest: trade with a hidden backup cannon, color=0
+ok 28 - trade with a hidden backup cannon, color=0
+  ---
+  duration_ms: 212.615215
+  ...
+# Subtest: trade away last counter when its final target is removed, color=0
+ok 29 - trade away last counter when its final target is removed, color=0
+  ---
+  duration_ms: 49.595219
+  ...
+# Subtest: trade with a hidden backup cannon, color=1
+ok 30 - trade with a hidden backup cannon, color=1
+  ---
+  duration_ms: 218.781225
+  ...
+# Subtest: trade away last counter when its final target is removed, color=1
+ok 31 - trade away last counter when its final target is removed, color=1
+  ---
+  duration_ms: 44.729119
+  ...
+# Subtest: save a last king counter from a pawn recapture
+ok 32 - save a last king counter from a pawn recapture
+  ---
+  duration_ms: 167.109256
+  ...
+# Subtest: when preservation is impossible, make the only legal capture
+ok 33 - when preservation is impossible, make the only legal capture
+  ---
+  duration_ms: 11.00756
+  ...
+# Subtest: a last-cannon trade can keep a points route instead of losing immediately at 50
+ok 34 - a last-cannon trade can keep a points route instead of losing immediately at 50
+  ---
+  duration_ms: 52.670268
+  ...
+# Subtest: tactical baseline cannon_shot, color=0
+ok 35 - tactical baseline cannon_shot, color=0
+  ---
+  duration_ms: 20.25027
+  ...
+# Subtest: tactical baseline cannon_shot, color=1
+ok 36 - tactical baseline cannon_shot, color=1
+  ---
+  duration_ms: 31.420979
+  ...
+# Subtest: tactical baseline cannon_screen, color=0
+ok 37 - tactical baseline cannon_screen, color=0
+  ---
+  duration_ms: 49.508869
+  ...
+# Subtest: tactical baseline cannon_screen, color=1
+ok 38 - tactical baseline cannon_screen, color=1
+  ---
+  duration_ms: 41.348428
+  ...
+# Subtest: tactical baseline major_exchange, color=0
+ok 39 - tactical baseline major_exchange, color=0
+  ---
+  duration_ms: 29.759579
+  ...
+# Subtest: tactical baseline major_exchange, color=1
+ok 40 - tactical baseline major_exchange, color=1
+  ---
+  duration_ms: 33.010499
+  ...
+# Subtest: tactical baseline pawn_king, color=0
+ok 41 - tactical baseline pawn_king, color=0
+  ---
+  duration_ms: 15.06153
+  ...
+# Subtest: tactical baseline pawn_king, color=1
+ok 42 - tactical baseline pawn_king, color=1
+  ---
+  duration_ms: 12.004079
+  ...
+# Subtest: cannon screen construction wins a guard against every legal reply
+ok 43 - cannon screen construction wins a guard against every legal reply
+  ---
+  duration_ms: 57.938599
+  ...
+# Subtest: cannons require exactly one screen; adjacent or two-screen captures are illegal
+ok 44 - cannons require exactly one screen; adjacent or two-screen captures are illegal
+  ---
+  duration_ms: 14.32393
+  ...
+# Subtest: 50-ply scoring win remains valid without a guard counter
+ok 45 - 50-ply scoring win remains valid without a guard counter
+  ---
+  duration_ms: 11.214889
+  ...
+# Subtest: capture resets the clock instead of accepting a points loss
+ok 46 - capture resets the clock instead of accepting a points loss
+  ---
+  duration_ms: 11.452249
+  ...
+# Subtest: equal capture points are a real draw, even with an unfavorable static evaluation
+not ok 47 - equal capture points are a real draw, even with an unfavorable static evaluation
+  ---
+  duration_ms: 11.74648
+  location: '<repo>/tests/banqi-ai.test.cjs:161:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+
+    -1234 !== 0
+
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 0
+  actual: -1234
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (<repo>/tests/banqi-ai.test.cjs:166:12)
+    Test.runInAsyncScope (node:async_hooks:206:9)
+    Test.run (node:internal/test_runner/test:796:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:526:18)
+    Test.postRun (node:internal/test_runner/test:889:19)
+    Test.run (node:internal/test_runner/test:835:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:526:7)
+  ...
+# Subtest: lack of a counter is not an immediate game over
+ok 48 - lack of a counter is not an immediate game over
+  ---
+  duration_ms: 11.14489
+  ...
+# Subtest: only public state affects decisions; future reveal identities are never accessed
+ok 49 - only public state affects decisions; future reveal identities are never accessed
+  ---
+  duration_ms: 238.081414
+  ...
+# Subtest: interrupted search fully restores public state at node 1
+ok 50 - interrupted search fully restores public state at node 1
+  ---
+  duration_ms: 14.35995
+  ...
+# Subtest: interrupted search fully restores public state at node 2
+ok 51 - interrupted search fully restores public state at node 2
+  ---
+  duration_ms: 15.224799
+  ...
+# Subtest: interrupted search fully restores public state at node 37
+ok 52 - interrupted search fully restores public state at node 37
+  ---
+  duration_ms: 11.87188
+  ...
+# Subtest: interrupted search fully restores public state at node 128
+ok 53 - interrupted search fully restores public state at node 128
+  ---
+  duration_ms: 19.78103
+  ...
+# Subtest: interrupted search fully restores public state at node 1024
+ok 54 - interrupted search fully restores public state at node 1024
+  ---
+  duration_ms: 60.830378
+  ...
+# Subtest: interrupted search fully restores public state at node 8192
+ok 55 - interrupted search fully restores public state at node 8192
+  ---
+  duration_ms: 165.392106
+  ...
+# Subtest: wall-clock abort and incomplete root rounds retain a legal fallback and restore state
+ok 56 - wall-clock abort and incomplete root rounds retain a legal fallback and restore state
+  ---
+  duration_ms: 115.513787
+  ...
+# Subtest: chance branches and TT bounds match an independent exhaustive tree (including conditional second flips)
+not ok 57 - chance branches and TT bounds match an independent exhaustive tree (including conditional second flips)
+  ---
+  duration_ms: 50.129348
+  location: '<repo>/tests/banqi-ai.test.cjs:228:1'
+  failureType: 'testCodeFailure'
+  error: '139 != 92.64666666666666'
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: '=='
+  stack: |-
+    TestContext.<anonymous> (<repo>/tests/banqi-ai.test.cjs:238:21)
+    Test.runInAsyncScope (node:async_hooks:206:9)
+    Test.run (node:internal/test_runner/test:796:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:526:18)
+    Test.postRun (node:internal/test_runner/test:889:19)
+    Test.run (node:internal/test_runner/test:835:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:526:7)
+  ...
+# Subtest: every committed root iteration compares moves and flips at the same depth
+not ok 58 - every committed root iteration compares moves and flips at the same depth
+  ---
+  duration_ms: 120.220927
+  location: '<repo>/tests/banqi-ai.test.cjs:242:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    The expression evaluated to a falsy value:
+
+      assert.ok(api.BanqiAI.lastSearch)
+
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  operator: '=='
+  stack: |-
+    TestContext.<anonymous> (<repo>/tests/banqi-ai.test.cjs:244:12)
+    Test.runInAsyncScope (node:async_hooks:206:9)
+    Test.run (node:internal/test_runner/test:796:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:526:18)
+    Test.postRun (node:internal/test_runner/test:889:19)
+    Test.run (node:internal/test_runner/test:835:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:526:7)
+  ...
+# Subtest: chance TT does not reuse mixed mate-distance expectations at another absolute ply
+not ok 59 - chance TT does not reuse mixed mate-distance expectations at another absolute ply
+  ---
+  duration_ms: 11.68498
+  location: '<repo>/tests/banqi-ai.test.cjs:252:1'
+  failureType: 'testCodeFailure'
+  error: 'This is an expectation, not a proven loss'
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: '=='
+  stack: |-
+    TestContext.<anonymous> (<repo>/tests/banqi-ai.test.cjs:261:12)
+    Test.runInAsyncScope (node:async_hooks:206:9)
+    Test.run (node:internal/test_runner/test:796:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:526:18)
+    Test.postRun (node:internal/test_runner/test:889:19)
+    Test.run (node:internal/test_runner/test:835:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:526:7)
+  ...
+# Subtest: per-piece danger masks equal actual board mutations, including captures, removed screens and bit 31
+not ok 60 - per-piece danger masks equal actual board mutations, including captures, removed screens and bit 31
+  ---
+  duration_ms: 18.57418
+  location: '<repo>/tests/banqi-ai.test.cjs:266:1'
+  failureType: 'testCodeFailure'
+  error: 'api.Engine.pressureScore is not a function'
+  code: 'ERR_TEST_FAILURE'
+  name: 'TypeError'
+  stack: |-
+    TestContext.<anonymous> (<repo>/tests/banqi-ai.test.cjs:284:20)
+    Test.runInAsyncScope (node:async_hooks:206:9)
+    Test.run (node:internal/test_runner/test:796:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:526:18)
+    Test.postRun (node:internal/test_runner/test:889:19)
+    Test.run (node:internal/test_runner/test:835:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:526:7)
+  ...
+1..60
+# tests 60
+# suites 0
+# pass 37
+# fail 23
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 4314.211517

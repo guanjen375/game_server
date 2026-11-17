@@ -1,0 +1,108 @@
+{
+  "games": 8,
+  "plies": 1194,
+  "sources": {
+    "current": "05f81e88bab84a99516c9dab775e3bd89fc6ccf69487f9affdd34d18eb202834",
+    "opponent": "9bff8bc10f752182739ed472ab61312b1330f3d899adfb0df0aa6e6ea2929717"
+  },
+  "engines": {
+    "current": {
+      "wins": 4,
+      "moves": 597,
+      "nodesMean": 18925.675041876046,
+      "nodesMax": 20000,
+      "msMean": 173.80418760469013,
+      "maxDepth": 12,
+      "metrics": {
+        "newUncoveredTypes": 17,
+        "counterLostInTradeWhileBehind": 0,
+        "nonwinningCycles": 0,
+        "scoringCycles": 0,
+        "captures": 90,
+        "flips": 93
+      }
+    },
+    "baseline": {
+      "wins": 4,
+      "moves": 597,
+      "nodesMean": 18965.053601340034,
+      "nodesMax": 20000,
+      "msMean": 176.2385929648241,
+      "maxDepth": 12,
+      "metrics": {
+        "newUncoveredTypes": 13,
+        "counterLostInTradeWhileBehind": 0,
+        "nonwinningCycles": 0,
+        "scoringCycles": 0,
+        "captures": 93,
+        "flips": 93
+      }
+    }
+  },
+  "initialPointsAdvantage": [
+    {
+      "id": "s601-p0",
+      "currentSide": 0,
+      "redPointsLead": 0,
+      "advantagedEngine": null,
+      "winner": "current",
+      "reason": "eliminate/stalemate"
+    },
+    {
+      "id": "s601-p0",
+      "currentSide": 1,
+      "redPointsLead": 0,
+      "advantagedEngine": null,
+      "winner": "baseline",
+      "reason": "eliminate/stalemate"
+    },
+    {
+      "id": "s601-p24",
+      "currentSide": 0,
+      "redPointsLead": -6,
+      "advantagedEngine": "baseline",
+      "winner": "current",
+      "reason": "eliminate/stalemate"
+    },
+    {
+      "id": "s601-p24",
+      "currentSide": 1,
+      "redPointsLead": -6,
+      "advantagedEngine": "current",
+      "winner": "baseline",
+      "reason": "eliminate/stalemate"
+    },
+    {
+      "id": "s701-p0",
+      "currentSide": 0,
+      "redPointsLead": 0,
+      "advantagedEngine": null,
+      "winner": "baseline",
+      "reason": "eliminate/stalemate"
+    },
+    {
+      "id": "s701-p0",
+      "currentSide": 1,
+      "redPointsLead": 0,
+      "advantagedEngine": null,
+      "winner": "current",
+      "reason": "eliminate/stalemate"
+    },
+    {
+      "id": "s701-p24",
+      "currentSide": 0,
+      "redPointsLead": 2,
+      "advantagedEngine": "current",
+      "winner": "current",
+      "reason": "points"
+    },
+    {
+      "id": "s701-p24",
+      "currentSide": 1,
+      "redPointsLead": 2,
+      "advantagedEngine": "baseline",
+      "winner": "baseline",
+      "reason": "eliminate/stalemate"
+    }
+  ]
+}

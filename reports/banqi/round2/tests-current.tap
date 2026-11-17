@@ -1,0 +1,365 @@
+TAP version 13
+# Subtest: confined-guard pressure: color=0, mirror=false, vertical=false
+ok 1 - confined-guard pressure: color=0, mirror=false, vertical=false
+  ---
+  duration_ms: 295.364877
+  ...
+# Subtest: save last cannon: color=0, mirror=false, vertical=false
+ok 2 - save last cannon: color=0, mirror=false, vertical=false
+  ---
+  duration_ms: 485.402466
+  ...
+# Subtest: confined-guard pressure: color=0, mirror=false, vertical=true
+ok 3 - confined-guard pressure: color=0, mirror=false, vertical=true
+  ---
+  duration_ms: 320.164117
+  ...
+# Subtest: save last cannon: color=0, mirror=false, vertical=true
+ok 4 - save last cannon: color=0, mirror=false, vertical=true
+  ---
+  duration_ms: 449.204126
+  ...
+# Subtest: confined-guard pressure: color=0, mirror=true, vertical=false
+ok 5 - confined-guard pressure: color=0, mirror=true, vertical=false
+  ---
+  duration_ms: 255.463857
+  ...
+# Subtest: save last cannon: color=0, mirror=true, vertical=false
+ok 6 - save last cannon: color=0, mirror=true, vertical=false
+  ---
+  duration_ms: 379.910827
+  ...
+# Subtest: confined-guard pressure: color=0, mirror=true, vertical=true
+ok 7 - confined-guard pressure: color=0, mirror=true, vertical=true
+  ---
+  duration_ms: 272.221097
+  ...
+# Subtest: save last cannon: color=0, mirror=true, vertical=true
+ok 8 - save last cannon: color=0, mirror=true, vertical=true
+  ---
+  duration_ms: 565.647845
+  ...
+# Subtest: confined-guard pressure: color=1, mirror=false, vertical=false
+ok 9 - confined-guard pressure: color=1, mirror=false, vertical=false
+  ---
+  duration_ms: 291.084087
+  ...
+# Subtest: save last cannon: color=1, mirror=false, vertical=false
+ok 10 - save last cannon: color=1, mirror=false, vertical=false
+  ---
+  duration_ms: 410.264826
+  ...
+# Subtest: confined-guard pressure: color=1, mirror=false, vertical=true
+ok 11 - confined-guard pressure: color=1, mirror=false, vertical=true
+  ---
+  duration_ms: 304.021597
+  ...
+# Subtest: save last cannon: color=1, mirror=false, vertical=true
+ok 12 - save last cannon: color=1, mirror=false, vertical=true
+  ---
+  duration_ms: 487.798505
+  ...
+# Subtest: confined-guard pressure: color=1, mirror=true, vertical=false
+ok 13 - confined-guard pressure: color=1, mirror=true, vertical=false
+  ---
+  duration_ms: 261.328808
+  ...
+# Subtest: save last cannon: color=1, mirror=true, vertical=false
+ok 14 - save last cannon: color=1, mirror=true, vertical=false
+  ---
+  duration_ms: 430.072137
+  ...
+# Subtest: confined-guard pressure: color=1, mirror=true, vertical=true
+ok 15 - confined-guard pressure: color=1, mirror=true, vertical=true
+  ---
+  duration_ms: 277.909557
+  ...
+# Subtest: save last cannon: color=1, mirror=true, vertical=true
+ok 16 - save last cannon: color=1, mirror=true, vertical=true
+  ---
+  duration_ms: 507.980815
+  ...
+# Subtest: avoid known threat pawn_danger, color=0
+ok 17 - avoid known threat pawn_danger, color=0
+  ---
+  duration_ms: 533.789405
+  ...
+# Subtest: avoid known threat pawn_danger, color=1
+ok 18 - avoid known threat pawn_danger, color=1
+  ---
+  duration_ms: 479.482376
+  ...
+# Subtest: avoid known threat cannon_danger, color=0
+ok 19 - avoid known threat cannon_danger, color=0
+  ---
+  duration_ms: 792.871912
+  ...
+# Subtest: avoid known threat cannon_danger, color=1
+ok 20 - avoid known threat cannon_danger, color=1
+  ---
+  duration_ms: 886.726151
+  ...
+# Subtest: avoid known threat recapture_danger, color=0
+ok 21 - avoid known threat recapture_danger, color=0
+  ---
+  duration_ms: 288.737887
+  ...
+# Subtest: avoid known threat recapture_danger, color=1
+ok 22 - avoid known threat recapture_danger, color=1
+  ---
+  duration_ms: 273.641818
+  ...
+# Subtest: pressure generalizes to rank 1 vs 9
+ok 23 - pressure generalizes to rank 1 vs 9
+  ---
+  duration_ms: 30.80558
+  ...
+# Subtest: pressure generalizes to rank 2 vs 10
+ok 24 - pressure generalizes to rank 2 vs 10
+  ---
+  duration_ms: 48.873029
+  ...
+# Subtest: pressure generalizes to rank 4 vs 12
+ok 25 - pressure generalizes to rank 4 vs 12
+  ---
+  duration_ms: 54.90829
+  ...
+# Subtest: after a defensive pawn reveal, retreat when taking the guard would trap the king
+ok 26 - after a defensive pawn reveal, retreat when taking the guard would trap the king
+  ---
+  duration_ms: 144.746108
+  ...
+# Subtest: the default normal level also escapes the pawn trap at its two-ply horizon
+ok 27 - the default normal level also escapes the pawn trap at its two-ply horizon
+  ---
+  duration_ms: 38.79718
+  ...
+# Subtest: trade with a hidden backup cannon, color=0
+ok 28 - trade with a hidden backup cannon, color=0
+  ---
+  duration_ms: 632.018554
+  ...
+# Subtest: trade away last counter when its final target is removed, color=0
+ok 29 - trade away last counter when its final target is removed, color=0
+  ---
+  duration_ms: 118.948269
+  ...
+# Subtest: trade with a hidden backup cannon, color=1
+ok 30 - trade with a hidden backup cannon, color=1
+  ---
+  duration_ms: 580.546794
+  ...
+# Subtest: trade away last counter when its final target is removed, color=1
+ok 31 - trade away last counter when its final target is removed, color=1
+  ---
+  duration_ms: 124.01963
+  ...
+# Subtest: save a last king counter from a pawn recapture
+ok 32 - save a last king counter from a pawn recapture
+  ---
+  duration_ms: 379.449807
+  ...
+# Subtest: when preservation is impossible, make the only legal capture
+ok 33 - when preservation is impossible, make the only legal capture
+  ---
+  duration_ms: 3.60652
+  ...
+# Subtest: a last-cannon trade can keep a points route instead of losing immediately at 50
+ok 34 - a last-cannon trade can keep a points route instead of losing immediately at 50
+  ---
+  duration_ms: 151.135288
+  ...
+# Subtest: tactical baseline cannon_shot, color=0
+ok 35 - tactical baseline cannon_shot, color=0
+  ---
+  duration_ms: 41.90159
+  ...
+# Subtest: tactical baseline cannon_shot, color=1
+ok 36 - tactical baseline cannon_shot, color=1
+  ---
+  duration_ms: 45.238399
+  ...
+# Subtest: tactical baseline cannon_screen, color=0
+ok 37 - tactical baseline cannon_screen, color=0
+  ---
+  duration_ms: 123.123579
+  ...
+# Subtest: tactical baseline cannon_screen, color=1
+ok 38 - tactical baseline cannon_screen, color=1
+  ---
+  duration_ms: 86.87571
+  ...
+# Subtest: tactical baseline major_exchange, color=0
+ok 39 - tactical baseline major_exchange, color=0
+  ---
+  duration_ms: 80.402509
+  ...
+# Subtest: tactical baseline major_exchange, color=1
+ok 40 - tactical baseline major_exchange, color=1
+  ---
+  duration_ms: 106.816579
+  ...
+# Subtest: tactical baseline pawn_king, color=0
+ok 41 - tactical baseline pawn_king, color=0
+  ---
+  duration_ms: 13.19401
+  ...
+# Subtest: tactical baseline pawn_king, color=1
+ok 42 - tactical baseline pawn_king, color=1
+  ---
+  duration_ms: 27.270419
+  ...
+# Subtest: cannon screen construction wins a guard against every legal reply
+ok 43 - cannon screen construction wins a guard against every legal reply
+  ---
+  duration_ms: 183.976799
+  ...
+# Subtest: cannons require exactly one screen; adjacent or two-screen captures are illegal
+ok 44 - cannons require exactly one screen; adjacent or two-screen captures are illegal
+  ---
+  duration_ms: 4.14075
+  ...
+# Subtest: 50-ply scoring win remains valid without a guard counter
+ok 45 - 50-ply scoring win remains valid without a guard counter
+  ---
+  duration_ms: 9.78928
+  ...
+# Subtest: capture resets the clock instead of accepting a points loss
+ok 46 - capture resets the clock instead of accepting a points loss
+  ---
+  duration_ms: 8.64138
+  ...
+# Subtest: equal capture points are a real draw, even with an unfavorable static evaluation
+ok 47 - equal capture points are a real draw, even with an unfavorable static evaluation
+  ---
+  duration_ms: 2.66698
+  ...
+# Subtest: lack of a counter is not an immediate game over
+ok 48 - lack of a counter is not an immediate game over
+  ---
+  duration_ms: 2.95487
+  ...
+# Subtest: only public state affects decisions; future reveal identities are never accessed
+ok 49 - only public state affects decisions; future reveal identities are never accessed
+  ---
+  duration_ms: 548.548794
+  ...
+# Subtest: interrupted search fully restores public state at node 1
+ok 50 - interrupted search fully restores public state at node 1
+  ---
+  duration_ms: 4.927649
+  ...
+# Subtest: interrupted search fully restores public state at node 2
+ok 51 - interrupted search fully restores public state at node 2
+  ---
+  duration_ms: 2.7009
+  ...
+# Subtest: interrupted search fully restores public state at node 37
+ok 52 - interrupted search fully restores public state at node 37
+  ---
+  duration_ms: 7.947869
+  ...
+# Subtest: interrupted search fully restores public state at node 128
+ok 53 - interrupted search fully restores public state at node 128
+  ---
+  duration_ms: 32.44041
+  ...
+# Subtest: interrupted search fully restores public state at node 1024
+ok 54 - interrupted search fully restores public state at node 1024
+  ---
+  duration_ms: 170.734498
+  ...
+# Subtest: interrupted search fully restores public state at node 8192
+ok 55 - interrupted search fully restores public state at node 8192
+  ---
+  duration_ms: 315.200808
+  ...
+# Subtest: wall-clock abort and incomplete root rounds retain a legal fallback and restore state
+ok 56 - wall-clock abort and incomplete root rounds retain a legal fallback and restore state
+  ---
+  duration_ms: 8.61946
+  ...
+# Subtest: chance branches and TT bounds match an independent exhaustive tree (including conditional second flips)
+ok 57 - chance branches and TT bounds match an independent exhaustive tree (including conditional second flips)
+  ---
+  duration_ms: 258.414937
+  ...
+# Subtest: every committed root iteration compares moves and flips at the same depth
+ok 58 - every committed root iteration compares moves and flips at the same depth
+  ---
+  duration_ms: 274.766967
+  ...
+# Subtest: chance TT does not reuse mixed mate-distance expectations at another absolute ply
+ok 59 - chance TT does not reuse mixed mate-distance expectations at another absolute ply
+  ---
+  duration_ms: 5.439951
+  ...
+# Subtest: per-piece danger masks equal actual board mutations, including captures, removed screens and bit 31
+ok 60 - per-piece danger masks equal actual board mutations, including captures, removed screens and bit 31
+  ---
+  duration_ms: 85.35001
+  ...
+# Subtest: keep a forced points win instead of resetting for a pawn: color=0, mirror=false
+ok 61 - keep a forced points win instead of resetting for a pawn: color=0, mirror=false
+  ---
+  duration_ms: 34.84671
+  ...
+# Subtest: keep a forced points win instead of resetting for a pawn: color=0, mirror=true
+ok 62 - keep a forced points win instead of resetting for a pawn: color=0, mirror=true
+  ---
+  duration_ms: 25.5442
+  ...
+# Subtest: keep a forced points win instead of resetting for a pawn: color=1, mirror=false
+ok 63 - keep a forced points win instead of resetting for a pawn: color=1, mirror=false
+  ---
+  duration_ms: 36.710529
+  ...
+# Subtest: keep a forced points win instead of resetting for a pawn: color=1, mirror=true
+ok 64 - keep a forced points win instead of resetting for a pawn: color=1, mirror=true
+  ---
+  duration_ms: 35.64213
+  ...
+# Subtest: a quiet evasion at the leaf uses the actual 50-ply points result
+ok 65 - a quiet evasion at the leaf uses the actual 50-ply points result
+  ---
+  duration_ms: 13.80298
+  ...
+# Subtest: quiet clock extensions restore the board on completion and abort
+ok 66 - quiet clock extensions restore the board on completion and abort
+  ---
+  duration_ms: 15.76172
+  ...
+# Subtest: reveal candidate sets are invariant under color swaps and both reflections
+ok 67 - reveal candidate sets are invariant under color swaps and both reflections
+  ---
+  duration_ms: 21.78521
+  ...
+# Subtest: real controller exports replayable public actions, with per-turn difficulty and search statistics
+ok 68 - real controller exports replayable public actions, with per-turn difficulty and search statistics
+  ---
+  duration_ms: 293.494147
+  ...
+# Subtest: replay prefix never reads future reveals or the final state
+ok 69 - replay prefix never reads future reveals or the final state
+  ---
+  duration_ms: 5.77021
+  ...
+# Subtest: undo removes abandoned actions and diagnostics before exporting
+ok 70 - undo removes abandoned actions and diagnostics before exporting
+  ---
+  duration_ms: 73.120649
+  ...
+# Subtest: a first random reveal does not inherit statistics from an earlier search
+ok 71 - a first random reveal does not inherit statistics from an earlier search
+  ---
+  duration_ms: 6.01423
+  ...
+1..71
+# tests 71
+# suites 0
+# pass 71
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 15073.353409
