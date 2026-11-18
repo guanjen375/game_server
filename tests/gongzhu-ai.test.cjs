@@ -7,7 +7,7 @@ const { compileFunction } = require('node:vm');
 
 const html = fs.readFileSync(path.join(__dirname, '../games/gongzhu.html'), 'utf8');
 const script = html.match(/<script>([\s\S]*?)<\/script>/)[1];
-const load = compileFunction(script + '\nreturn { game, ai: GongZhuAI };', ['window', 'Math']);
+const load = compileFunction(script + '\nreturn { game, ai: GongZhuAI };', ['window', 'Math', 'document']);
 const name = card => card.suit + card.label;
 
 // Replay the public tricks in play order. The bot only gets its own remaining hand.
@@ -160,6 +160,53 @@ test('the score projections match game settlement for ordinary hands, flipped sp
                 if (!count) assert.equal(ai.score(cap, true, mode), game.calculatePlayerScore(cards, true).score);
             }
         }
+    }
+});
+
+test('all four seats start with 50 and only card points are doubled or replaced by a slam', () => {
+    const { game } = load({}, Math);
+    const deck = game.createShuffledDeck();
+    const hearts = deck.filter(c => c.suit === 'H');
+    const [pig, sheep, transformer] = ['SQ', 'DJ', 'C10'].map(key => deck.find(c => name(c) === key));
+    const scores = captures => game.SEAT_ORDER.map(seat => captures[seat].score);
+    assert.deepEqual(scores(game.calculateRoundScores()), [50, 50, 50, 50]);
+    for (const [mode, bonus] of [['classic', 800], ['strict_swap', 800], ['super_slam', 1000]]) {
+        game.scoringRuleMode = mode;
+        for (const [piles, expected] of [
+            [{ south: [pig, transformer], east: [sheep] }, [-150, 150, 50, 50]],
+            [{ south: [transformer], east: [pig] }, [100, -50, 50, 50]],
+            [{ south: [...hearts, sheep, transformer], east: [pig] }, [250, 150, 50, 50]],
+            [{ west: [...hearts, pig, sheep, transformer] }, [50, 50, 50, 50 + bonus]]
+        ]) {
+            const round = game.calculateRoundScores(piles);
+            assert.deepEqual(scores(round), expected);
+            for (const seat of game.SEAT_ORDER) assert.match(round[seat].formula, /^底分\(\+50\)/);
+        }
+    }
+});
+
+test('settling twice and recalculating history credit the base only once per seat per round', () => {
+    const document = { getElementById: id => id.startsWith('trick-slot-') ? {} : null };
+    const { game } = load({}, Math, document);
+    game.sound.enabled = false;
+    game.renderAllPlayers = game.showCenterBanner = game.openScoreModal = () => {};
+    const totals = () => game.SEAT_ORDER.map(seat => game.PLAYERS[seat].totalScore);
+    game.PLAYERS.east.captured = game.createShuffledDeck().filter(c => c.isScoring);
+    game.finishRound();
+    game.finishRound();
+    assert.equal(game.roundHistory.length, 1);
+    assert.deepEqual(totals(), [50, 850, 50, 50]);
+
+    game.closeScoreModal = game.updateHeaderInfo = game.later = () => {};
+    game.startNextRound();
+    assert.deepEqual(totals(), [50, 850, 50, 50]);
+    game.PLAYERS.south.captured = game.createShuffledDeck().filter(c => c.isScoring);
+    game.finishRound();
+    for (const [mode, total] of [['super_slam', 1100], ['super_slam', 1100], ['classic', 900]]) {
+        game.setScoringRuleMode(mode);
+        assert.deepEqual(totals(), [total, total, 100, 100]);
+        assert.equal(game.roundHistory.length, 2);
+        assert.equal(game.roundHistory[0].scores.south, total - 50);
     }
 });
 
