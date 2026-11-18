@@ -162,3 +162,72 @@ test('the score projections match game settlement for ordinary hands, flipped sp
         }
     }
 });
+
+test('avoid doubling a pig, use another winner if forced, and double a sheep when it pays', () => {
+    const small = 'C3 C10 D2 D4 D6 D8 D10 S2 S4 S6 H2 H4 H6';
+    for (const [trick, hand, expected] of [
+        ['C2 C7 SQ', small, 'C3'],
+        ['C2 C7 SQ', small.replace('C3', 'CA'), 'CA'],
+        ['C2 C7 DJ', small, 'C10']
+    ]) {
+        const pick = position({ trick, hand });
+        assert.equal(pick(0), expected);
+        assert.equal(pick(32), expected);
+    }
+});
+
+test('do not lead the transformer into more penalties after taking HA and HJ', () => {
+    const state = {
+        leader: 0, history: ['C2 C6 CK CQ', 'H3 HA HJ C9'], trick: '',
+        hand: 'SA SK S7 H10 H4 CJ C10 C4 C3 D3 D2'
+    };
+    for (const seed of [1, 19, 73]) assert.notEqual(position({ ...state, seed })(32), 'C10');
+});
+
+test('cash the club ace on an empty trick or duck if the last player has shown a club void', () => {
+    for (const [lastCard, expected] of [['C7', 'CA'], ['H2', 'C3']]) {
+        const pick = position({
+            leader: 0, history: ['C2 CK C5 ' + lastCard, 'H9 H4 H6 H3', 'H10 H7 H5 HJ'],
+            trick: 'C4 C6', hand: 'C3 CA S2 S5 S7 S9 D2 D4 D6 H8'
+        });
+        assert.equal(pick(0), expected);
+        assert.equal(pick(32), expected);
+    }
+});
+
+test('with two tricks left, lead the diamond king while the sheep is still out', () => {
+    const state = {
+        leader: 2, history: ['C2 CK CQ C8', 'H2 H7 H3 HK', 'C10 C9 C4 C6', 'CJ C7 CA C3',
+            'D10 D6 D5 D4', 'D3 D2 D9 DQ', 'H8 H5 H9 H4', 'HJ D7 H6 HQ', 'S9 S2 S8 S6',
+            'SJ SK S10 S5', 'H10 SA C5 HA'], trick: '', hand: 'S3 DK'
+    };
+    for (const seed of [1, 19, 73]) assert.equal(position({ ...state, seed })(24), 'DK');
+});
+
+test('place an ordinary sheep with the known ace winner when keeping it risks the transformer holder taking it', () => {
+    const pick = position({
+        leader: 3, history: ['C2 CA C4 CQ', 'S2 S3 SJ S10', 'H7 H2 HA HQ', 'D5 DQ D8 D10',
+            'H6 H4 HJ H8', 'C5 C9 C8 C7', 'S5 S8 SA S6', 'H3 H5 D9 C6', 'C10 D3 C3 HK',
+            'S4 S7 S9 H10', 'SQ H9 D7 SK'], trick: 'DA CK', hand: 'DJ D4'
+    });
+    assert.equal(pick(24), 'DJ');
+});
+
+test('endgame hypotheses respect public voids and an expensive voluntary capture is soft evidence', () => {
+    const { ai } = load({}, Math);
+    const unseen = [5, 6, 40, 41, 16, 17], need = [0, 2, 2, 2];
+    const all = ai.lastDeals(unseen, need, [0, 0, 0, 0], 0, [0, 1]);
+    const limited = ai.lastDeals(unseen, need, [0, 1, 0, 0], 0, [0, 1]);
+    assert.equal(new Set(all.map(h => JSON.stringify(h))).size, 90);
+    assert.equal(limited.length, 36);
+    assert.ok(limited.every(h => h[1].every(c => c >= 13)));
+
+    const trick = [{ p: 0, c: 31 }, { p: 1, c: ai.PIG }, { p: 2, c: 30 }]; // C7, SQ, C6
+    const cap = [[13], [], [14], []].map(cards => ai.newCap(cards));
+    const live = [8191, 8191, 8191, 8191];
+    for (const c of [13, 14, ...trick.map(t => t.c)]) live[Math.floor(c / 13)] &= ~(1 << (c % 13));
+    const clue = { p: 3, card: 37, known: [37], trick, cap, live, voids: [0, 4, 0, 0] }; // CK took the pig.
+    const weight = held => ai.dealWeight([[], [], [], held], [clue], { mode: 'classic', totals: [0, 0, 0, 0] });
+    assert.ok(weight([27, 39]) < weight([38, 39])); // A C3 could have ducked. A CA could not.
+    assert.ok(weight([27, 39]) > 0);
+});

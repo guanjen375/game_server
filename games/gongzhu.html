@@ -924,6 +924,11 @@
             PIG: 10, SHEEP: 48, TRANS: 34,           // ♠Q、♦J、♣10
             HEART_POINTS: [0, 0, 0, -10, -10, -10, -10, -10, -10, -20, -30, -40, -50],   // ♥2 ~ ♥A
             BUDGET_MS: 160, MIN_SAMPLES: 24, MAX_SAMPLES: 400,
+            RANK_COUNT: (() => {
+                const count = new Uint8Array(1 << 13);
+                for (let mask = 1; mask < count.length; mask++) count[mask] = 1 + count[mask & (mask - 1)];
+                return count;
+            })(),
 
             toInt(card) { return this.SUIT_INDEX[card.suit] * 13 + card.rank - 2; },
 
@@ -933,7 +938,7 @@
              */
             choose(view) {
                 const legal = view.legal;
-                if (legal.length === 1) return legal[0];
+                if (legal.length <= 1) return legal[0];
                 const me = view.me;
                 const match = { totals: view.totals ?? [0, 0, 0, 0], mode: view.mode };
                 const hand = view.hand.map(c => this.toInt(c));
@@ -942,51 +947,145 @@
                 const played = new Array(4).fill(0);
                 const voids = [0, 0, 0, 0];             // bit s = 這家沒有花色 s
                 const seen = new Uint8Array(52);          // 自己的牌 + 出過的牌
-                const gone = new Uint8Array(52);          // 出過的牌
+                const live = [8191, 8191, 8191, 8191];    // 每門尚未打出的 13 個點數，包含自己的牌
                 const cap = view.captured.map(list => this.newCap(list.map(c => this.toInt(c))));
+                const pastCap = [0, 1, 2, 3].map(() => this.newCap([]));
+                const shown = [[], [], [], []];
+                const clues = [[], [], [], []];
                 for (const c of hand) seen[c] = 1;
                 const noteTrick = tr => {
                     const lead = Math.floor(tr[0].c / 13);
-                    for (const t of tr) {
+                    for (let i = 0; i < tr.length; i++) {
+                        const t = tr[i];
+                        // 末家看得到計分墩會落到誰手上。他當時選擇吃或閃，可以協助推測剩下的牌。
+                        if (i === 3 && t.p !== me && tr.some(x => this.isScoring(x.c))) {
+                            const recent = clues[t.p];
+                            recent.push({ p: t.p, card: t.c, start: shown[t.p].length, trick: tr.slice(0, i),
+                                cap: pastCap.map(c => ({ ...c })), live: live.slice(), voids: voids.slice() });
+                            if (recent.length > 2) recent.shift();
+                        }
+                        shown[t.p].push(t.c);
                         seen[t.c] = 1;
-                        gone[t.c] = 1;
+                        live[Math.floor(t.c / 13)] &= ~(1 << (t.c % 13));
                         played[t.p]++;
                         if (Math.floor(t.c / 13) !== lead) voids[t.p] |= 1 << lead;
                     }
-                    if (tr.length === 4 && tr.some(t => t.c >= 13 && t.c < 26)) cap[this.winner(tr).p].heartTricks++;
+                    if (tr.length === 4) {
+                        const w = this.winner(tr).p;
+                        const before = pastCap[w].hearts;
+                        for (const t of tr) this.addCap(pastCap[w], t.c);
+                        if (pastCap[w].hearts > before) {
+                            pastCap[w].heartTricks++;
+                            cap[w].heartTricks++;
+                        }
+                    }
                 };
                 for (const tr of view.history) noteTrick(tr.map(t => ({ p: t.p, c: this.toInt(t.card) })));
                 if (trick.length) noteTrick(trick);
                 const unseen = [];
                 for (let c = 0; c < 52; c++) if (!seen[c]) unseen.push(c);
                 const need = [0, 1, 2, 3].map(p => (p === me ? 0 : 13 - played[p]));
-                const cands = legal.map(c => this.toInt(c));
+                const estimates = [];
+                const pref = this.policy(me, hand, trick, cap, live, voids, match, 0, estimates);
+                // 同花色、同分值，且桌面和對手都沒有夾在中間的牌，兩張的吃墩能力相同。
+                const external = live.slice();
+                for (const c of hand) external[Math.floor(c / 13)] &= ~(1 << (c % 13));
+                for (const { c } of trick) external[Math.floor(c / 13)] |= 1 << (c % 13);
+                const groups = new Map();
+                for (const card of legal) {
+                    const c = this.toInt(card), suit = Math.floor(c / 13);
+                    const lower = external[suit] & ((1 << (c % 13)) - 1);
+                    const points = suit === 1 ? this.HEART_POINTS[c - 13] : 0;
+                    const key = c === this.PIG || c === this.SHEEP || c === this.TRANS ? c : [suit, lower, points].join('/');
+                    if (!groups.has(key) || c === pref) groups.set(key, card);
+                }
+                const options = Array.from(groups.values());
+                if (options.length === 1) return options[0];
+                const cands = options.map(c => this.toInt(c));
+                const evidence = clues.flat();
+                for (const e of evidence) e.known = shown[e.p].slice(e.start);
+                const reference = Math.max(0, cands.indexOf(pref));
                 const sums = new Float64Array(cands.length);
-                const hands = [[], [], [], []];
+                const squares = new Float64Array(cands.length);
+                let hands = [[], [], [], []];
+                const layouts = hand.length === 2 && this.MAX_SAMPLES > 0 ? this.lastDeals(unseen, need, voids, me, hand) : null;
+                const endings = hand.length === 3 ? new Map() : null;
                 const t0 = Date.now();
-                let n = 0;
-                for (; n < this.MAX_SAMPLES; n++) {
-                    if (n >= this.MIN_SAMPLES && Date.now() - t0 > this.BUDGET_MS) break;
-                    if (!this.deal(unseen, need, voids, me, hands)) break;
-                    hands[me] = hand;
+                let totalWeight = 0, squaredWeight = 0;
+                const sampled = new Float64Array(cands.length);
+                for (let n = 0; n < (layouts ? layouts.length : this.MAX_SAMPLES); n++) {
+                    if (layouts) {
+                        hands = layouts[n];
+                    } else {
+                        if (n >= this.MIN_SAMPLES && Date.now() - t0 > this.BUDGET_MS) break;
+                        if (!this.deal(unseen, need, voids, me, hands)) break;
+                        hands[me] = hand;
+                    }
+                    const weight = this.dealWeight(hands, evidence, match);
+                    totalWeight += weight;
+                    squaredWeight += weight * weight;
+                    let values = sampled;
+                    if (layouts || endings) {
+                        const key = endings && hands.map(h => h.slice().sort((a, b) => a - b).join(',')).join('/');
+                        values = endings?.get(key);
+                        if (!values) {
+                            values = this.endgame(hands, trick, cands, me, cap, match).map(row => row[me]);
+                            if (endings) endings.set(key, values);
+                        }
+                    } else {
+                        // 每份假想牌局固定三位對手的打法，讓所有候選牌面對相同的回應風格。
+                        // 每八次發牌輪過三家偏重閃分或偏重名次的全部組合。
+                        const caution = [0, 0, 0, 0];
+                        for (let i = 0; i < 3; i++) {
+                            if (n & (1 << i)) caution[(me + i + 1) % 4] = 0.75;
+                        }
+                        for (let i = 0; i < cands.length; i++) {
+                            values[i] = this.playout(hands, trick, cands[i], me, cap, live, voids, match, caution);
+                        }
+                    }
                     for (let i = 0; i < cands.length; i++) {
-                        sums[i] += this.playout(hands, trick, cands[i], me, cap, gone, voids, match);
+                        const diff = values[i] - values[reference];
+                        sums[i] += weight * diff;
+                        squares[i] += weight * diff * diff;
                     }
                 }
-                // 平均分數相同時（例如同一門兩張相鄰的小牌）照快速策略的選擇
-                const pref = this.policy(me, hand, trick, cap, gone, voids, match);
-                let best = 0, bestScore = -Infinity;
+                if (!totalWeight) return options[reference];
+                // 兩張牌都在同一批發牌上比較。模擬只領先一點、而公牌明顯不利時，
+                // 用兩者分差的一個標準誤調低估計；完整算到結算的殘局直接用實得分。
+                const samples = totalWeight * totalWeight / squaredWeight;
+                let best = reference, bestScore = 0;
                 for (let i = 0; i < cands.length; i++) {
-                    const s = sums[i] / Math.max(1, n) + (cands[i] === pref ? 0.01 : 0);
-                    if (s > bestScore) { bestScore = s; best = i; }
+                    let value = sums[i] / totalWeight;
+                    if (hand.length > 3 && samples > 1) {
+                        const variance = Math.max(0, squares[i] / totalWeight - value * value);
+                        const error = Math.sqrt(variance / (samples - 1));
+                        const publicGap = Math.max(0, estimates[cands[reference]] - estimates[cands[i]]);
+                        value -= Math.min(error, publicGap);
+                    }
+                    if (value > bestScore) { bestScore = value; best = i; }
                 }
-                return legal[best];
+                return options[best];
             },
 
             newCap(list) {
                 const c = { pig: false, sheep: false, trans: false, hearts: 0, heartSum: 0, heartTricks: 0 };
                 for (const x of list) this.addCap(c, x);
                 return c;
+            },
+            isScoring(c) { return (c >= 13 && c < 26) || c === this.PIG || c === this.SHEEP || c === this.TRANS; },
+
+            dealWeight(hands, evidence, match) {
+                let likelihood = 1;
+                const values = [];
+                for (const e of evidence) {
+                    const then = e.known.concat(hands[e.p]);
+                    const best = this.policy(e.p, then, e.trick, e.cap, e.live, e.voids, match, 0, values);
+                    if (best === e.card) continue;
+                    const cost = Math.max(0, values[best] - values[e.card]);
+                    likelihood *= 35 / (35 + cost);
+                }
+                // 玩家可能刻意讓分或保留贏張，每份符合跟牌紀錄的發牌都保留權重。
+                return 0.2 + 0.8 * likelihood;
             },
             addCap(c, x) {
                 if (x === this.PIG) c.pig = true;
@@ -1027,6 +1126,90 @@
                 return own - bestRival + position;
             },
 
+            finalTotals(cap, match) {
+                const allHearts = cap.some(c => c.hearts === 13);
+                return cap.map((c, q) => match.totals[q] + this.score(c, allHearts, match.mode));
+            },
+
+            // 各剩兩張牌時，三家最多只有 90 種分配，可以把符合缺門的發牌全部列出。
+            lastDeals(unseen, need, voids, me, hand) {
+                const layouts = [], hands = [[], [], [], []];
+                hands[me] = hand;
+                const assign = i => {
+                    if (i === unseen.length) {
+                        layouts.push(hands.map(h => h.slice()));
+                        return;
+                    }
+                    const c = unseen[i], suit = Math.floor(c / 13);
+                    for (let q = 0; q < 4; q++) {
+                        if (hands[q].length >= need[q] || (voids[q] & (1 << suit))) continue;
+                        hands[q].push(c);
+                        assign(i + 1);
+                        hands[q].pop();
+                    }
+                };
+                assign(0);
+                return layouts;
+            },
+
+            // 最後三墩對每份可能的發牌逐手算到結算，每家都挑對自己排名最有利的續著。
+            endgame(hands, trick, candidates, me, cap, match) {
+                const finish = () => {
+                    const scores = this.finalTotals(cap, match);
+                    return scores.map((_, q) => this.standingValue(q, scores));
+                };
+                const lastTrick = w => {
+                    const suit = Math.floor(hands[w][0] / 13);
+                    for (let q = 0; q < 4; q++) {
+                        const c = hands[q][0];
+                        if (Math.floor(c / 13) === suit && c > hands[w][0]) w = q;
+                    }
+                    const previous = cap[w];
+                    cap[w] = { ...previous };
+                    for (const h of hands) this.addCap(cap[w], h[0]);
+                    const result = finish();
+                    cap[w] = previous;
+                    return result;
+                };
+                const search = (p, table) => {
+                    const h = hands[p];
+                    const suit = table.length ? Math.floor(table[0].c / 13) : -1;
+                    const mustFollow = suit >= 0 && h.some(c => Math.floor(c / 13) === suit);
+                    let best = null, bestCard = -1;
+                    for (let i = 0; i < h.length; i++) {
+                        if (mustFollow && Math.floor(h[i] / 13) !== suit) continue;
+                        const outcome = play(p, i, table);
+                        if (!best || outcome[p] > best[p] || (outcome[p] === best[p] && h[i] < bestCard)) {
+                            best = outcome;
+                            bestCard = h[i];
+                        }
+                    }
+                    return best;
+                };
+                const play = (p, i, table) => {
+                    const h = hands[p];
+                    const [card] = h.splice(i, 1);
+                    table.push({ p, c: card });
+                    let outcome;
+                    if (table.length === 4) {
+                        const w = this.winner(table).p;
+                        const previous = cap[w];
+                        cap[w] = { ...previous };
+                        for (const t of table) this.addCap(cap[w], t.c);
+                        if (h.length === 1) outcome = lastTrick(w);
+                        else if (h.length) outcome = search(w, []);
+                        else outcome = finish();
+                        cap[w] = previous;
+                    } else {
+                        outcome = search((p + 1) % 4, table);
+                    }
+                    table.pop();
+                    h.splice(i, 0, card);
+                    return outcome;
+                };
+                return candidates.map(card => play(me, hands[me].indexOf(card), trick));
+            },
+
             /**
              * 依缺門把沒看到的牌隨機發給其他三家（限制最多的花色先發）；發不出來就回傳 false
              */
@@ -1063,10 +1246,10 @@
             /**
              * 從目前這一墩接著把整局打完（me 先出 first），比較結算後的四家累計總分。
              */
-            playout(hands0, trick0, first, me, cap0, gone0, voids0, match) {
+            playout(hands0, trick0, first, me, cap0, live0, voids0, match, caution) {
                 const hands = hands0.map(h => h.slice());
                 const cap = cap0.map(c => ({ ...c }));
-                const gone = gone0.slice();             // gone[c] = 1：這張牌已經出過
+                const live = live0.slice();
                 const voids = voids0.slice();
                 let trick = trick0.slice();
                 let p = me;
@@ -1079,7 +1262,7 @@
                         if (Math.floor(card / 13) !== lead) voids[p] |= 1 << lead;
                     }
                     trick.push({ p, c: card });
-                    gone[card] = 1;
+                    live[Math.floor(card / 13)] &= ~(1 << (card % 13));
                     if (trick.length === 4) {
                         const w = this.winner(trick);
                         const pile = cap[w.p];
@@ -1092,14 +1275,19 @@
                     } else {
                         p = (p + 1) % 4;
                     }
-                    card = this.policy(p, hands[p], trick, cap, gone, voids, match);
+                    if (!trick.length && hands[p].length === 2) {
+                        const lines = this.endgame(hands, trick, hands[p].slice(), p, cap, match);
+                        let best = lines[0];
+                        for (const line of lines) if (line[p] > best[p]) best = line;
+                        return best[me];
+                    }
+                    card = this.policy(p, hands[p], trick, cap, live, voids, match, caution[p]);
                 }
-                const allHearts = cap.some(c => c.hearts === 13);
-                return this.standingValue(me, cap.map((c, q) => match.totals[q] + this.score(c, allHearts, match.mode)));
+                return this.standingValue(me, this.finalTotals(cap, match));
             },
 
             // 同一家從第一張紅心起就可能收全紅。分散到兩家後，這局的豬羊牌值已確定。
-            sweepForecast(p, hand, cap, gone, voids) {
+            sweepForecast(p, held, outside, cap, voids, entryTrick) {
                 let seat = -1;
                 for (let q = 0; q < 4; q++) {
                     if (!cap[q].hearts) continue;
@@ -1109,12 +1297,8 @@
                 if (seat >= 0 && cap[seat].hearts === 13) return { seat, chance: 1 };
 
                 // 自己有幾張連續最大的紅心可領，以及其餘三家一共有幾張紅心要跟。
-                let masters = 0, outside = 0;
-                for (let c = 25; c >= 13; c--) {
-                    if (gone[c]) continue;
-                    if (!hand.includes(c)) outside++;
-                    else if (!outside) masters++;
-                }
+                const masters = this.RANK_COUNT[held[1] >>> (32 - Math.clz32(outside[1]))];
+                const otherHearts = this.RANK_COUNT[outside[1]];
                 if (seat < 0) {
                     if (!masters) return null;
                     seat = p;
@@ -1125,38 +1309,116 @@
                 let chance = (pile.hearts + repeats) / (13 + repeats);
                 if (masters) {
                     // 大紅心能帶出幾張外面的紅心，取決於還有幾家能跟。還要取得並保持領牌權。
-                    const heartSeats = voids.filter((mask, q) => q !== p && !(mask & (1 << 1))).length;
-                    const draws = masters * Math.max(1, heartSeats);
-                    const exposed = Math.max(0, outside - masters) + 1;
-                    const control = (draws / (draws + exposed)) ** 2;
+                    const heartSeats = Math.max(1, voids.filter((mask, q) => q !== p && !(mask & (1 << 1))).length);
+                    const draws = masters * heartSeats;
+                    const exposed = Math.max(0, otherHearts - masters) + 1;
+                    let control = (draws / (draws + exposed)) ** 2;
+                    // 評估實際出牌及回看歷史時，另算能否以旁門大牌上手，連收全部紅心。
+                    // 假設外面每張紅心等機會落到未缺門的各家，估計有一家比連續大牌更長的機率上界。
+                    if (entryTrick) {
+                        let blocked = heartSeats;
+                        for (let i = 0; i <= masters; i++) {
+                            blocked *= (otherHearts - i) / ((i + 1) * heartSeats);
+                        }
+                        let entry = 1;
+                        if (entryTrick.length) {
+                            const high = this.winner(entryTrick).c, suit = Math.floor(high / 13);
+                            const higher = held[suit] >>> Math.max(high % 13 + 1, 32 - Math.clz32(outside[suit]));
+                            if (!higher) {
+                                let entrances = 0;
+                                for (const s of [0, 2, 3]) {
+                                    if (outside[s] && held[s] >>> (32 - Math.clz32(outside[s]))) entrances++;
+                                }
+                                entry = 1 - 0.5 ** entrances;
+                            }
+                        }
+                        control += (1 - control) * entry * Math.max(0, 1 - blocked);
+                    }
                     chance = seat === p ? chance + (1 - chance) * control : chance * (1 - control);
                 }
                 return { seat, chance };
             },
 
             // 各家模擬時只看自己的手牌及公牌，分別試算「紅心拆開」和「這家全紅」兩種分差。
-            policy(p, hand, trick, cap, gone, voids, match) {
+            policy(p, hand, trick, cap, live, voids, match, caution = 0, values = null) {
                 if (hand.length === 1) return hand[0];
                 const lead = trick.length ? Math.floor(trick[0].c / 13) : -1;
                 const follow = lead < 0 ? hand : hand.filter(c => Math.floor(c / 13) === lead);
                 const legal = follow.length ? follow : hand;
                 if (legal.length === 1) return legal[0];
-                const pref = this.normalPlay(hand, trick, gone);
-                const sweep = this.sweepForecast(p, hand, cap, gone, voids);
+                const held = [0, 0, 0, 0];
+                for (const c of hand) held[Math.floor(c / 13)] |= 1 << (c % 13);
+                const outside = live.map((mask, s) => mask & ~held[s]);
+                const pigOut = Boolean(outside[0] & (1 << 10));
+                const pref = this.normalPlay(hand, trick, pigOut);
+                const sweep = this.sweepForecast(p, held, outside, cap, voids, values ? trick : null);
                 const { totals, mode } = match;
                 const seat = sweep?.seat ?? -1;
                 const chance = sweep?.chance ?? 0;
+                if (caution > chance) return pref;
+                const count = this.RANK_COUNT;
+                const pigLive = Boolean(live[0] & (1 << 10));
+                const sheepLive = Boolean(live[3] & (1 << 9));
+                let heartPoints = 0;
+                for (let r = 3; r < 13; r++) if (live[1] & (1 << r)) heartPoints += this.HEART_POINTS[r];
+                const transformerSeat = cap.findIndex(c => c.trans);
+                // 變壓器會再乘到後面的分數。按尚未分配的牌估計多出的一份得失，
+                // 單吃的 +50 也要看其餘計分墩全部由別家吃走的機會。
+                const outlook = (pile, flipped, collector, card) => {
+                    const now = this.score(pile, flipped, mode, collector);
+                    if (!pile.trans) return now;
+                    const heart = card >= 13 && card < 26;
+                    const pig = Number(pigLive && card !== this.PIG);
+                    const sheep = Number(sheepLive && card !== this.SHEEP);
+                    const pointsLeft = flipped ? (pig - sheep) * 100
+                        : (sheep - pig) * 100 + heartPoints - (heart ? this.HEART_POINTS[card - 13] : 0);
+                    let value = now + pointsLeft / 4;
+                    if (!collector && !pile.hearts && !pile.pig && !pile.sheep) {
+                        const heartTricks = flipped ? 0 : (count[live[1]] - Number(heart)) / 3;
+                        value -= 50 * (1 - 0.75 ** (pig + sheep + heartTricks));
+                    }
+                    return value;
+                };
                 const ordinaryTotals = cap.map((c, q) => totals[q] + this.score(c, false, mode, false));
                 const sweepTotals = sweep && cap.map((c, q) => totals[q] + this.score(c, true, mode, q === seat));
+                const followers = 3 - trick.length;
+                const suitSeats = live.map((_, s) => voids.filter((mask, q) => q !== p && !(mask & (1 << s))).length);
+                // 後手已經缺門時，估計他能墊出的最大負分牌。只用外面還沒出現的牌。
+                const risks = [];
+                const discardRisk = s => {
+                    if (risks[s]) return risks[s];
+                    let ordinary = 0, flipped = 0;
+                    for (let i = 1; i <= followers; i++) {
+                        const q = (p + i) % 4;
+                        if (!(voids[q] & (1 << s))) continue;
+                        let loss = 0;
+                        if (s !== 1 && !(voids[q] & (1 << 1))) {
+                            const share = 1 / suitSeats[1];
+                            let noneHigher = 1;
+                            for (let r = 12; r >= 3; r--) if (outside[1] & (1 << r)) {
+                                loss += noneHigher * share * this.HEART_POINTS[r];
+                                noneHigher *= 1 - share;
+                            }
+                        }
+                        if (s !== 0 && pigOut && !(voids[q] & 1)) loss += (-100 - loss) / suitSeats[0];
+                        if (s !== 3 && (outside[3] & (1 << 9)) && !(voids[q] & (1 << 3))) flipped -= 100 / suitSeats[3];
+                        ordinary += loss;
+                    }
+                    risks[s] = { ordinary, flipped };
+                    return risks[s];
+                };
                 const withTable = cap.map(pile => {
                     const after = { ...pile };
                     for (const t of trick) this.addCap(after, t.c);
                     return after;
                 });
-                const payoff = (taker, card) => {
+                const payoff = (taker, card, observer = p) => {
                     const after = { ...withTable[taker] };
                     this.addCap(after, card);
-                    const ordinary = this.standingValue(p, ordinaryTotals, taker, totals[taker] + this.score(after, false, mode, false));
+                    const risk = discardRisk(lead < 0 ? Math.floor(card / 13) : lead);
+                    const multiplier = after.trans ? 2 : 1;
+                    const ordinary = this.standingValue(observer, ordinaryTotals, taker,
+                        totals[taker] + outlook(after, false, false, card) + risk.ordinary * multiplier);
                     if (!sweep) return ordinary;
                     let weight = chance;
                     const heartsInTrick = after.hearts - cap[taker].hearts;
@@ -1166,12 +1428,12 @@
                     }
                     // 保有領牌權可以繼續收紅心；是否有利仍由四家的分差決定。
                     if (taker === seat && after.hearts < 13) weight += 0.1 * weight * (1 - weight);
-                    const flipped = this.standingValue(p, sweepTotals, taker, totals[taker] + this.score(after, true, mode, taker === seat));
+                    const flipped = this.standingValue(observer, sweepTotals, taker,
+                        totals[taker] + outlook(after, true, taker === seat, card) + risk.flipped * multiplier);
                     return ordinary + weight * (flipped - ordinary);
                 };
 
                 const winner = trick.length ? this.winner(trick) : null;
-                const followers = 3 - trick.length;
                 const trickValue = card => {
                     const wins = !winner || (Math.floor(card / 13) === lead && card > winner.c);
                     const taker = wins ? p : winner.p;
@@ -1179,37 +1441,61 @@
                     if (!followers) return unbeaten;
                     const high = wins ? card : winner.c;
                     const suit = Math.floor(high / 13);
-                    let overcards = 0;
-                    for (let c = high + 1; c < (suit + 1) * 13; c++) if (!gone[c] && !hand.includes(c)) overcards++;
-                    if (!overcards) return unbeaten;
+                    const overcards = this.RANK_COUNT[outside[suit] >>> (high % 13 + 1)];
+                    if (!overcards || !suitSeats[suit]) return unbeaten;
 
-                    // 只考慮可能持有大牌的後手，並粗估持有者有一半機會選擇蓋牌。
-                    let possible = 0, waiting = 0, overtaken = 0;
-                    for (let i = 1; i <= 3; i++) {
+                    // 後手只有大牌時得蓋，能閃時則看搶下和放過對他自己的分差。
+                    const undercards = count[outside[suit] & ((1 << (high % 13)) - 1)];
+                    const miss = 1 - 1 / suitSeats[suit];
+                    const noDuck = miss ** undercards;
+                    let pressure = 0, overtaken = 0;
+                    for (let i = 1; i <= followers; i++) {
                         const q = (p + i) % 4;
                         if (voids[q] & (1 << suit)) continue;
-                        possible++;
-                        if (i <= followers) {
-                            waiting++;
-                            overtaken += payoff(q, card);
-                        }
+                        const gain = payoff(q, card, q) - payoff(taker, card, q);
+                        const wants = 0.5 + 0.5 * gain / (30 + Math.abs(gain));
+                        const take = noDuck + (1 - noDuck) * wants;
+                        pressure += take;
+                        overtaken += take * payoff(q, card);
                     }
-                    if (!waiting) return unbeaten;
-                    const holds = (1 - 0.5 * waiting / possible) ** overcards;
-                    return holds * unbeaten + (1 - holds) * overtaken / waiting;
+                    if (!pressure) return unbeaten;
+                    const holds = (1 - pressure / suitSeats[suit]) ** overcards;
+                    return holds * unbeaten + (1 - holds) * overtaken / pressure;
                 };
+                const ordinaryPool = heartPoints + 100 * (Number(sheepLive) - Number(pigLive));
+                const flippedPool = 100 * (Number(pigLive) - Number(sheepLive)) + (p === seat ? 200 * count[live[1]] / 13 : 0);
+                const nextTrick = ((1 - chance) * ordinaryPool + chance * flippedPool) / hand.length;
+                const sheepOut = Boolean(outside[3] & (1 << 9));
+                const hasPenalty = (held[1] & ~7) || (held[0] & (1 << 10));
                 let best = pref, bestValue = -Infinity;
                 for (const card of legal) {
+                    if (transformerSeat >= 0) {
+                        const q = transformerSeat;
+                        ordinaryTotals[q] = totals[q] + outlook(cap[q], false, false, card);
+                        if (sweep) sweepTotals[q] = totals[q] + outlook(cap[q], true, q === seat, card);
+                    }
                     let value = trickValue(card);
                     if (card === this.PIG || card === this.SHEEP) {
                         // 留在手中還有機會自己吃；在全紅假設下也要算進變壓器與大滿貫。
                         const kept = { ...cap[p] };
                         this.addCap(kept, card);
-                        const ordinaryGain = totals[p] + this.score(kept, false, mode, false) - ordinaryTotals[p];
-                        const flippedGain = sweep ? totals[p] + this.score(kept, true, mode, p === seat) - sweepTotals[p] : 0;
+                        const ordinaryGain = totals[p] + outlook(kept, false, false, card) - ordinaryTotals[p];
+                        const flippedGain = sweep ? totals[p] + outlook(kept, true, p === seat, card) - sweepTotals[p] : 0;
                         value -= ((1 - chance) * ordinaryGain + chance * flippedGain) / 4;
                     }
+                    // 保留有機會吃正分的贏張；還有負分牌時，先清掉短門就有機會墊牌。
+                    const s = Math.floor(card / 13), bit = 1 << (card % 13);
+                    const unheld = count[outside[s]];
+                    if (unheld) {
+                        const strength = count[outside[s] & (bit - 1)] / unheld;
+                        let prize = 0;
+                        if (s === 3 && sheepOut && card > this.SHEEP) prize = 100;
+                        if (s === 0 && pigOut && card > this.PIG) prize = -100;
+                        value -= strength * (nextTrick + (1 - 2 * chance) * prize / (1 + unheld / 3));
+                        if (held[s] === bit && hasPenalty) value += (1 - chance) * 12 * unheld / (unheld + 3);
+                    }
                     if (card === pref) value += 1;
+                    if (values) values[card] = value;
                     if (value > bestValue) { bestValue = value; best = card; }
                 }
                 return best;
@@ -1218,12 +1504,12 @@
             /**
              * 平常的出牌策略：能閃就閃，豬和有分的紅心先墊出去
              */
-            normalPlay(hand, trick, gone) {
-                if (!trick.length) return this.lead(hand, gone);
+            normalPlay(hand, trick, pigOut) {
+                if (!trick.length) return this.lead(hand, pigOut);
                 const lead = Math.floor(trick[0].c / 13);
                 let lo = -1, hi = -1;
                 for (const c of hand) if (Math.floor(c / 13) === lead) { if (lo < 0 || c < lo) lo = c; if (c > hi) hi = c; }
-                if (lo < 0) return this.discard(hand, gone);
+                if (lo < 0) return this.discard(hand, pigOut);
                 if (lo === hi) return lo;
                 let win = trick[0].c, pts = 0, hasPig = false, hasSheep = false;
                 for (const t of trick) {
@@ -1250,8 +1536,7 @@
                 return lo;
             },
 
-            lead(hand, gone) {
-                const pigOut = !gone[this.PIG] && !hand.includes(this.PIG);
+            lead(hand, pigOut) {
                 let best = hand[0], bs = Infinity;
                 for (const c of hand) {
                     const s = Math.floor(c / 13), r = c % 13;
@@ -1266,10 +1551,9 @@
                 return best;
             },
 
-            discard(hand, gone) {
+            discard(hand, pigOut) {
                 if (hand.includes(this.PIG)) return this.PIG;
                 let best = hand[0], bs = -Infinity;
-                const pigOut = !gone[this.PIG];
                 for (const c of hand) {
                     const s = Math.floor(c / 13), r = c % 13;
                     let v = r;
