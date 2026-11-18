@@ -916,7 +916,7 @@
         /**
          * 拱豬電腦 AI：記牌（每張出過的牌、誰缺哪一門），把還沒出現的牌依缺門隨機發給其他三家，
          * 每張能出的牌都把這一局模擬打完許多次，用正式計分（豬、羊、變壓器、收全紅、全吃）算出四家分數，
-         * 選「自己減掉這局最高分的對手」平均最高的：不只自己少吃分，也會擋別人收全紅、壓這局最高分的人。
+         * 將模擬結果加回累計總分，比較自己與領先者、以及其他接近自己名次的對手之間的差距。
          * 牌以整數表示：花色 S=0 H=1 C=2 D=3，c = 花色 * 13 + (點數 - 2)
          */
         const GongZhuAI = {
@@ -924,18 +924,18 @@
             PIG: 10, SHEEP: 48, TRANS: 34,           // ♠Q、♦J、♣10
             HEART_POINTS: [0, 0, 0, -10, -10, -10, -10, -10, -10, -20, -30, -40, -50],   // ♥2 ~ ♥A
             BUDGET_MS: 160, MIN_SAMPLES: 24, MAX_SAMPLES: 400,
-            SHOOT_MIN: 5, SHOOT_MIN_PIG: 3,          // 只有一家吃到紅心、張數到這麼多（有豬時用後者）：模擬時當他在收全紅
 
             toInt(card) { return this.SUIT_INDEX[card.suit] * 13 + card.rank - 2; },
 
             /**
-             * view：{ me, legal, hand, trick: [{ p, card }], history: [[{ p, card } x4]], captured: [[card] x4], mode }
+             * view：{ me, legal, hand, trick: [{ p, card }], history: [[{ p, card } x4]], captured: [[card] x4], totals, mode }
              * 座位以出牌順序 0~3 表示；回傳 legal 裡的一張牌
              */
             choose(view) {
                 const legal = view.legal;
                 if (legal.length === 1) return legal[0];
                 const me = view.me;
+                const match = { totals: view.totals ?? [0, 0, 0, 0], mode: view.mode };
                 const hand = view.hand.map(c => this.toInt(c));
                 const trick = view.trick.map(t => ({ p: t.p, c: this.toInt(t.card) }));
                 // 每家已出的張數、缺門
@@ -943,6 +943,7 @@
                 const voids = [0, 0, 0, 0];             // bit s = 這家沒有花色 s
                 const seen = new Uint8Array(52);          // 自己的牌 + 出過的牌
                 const gone = new Uint8Array(52);          // 出過的牌
+                const cap = view.captured.map(list => this.newCap(list.map(c => this.toInt(c))));
                 for (const c of hand) seen[c] = 1;
                 const noteTrick = tr => {
                     const lead = Math.floor(tr[0].c / 13);
@@ -952,17 +953,13 @@
                         played[t.p]++;
                         if (Math.floor(t.c / 13) !== lead) voids[t.p] |= 1 << lead;
                     }
+                    if (tr.length === 4 && tr.some(t => t.c >= 13 && t.c < 26)) cap[this.winner(tr).p].heartTricks++;
                 };
                 for (const tr of view.history) noteTrick(tr.map(t => ({ p: t.p, c: this.toInt(t.card) })));
                 if (trick.length) noteTrick(trick);
-                const goneBeforeTrick = gone.slice();
-                for (const t of trick) goneBeforeTrick[t.c] = 0;
                 const unseen = [];
                 for (let c = 0; c < 52; c++) if (!seen[c]) unseen.push(c);
                 const need = [0, 1, 2, 3].map(p => (p === me ? 0 : 13 - played[p]));
-                // 已吃的計分牌
-                const cap = view.captured.map(list => this.newCap(list.map(c => this.toInt(c))));
-
                 const cands = legal.map(c => this.toInt(c));
                 const sums = new Float64Array(cands.length);
                 const hands = [[], [], [], []];
@@ -973,11 +970,11 @@
                     if (!this.deal(unseen, need, voids, me, hands)) break;
                     hands[me] = hand;
                     for (let i = 0; i < cands.length; i++) {
-                        sums[i] += this.playout(hands, trick, cands[i], me, cap, view.mode, goneBeforeTrick);
+                        sums[i] += this.playout(hands, trick, cands[i], me, cap, gone, voids, match);
                     }
                 }
                 // 平均分數相同時（例如同一門兩張相鄰的小牌）照快速策略的選擇
-                const pref = this.policy(me, hand, trick, cap, gone);
+                const pref = this.policy(me, hand, trick, cap, gone, voids, match);
                 let best = 0, bestScore = -Infinity;
                 for (let i = 0; i < cands.length; i++) {
                     const s = sums[i] / Math.max(1, n) + (cands[i] === pref ? 0.01 : 0);
@@ -987,7 +984,7 @@
             },
 
             newCap(list) {
-                const c = { pig: false, sheep: false, trans: false, hearts: 0, heartSum: 0, any: false };
+                const c = { pig: false, sheep: false, trans: false, hearts: 0, heartSum: 0, heartTricks: 0 };
                 for (const x of list) this.addCap(c, x);
                 return c;
             },
@@ -996,20 +993,38 @@
                 else if (x === this.SHEEP) c.sheep = true;
                 else if (x === this.TRANS) c.trans = true;
                 else if (x >= 13 && x < 26) { c.hearts++; c.heartSum += this.HEART_POINTS[x - 13]; }
-                else return;
-                c.any = true;
             },
-            // 與 GongZhuGame.calculatePlayerScore 相同的算法
-            score(c, roundAllHearts, mode) {
-                if (!c.any) return 0;
-                if (c.trans && !c.pig && !c.sheep && c.hearts === 0) return 50;
-                const allHearts = c.hearts === 13;
+            // 正式結算以實收張數判斷全紅。估牌時也可以試算指定一家收齊剩餘紅心的分數。
+            score(c, roundAllHearts, mode, allHearts = c.hearts === 13) {
+                if (c.trans && !c.pig && !c.sheep && !allHearts && c.hearts === 0) return 50;
                 if (allHearts && c.pig && c.sheep && c.trans) return mode === 'super_slam' ? 1000 : 800;
                 let base = allHearts ? 200 : c.heartSum;
                 const changed = allHearts || roundAllHearts;
                 if (c.pig) base += changed ? 100 : -100;
                 if (c.sheep) base += changed ? -100 : 100;
                 return c.trans ? base * 2 : base;
+            },
+
+            winner(trick) {
+                let w = trick[0];
+                const lead = Math.floor(w.c / 13);
+                for (const t of trick) if (Math.floor(t.c / 13) === lead && t.c > w.c) w = t;
+                return w;
+            },
+
+            // 保留與榜首的分差，也衡量與每一家的名次競爭。以豬羊的 100 分為尺度，
+            // 對手越接近自己，同樣的分數變化越重要；能靠大滿貫追上來的末家也算在內。
+            standingValue(me, scores, taker = me, after = scores[taker]) {
+                const own = me === taker ? after : scores[me];
+                let bestRival = -Infinity, position = 0;
+                for (let q = 0; q < 4; q++) {
+                    if (q === me) continue;
+                    const other = q === taker ? after : scores[q];
+                    bestRival = Math.max(bestRival, other);
+                    const gap = own - other;
+                    position += 100 * gap / (100 + Math.abs(gap));
+                }
+                return own - bestRival + position;
             },
 
             /**
@@ -1041,131 +1056,169 @@
                         }
                     }
                     if (ok) return true;
-                    if (attempt === 25) voids = [0, 0, 0, 0];   // 推論有誤時退回不考慮缺門
                 }
                 return false;
             },
 
             /**
-             * 從目前這一墩接著把整局打完（me 先出 first），回傳 me 的得分減掉這局最高分的對手
+             * 從目前這一墩接著把整局打完（me 先出 first），比較結算後的四家累計總分。
              */
-            playout(hands0, trick0, first, me, cap0, mode, gone0) {
+            playout(hands0, trick0, first, me, cap0, gone0, voids0, match) {
                 const hands = hands0.map(h => h.slice());
                 const cap = cap0.map(c => ({ ...c }));
                 const gone = gone0.slice();             // gone[c] = 1：這張牌已經出過
-                let trick = trick0.map(t => ({ p: t.p, c: t.c }));
-                for (const t of trick) gone[t.c] = 1;
+                const voids = voids0.slice();
+                let trick = trick0.slice();
                 let p = me;
                 let card = first;
                 for (;;) {
                     const h = hands[p];
                     h.splice(h.indexOf(card), 1);
+                    if (trick.length) {
+                        const lead = Math.floor(trick[0].c / 13);
+                        if (Math.floor(card / 13) !== lead) voids[p] |= 1 << lead;
+                    }
                     trick.push({ p, c: card });
                     gone[card] = 1;
                     if (trick.length === 4) {
-                        const lead = Math.floor(trick[0].c / 13);
-                        let w = trick[0];
-                        for (const t of trick) if (Math.floor(t.c / 13) === lead && t.c > w.c) w = t;
-                        for (const t of trick) this.addCap(cap[w.p], t.c);
+                        const w = this.winner(trick);
+                        const pile = cap[w.p];
+                        const before = pile.hearts;
+                        for (const t of trick) this.addCap(pile, t.c);
+                        if (pile.hearts > before) pile.heartTricks++;
                         trick = [];
                         p = w.p;
                         if (!hands[p].length) break;
                     } else {
                         p = (p + 1) % 4;
                     }
-                    card = this.policy(p, hands[p], trick, cap, gone);
+                    card = this.policy(p, hands[p], trick, cap, gone, voids, match);
                 }
-                // 減掉最高分的對手：別人收全紅、分數衝到最高時，就算自己沒被扣分也會想辦法擋
                 const allHearts = cap.some(c => c.hearts === 13);
-                let rival = -Infinity;
-                for (let q = 0; q < 4; q++) if (q !== me) rival = Math.max(rival, this.score(cap[q], allHearts, mode));
-                return this.score(cap[me], allHearts, mode) - rival;
+                return this.standingValue(me, cap.map((c, q) => match.totals[q] + this.score(c, allHearts, match.mode)));
             },
 
-            /**
-             * 模擬用的快速出牌策略（只看自己的手牌與桌面）：有人看起來在收全紅時，他照衝全紅的打法、其他家照攔的打法
-             */
-            policy(p, hand, trick, cap, gone) {
-                const s = this.shooterOf(cap);
-                if (s >= 0) return p === s ? this.shootPlay(hand, trick, gone) : this.blockPlay(p, s, hand, trick, cap, gone);
-                return this.normalPlay(p, hand, trick, cap, gone);
-            },
-
-            /**
-             * 只有一家吃到紅心、而且張數夠多：這家可能在收全紅，回傳座位；否則回傳 -1
-             */
-            shooterOf(cap) {
-                let s = -1;
+            // 同一家從第一張紅心起就可能收全紅。分散到兩家後，這局的豬羊牌值已確定。
+            sweepForecast(p, hand, cap, gone, voids) {
+                let seat = -1;
                 for (let q = 0; q < 4; q++) {
                     if (!cap[q].hearts) continue;
-                    if (s >= 0) return -1;
-                    s = q;
+                    if (seat >= 0) return null;
+                    seat = q;
                 }
-                return s >= 0 && cap[s].hearts >= (cap[s].pig ? this.SHOOT_MIN_PIG : this.SHOOT_MIN) ? s : -1;
+                if (seat >= 0 && cap[seat].hearts === 13) return { seat, chance: 1 };
+
+                // 自己有幾張連續最大的紅心可領，以及其餘三家一共有幾張紅心要跟。
+                let masters = 0, outside = 0;
+                for (let c = 25; c >= 13; c--) {
+                    if (gone[c]) continue;
+                    if (!hand.includes(c)) outside++;
+                    else if (!outside) masters++;
+                }
+                if (seat < 0) {
+                    if (!masters) return null;
+                    seat = p;
+                }
+                const pile = cap[seat];
+                // 不同墩持續由同一家吃紅心，比一墩剛好吃到多張更值得留意。
+                const repeats = Math.max(0, pile.heartTricks - 1);
+                let chance = (pile.hearts + repeats) / (13 + repeats);
+                if (masters) {
+                    // 大紅心能帶出幾張外面的紅心，取決於還有幾家能跟。還要取得並保持領牌權。
+                    const heartSeats = voids.filter((mask, q) => q !== p && !(mask & (1 << 1))).length;
+                    const draws = masters * Math.max(1, heartSeats);
+                    const exposed = Math.max(0, outside - masters) + 1;
+                    const control = (draws / (draws + exposed)) ** 2;
+                    chance = seat === p ? chance + (1 - chance) * control : chance * (1 - control);
+                }
+                return { seat, chance };
             },
 
-            // 還沒出過的紅心裡最大的一張（都出完了回傳 -1）
-            topHeart(gone) {
-                for (let c = 25; c >= 13; c--) if (!gone[c]) return c;
-                return -1;
-            },
+            // 各家模擬時只看自己的手牌及公牌，分別試算「紅心拆開」和「這家全紅」兩種分差。
+            policy(p, hand, trick, cap, gone, voids, match) {
+                if (hand.length === 1) return hand[0];
+                const lead = trick.length ? Math.floor(trick[0].c / 13) : -1;
+                const follow = lead < 0 ? hand : hand.filter(c => Math.floor(c / 13) === lead);
+                const legal = follow.length ? follow : hand;
+                if (legal.length === 1) return legal[0];
+                const pref = this.normalPlay(hand, trick, gone);
+                const sweep = this.sweepForecast(p, hand, cap, gone, voids);
+                const { totals, mode } = match;
+                const seat = sweep?.seat ?? -1;
+                const chance = sweep?.chance ?? 0;
+                const ordinaryTotals = cap.map((c, q) => totals[q] + this.score(c, false, mode, false));
+                const sweepTotals = sweep && cap.map((c, q) => totals[q] + this.score(c, true, mode, q === seat));
+                const withTable = cap.map(pile => {
+                    const after = { ...pile };
+                    for (const t of trick) this.addCap(after, t.c);
+                    return after;
+                });
+                const payoff = (taker, card) => {
+                    const after = { ...withTable[taker] };
+                    this.addCap(after, card);
+                    const ordinary = this.standingValue(p, ordinaryTotals, taker, totals[taker] + this.score(after, false, mode, false));
+                    if (!sweep) return ordinary;
+                    let weight = chance;
+                    const heartsInTrick = after.hearts - cap[taker].hearts;
+                    if (heartsInTrick) {
+                        if (taker !== seat) return ordinary;
+                        weight += (1 - weight) * heartsInTrick / (13 - cap[seat].hearts);
+                    }
+                    // 保有領牌權可以繼續收紅心；是否有利仍由四家的分差決定。
+                    if (taker === seat && after.hearts < 13) weight += 0.1 * weight * (1 - weight);
+                    const flipped = this.standingValue(p, sweepTotals, taker, totals[taker] + this.score(after, true, mode, taker === seat));
+                    return ordinary + weight * (flipped - ordinary);
+                };
 
-            /**
-             * 衝全紅：手上有剩下最大的紅心就領；否則領最大的非紅心保持出牌權；跟牌能贏就用最大的贏；沒有這門墊最小的非紅心
-             */
-            shootPlay(hand, trick, gone) {
-                if (!trick.length) {
-                    const top = this.topHeart(gone);
-                    if (top >= 0 && hand.includes(top)) return top;
-                    let best = -1;
-                    for (const c of hand) if (Math.floor(c / 13) !== 1 && (best < 0 || c % 13 > best % 13)) best = c;
-                    return best >= 0 ? best : Math.max(...hand);
-                }
-                const lead = Math.floor(trick[0].c / 13);
-                let lo = -1, hi = -1, win = trick[0].c;
-                for (const t of trick) if (Math.floor(t.c / 13) === lead && t.c > win) win = t.c;
-                for (const c of hand) if (Math.floor(c / 13) === lead) { if (lo < 0 || c < lo) lo = c; if (c > hi) hi = c; }
-                if (lo < 0) {
-                    let best = -1;
-                    for (const c of hand) if (Math.floor(c / 13) !== 1 && (best < 0 || c % 13 < best % 13)) best = c;
-                    return best >= 0 ? best : Math.min(...hand);
-                }
-                return hi > win ? hi : lo;
-            },
+                const winner = trick.length ? this.winner(trick) : null;
+                const followers = 3 - trick.length;
+                const trickValue = card => {
+                    const wins = !winner || (Math.floor(card / 13) === lead && card > winner.c);
+                    const taker = wins ? p : winner.p;
+                    const unbeaten = payoff(taker, card);
+                    if (!followers) return unbeaten;
+                    const high = wins ? card : winner.c;
+                    const suit = Math.floor(high / 13);
+                    let overcards = 0;
+                    for (let c = high + 1; c < (suit + 1) * 13; c++) if (!gone[c] && !hand.includes(c)) overcards++;
+                    if (!overcards) return unbeaten;
 
-            /**
-             * 攔全紅（s 是收全紅的那家）：有剩下最大的紅心就領出來自己吃；紅心墩（或桌上有紅心）他還沒出或正在贏時，能贏就搶；
-             * 沒有這門時，他正在贏就不墊紅心，他已經輸掉這墩就把紅心墊給贏的人
-             */
-            blockPlay(p, s, hand, trick, cap, gone) {
-                if (!trick.length) {
-                    const top = this.topHeart(gone);
-                    if (top >= 0 && hand.includes(top)) return top;
-                    return this.normalPlay(p, hand, trick, cap, gone);
+                    // 只考慮可能持有大牌的後手，並粗估持有者有一半機會選擇蓋牌。
+                    let possible = 0, waiting = 0, overtaken = 0;
+                    for (let i = 1; i <= 3; i++) {
+                        const q = (p + i) % 4;
+                        if (voids[q] & (1 << suit)) continue;
+                        possible++;
+                        if (i <= followers) {
+                            waiting++;
+                            overtaken += payoff(q, card);
+                        }
+                    }
+                    if (!waiting) return unbeaten;
+                    const holds = (1 - 0.5 * waiting / possible) ** overcards;
+                    return holds * unbeaten + (1 - holds) * overtaken / waiting;
+                };
+                let best = pref, bestValue = -Infinity;
+                for (const card of legal) {
+                    let value = trickValue(card);
+                    if (card === this.PIG || card === this.SHEEP) {
+                        // 留在手中還有機會自己吃；在全紅假設下也要算進變壓器與大滿貫。
+                        const kept = { ...cap[p] };
+                        this.addCap(kept, card);
+                        const ordinaryGain = totals[p] + this.score(kept, false, mode, false) - ordinaryTotals[p];
+                        const flippedGain = sweep ? totals[p] + this.score(kept, true, mode, p === seat) - sweepTotals[p] : 0;
+                        value -= ((1 - chance) * ordinaryGain + chance * flippedGain) / 4;
+                    }
+                    if (card === pref) value += 1;
+                    if (value > bestValue) { bestValue = value; best = card; }
                 }
-                const lead = Math.floor(trick[0].c / 13);
-                const shooterPlayed = trick.some(t => t.p === s);
-                let w = trick[0], heartsIn = false;
-                for (const t of trick) {
-                    if (Math.floor(t.c / 13) === lead && t.c > w.c) w = t;
-                    if (t.c >= 13 && t.c < 26) heartsIn = true;
-                }
-                let lo = -1, hi = -1;
-                for (const c of hand) if (Math.floor(c / 13) === lead) { if (lo < 0 || c < lo) lo = c; if (c > hi) hi = c; }
-                if (lo < 0) {
-                    const hearts = hand.filter(c => Math.floor(c / 13) === 1);
-                    if (shooterPlayed && w.p !== s && hearts.length) return Math.max(...hearts);
-                    const others = hand.filter(c => Math.floor(c / 13) !== 1);
-                    return this.discard(others.length ? others : hand, gone);
-                }
-                if ((lead === 1 || heartsIn) && (!shooterPlayed || w.p === s) && hi > w.c) return hi;
-                return this.normalPlay(p, hand, trick, cap, gone);
+                return best;
             },
 
             /**
              * 平常的出牌策略：能閃就閃，豬和有分的紅心先墊出去
              */
-            normalPlay(p, hand, trick, cap, gone) {
+            normalPlay(hand, trick, gone) {
                 if (!trick.length) return this.lead(hand, gone);
                 const lead = Math.floor(trick[0].c / 13);
                 let lo = -1, hi = -1;
@@ -1666,6 +1719,7 @@
                     trick: this.currentTrick.map(t => ({ p: idx(t.seat), card: t.card })),
                     history: this.trickHistory.map(tr => tr.map(t => ({ p: idx(t.seat), card: t.card }))),
                     captured: this.SEAT_ORDER.map(s => this.PLAYERS[s].captured),
+                    totals: this.SEAT_ORDER.map(s => this.PLAYERS[s].totalScore),
                     mode: this.scoringRuleMode
                 });
             }
