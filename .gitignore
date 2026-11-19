@@ -1,0 +1,7 @@
+# 伺服器執行時產生的檔案（紀錄檔裡有連線裝置的 IP，不要傳上去）
+server.log
+server.log.1
+server.pid
+
+# Python 快取
+__pycache__/
