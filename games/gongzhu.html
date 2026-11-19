@@ -919,7 +919,7 @@
         /**
          * 拱豬電腦 AI：記牌（每張出過的牌、誰缺哪一門），把還沒出現的牌依缺門隨機發給其他三家，
          * 每張能出的牌都把這一局模擬打完許多次，用正式計分（豬、羊、變壓器、收全紅、全吃）算出四家分數，
-         * 將模擬結果加回累計總分，比較自己與領先者、以及其他接近自己名次的對手之間的差距。
+         * 選「自己的分數減掉另外三家平均」最高的那張。三家對手一樣重要，累計名次不影響出牌。
          * 牌以整數表示：花色 S=0 H=1 C=2 D=3，c = 花色 * 13 + (點數 - 2)
          */
         const GongZhuAI = {
@@ -1037,7 +1037,7 @@
                         }
                     } else {
                         // 每份假想牌局固定三位對手的打法，讓所有候選牌面對相同的回應風格。
-                        // 每八次發牌輪過三家偏重閃分或偏重名次的全部組合。
+                        // 每八次發牌輪過三家偏重閃分或偏重分差的全部組合。
                         const caution = [0, 0, 0, 0];
                         for (let i = 0; i < 3; i++) {
                             if (n & (1 << i)) caution[(me + i + 1) % 4] = 0.75;
@@ -1120,19 +1120,17 @@
                 return w;
             },
 
-            // 保留與榜首的分差，也衡量與每一家的名次競爭。以豬羊的 100 分為尺度，
-            // 對手越接近自己，同樣的分數變化越重要；能靠大滿貫追上來的末家也算在內。
+            // 自己的分數減掉另外三家的平均。三家對手一樣重要，不看誰領先：罰分不會特地留給第一名，
+            // 也不會只擋第一名收全紅。四家各加上累計總分後，每張候選牌的評分都差同一個常數，
+            // 所以累計名次不影響出牌。
             standingValue(me, scores, taker = me, after = scores[taker]) {
                 const own = me === taker ? after : scores[me];
-                let bestRival = -Infinity, position = 0;
+                let sum = 0;
                 for (let q = 0; q < 4; q++) {
                     if (q === me) continue;
-                    const other = q === taker ? after : scores[q];
-                    bestRival = Math.max(bestRival, other);
-                    const gap = own - other;
-                    position += 100 * gap / (100 + Math.abs(gap));
+                    sum += q === taker ? after : scores[q];
                 }
-                return own - bestRival + position;
+                return own - sum / 3;
             },
 
             finalTotals(cap, match) {
@@ -1161,7 +1159,7 @@
                 return layouts;
             },
 
-            // 最後三墩對每份可能的發牌逐手算到結算，每家都挑對自己排名最有利的續著。
+            // 最後三墩對每份可能的發牌逐手算到結算，每家都挑對自己分差最有利的續著。
             endgame(hands, trick, candidates, me, cap, match) {
                 const finish = () => {
                     const scores = this.finalTotals(cap, match);

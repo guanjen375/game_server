@@ -59,13 +59,14 @@ test('first trick: a running heart hand gives the sheep to the transformer holde
     assert.notEqual(weak(32), 'DJ');
 });
 
-test('after a single zero-point heart, the simulation already weighs the possible sweep against the standings', () => {
+test('after a single zero-point heart, the simulation already breaks the possible sweep whatever the standings', () => {
     const early = {
         history: ['C2 CA C3 H4'], trick: 'H8 H2 H3', hand: 'H5 H9 S2 S4 S6 S8 D2 D4 D6 D8 C4 C6'
     };
     // An empty sample set exercises the same policy that plays every simulated turn.
     assert.equal(position(early)(0), 'H9');
-    assert.equal(position({ ...early, totals: [70, 100, -1200, 80] })(0), 'H5');
+    // The player collecting hearts is 1,300 behind us. That is no reason to let the sweep run.
+    assert.equal(position({ ...early, totals: [70, 100, -1200, 80] })(0), 'H9');
 });
 
 // After four tricks all hearts are out. Moving just the first heart to a second
@@ -124,21 +125,45 @@ test('keep the flipped sheep when giving it away would complete an opponent gran
     }
 });
 
-test('the same last-place player can be allowed a slam or stopped as the score gap and bonus change', () => {
+test('a last-place player is stopped one card short of a slam, however far behind', () => {
     const history = [
         'C2 CQ C5 C10', 'SA S3 S4 SQ', 'DA D6 D5 DJ',
         'HK H3 H4 H5', 'HQ H6 H7 H8', 'HJ H9 H10 H2', ...ending.slice(3)
     ];
-    for (const [totals, mode, expected] of [
-        [[100, 80, -1200, 60], 'super_slam', 'C3'], // Even +1000 leaves them behind. Taking HA costs us 50.
-        [[100, 80, -100, 60], 'super_slam', 'CA'],  // The same +1000 would now put them first.
-        [[100, 80, -800, 60], 'classic', 'C3'],
-        [[100, 80, -800, 60], 'super_slam', 'CA'],
-        [[100, 1500, -400, 0], 'classic', 'CA']     // The leader is safe, but our second place is at stake.
+    for (const [totals, mode] of [
+        [[100, 80, -1200, 60], 'super_slam'], // Even +1000 leaves them last. Stopping it still costs us only the 50 for HA.
+        [[100, 80, -100, 60], 'super_slam'],
+        [[100, 80, -800, 60], 'classic'],
+        [[100, 80, -800, 60], 'super_slam'],
+        [[100, 1500, -400, 0], 'classic']
     ]) {
         const pick = position({ history, trick: 'C4 CK HA', hand: 'C3 CA', totals, mode });
-        assert.equal(pick(0), expected);
-        assert.equal(pick(32), expected);
+        assert.equal(pick(0), 'CA');
+        assert.equal(pick(32), 'CA');
+    }
+});
+
+test('a penalty is worth the same on every opponent, and cumulative totals do not change the comparison', () => {
+    const { ai } = load({}, Math);
+    const totals = [130, -50, 60, -340]; // Seat 2 is second, 70 behind seat 0.
+    const worth = (q, scores = totals) => ai.standingValue(2, scores, q, scores[q] - 100) - ai.standingValue(2, scores);
+    const close = (a, b) => assert.ok(Math.abs(a - b) < 1e-9, a + ' != ' + b);
+    close(worth(0), worth(1));
+    close(worth(0), worth(3));
+    close(worth(0), worth(0, [0, 0, 0, 0]));
+    assert.ok(worth(2) < -2 * worth(0)); // Eating the pig costs three times what giving it away gains.
+});
+
+// West leads S6, South throws HJ and East plays SA. North is last, holding the pig and five low spades.
+test('the pig goes under a spade ace already on the table whoever leads the match', () => {
+    const tucked = {
+        history: ['C2 CA CK C5', 'D8 D5 D7 D2', 'S10 SK S5 SJ'], trick: 'S6 HJ SA',
+        hand: 'SQ S8 S7 S4 S3 S2 C8 C7 C3 D3'
+    };
+    // South first with North second, East (the ace) first, all level, South far ahead, North first.
+    for (const totals of [[130, -50, 60, -340], [-50, 130, 60, -340], [0, 0, 0, 0], [600, -50, 60, -340], [60, -50, 130, -340]]) {
+        assert.equal(position({ ...tucked, totals })(0), 'SQ');
+        for (const seed of [1, 19, 73]) assert.equal(position({ ...tucked, totals, seed })(32), 'SQ');
     }
 });
 
