@@ -677,7 +677,7 @@
                 </div>
 
                 <div class="bg-slate-800/80 border border-white/10 rounded-xl p-3.5 text-xs text-slate-300">
-                    💡 <strong>貼心防呆設計：</strong>輪到您時，滑過暗棋會亮起金框；點選己方棋子後，可走的空格會出現金色光點、可吃的敵子會亮起紅圈，不合規則的點擊會直接提示原因。點擊上方「走棋提示」可獲得電腦的建議；誤觸也能「悔棋」（悔棋後暗棋會重新隨機洗牌，無法偷看）。
+                    💡 <strong>貼心防呆設計：</strong>輪到您時，滑過暗棋會亮起金框；點選己方棋子後，可走的空格會出現金色光點、可吃的敵子會亮起紅圈，不合規則的點擊會直接提示原因。點擊上方「走棋提示」可獲得電腦的建議；誤觸也能「悔棋」（悔棋只收回走過的步，蓋著的暗棋不會重洗）。
                 </div>
             </div>
             <div class="px-6 py-3.5 bg-slate-950 border-t border-white/10 flex flex-wrap items-center justify-between gap-3">
@@ -1738,6 +1738,7 @@
 
                 this.roundNumber = 1;
                 this.state = Engine.createState();
+                this.dealHidden();
                 this.turn = 'south';
                 this.moveNumber = 1;
                 this.selectedSq = -1;
@@ -1864,6 +1865,7 @@
             startRound() {
                 this.cancelAI();
                 this.state = Engine.createState();
+                this.dealHidden();
                 this.moveNumber = 1;
                 this.selectedSq = -1;
                 this.lastMove = null;
@@ -1922,7 +1924,7 @@
             }
 
             // Only public state and already played actions. Unknown squares remain HIDDEN;
-            // draws happen in drawFromPool(), so no future piece layout exists to export.
+            // the pieces lying under them (hiddenLayout) are never exported.
             getPublicRecord() {
                 const st = this.state;
                 return JSON.parse(JSON.stringify({
@@ -1955,16 +1957,32 @@
             }
 
             /**
-             * 翻棋時從尚未翻開的棋子中隨機抽出一枚（悔棋後重翻也會重新抽，無法偷看）
+             * 開局時把還沒翻開的棋子洗好，固定擺在各個蓋著的格子底下；之後翻棋翻出的就是那一格底下的棋子。
+             * 悔棋只把棋子蓋回去、不重洗：悔棋是防按錯用的，不該改變棋局。
+             * 電腦只拿得到 state（哪些格子蓋著、還剩哪些棋子），看不到這份擺法
              */
-            drawFromPool() {
-                const st = this.state;
-                let r = Math.floor(Math.random() * st.hidden);
+            dealHidden() {
+                const st = this.state, codes = [];
                 for (let code = 1; code <= 14; code++) {
-                    r -= st.pool[code];
-                    if (r < 0) return code;
+                    for (let i = 0; i < st.pool[code]; i++) codes.push(code);
                 }
-                return 1;
+                for (let i = codes.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [codes[i], codes[j]] = [codes[j], codes[i]];
+                }
+                this.hiddenLayout = new Int8Array(SQUARES);
+                for (let sq = 0, k = 0; sq < SQUARES; sq++) {
+                    if (st.board[sq] === HIDDEN) this.hiddenLayout[sq] = codes[k++];
+                }
+            }
+
+            /**
+             * 翻棋時翻出的棋子：就是這一格底下那一枚，所以悔棋後再翻同一格還是同一枚
+             */
+            hiddenPieceAt(sq) {
+                // 正常對局一定對得上；棋局被整個換掉時（測試直接擺局），照還沒翻開的棋子重擺一次
+                if (!(this.state.pool[this.hiddenLayout[sq]] > 0)) this.dealHidden();
+                return this.hiddenLayout[sq];
             }
 
             /**
@@ -1981,7 +1999,7 @@
                 if (analysis) entry.analysis = JSON.parse(JSON.stringify(analysis));
 
                 if (action.type === 'flip') {
-                    const code = this.drawFromPool();
+                    const code = this.hiddenPieceAt(action.sq);
                     st.board[action.sq] = code;
                     st.pool[code]--;
                     st.hidden--;
@@ -2254,7 +2272,8 @@
             }
 
             /**
-             * 悔棋：每次動作前保存快照；人機對戰時一次退回到您上一步之前
+             * 悔棋：每次動作前保存快照；人機對戰時一次退回到您上一步之前。
+             * 蓋著的棋子不重洗（hiddenLayout 整局固定），翻過又蓋回去的格子底下還是原來那一枚
              */
             pushUndo() {
                 this.undoStack.push({
@@ -2297,7 +2316,7 @@
                 this.freshCapture = null;
                 this.renderAll();
                 this.sound.playSelect();
-                this.showCenterBanner('↩️ 已悔棋（暗棋重新隨機洗牌）', 'bg-sky-500 text-slate-950');
+                this.showCenterBanner('↩️ 已悔棋', 'bg-sky-500 text-slate-950');
                 this.scheduleAI(800);
             }
 

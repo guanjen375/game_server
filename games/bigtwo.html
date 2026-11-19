@@ -146,7 +146,7 @@ dialog{max-height:calc(var(--app-h)*.88)}dialog[open]{display:flex;flex-directio
       <div class="rule-box"><h3>計分方式</h3><p>輸家剩 1–9 張，每張扣 1 分；剩 10–12 張加倍；剩 13 張乘 3。贏家取得所有扣分，四家總和為 0。</p></div>
     </div>
     <p class="rule-small">💡 <strong>出牌提示</strong>會選取一組合法牌，重複按可換一組。金框是已選手牌，送出前會檢查牌型與大小。開啟視窗時，電腦會暫停等待。</p>
-    <p class="rule-small">↶ <strong>悔牌</strong>：按錯、出錯牌或誤按「不出」時，按上方的「悔牌」就回到您那一手之前，可以連續按；一局結算之後就不能悔牌了。為了公平，悔牌後電腦三家還沒出的手牌會重新洗過（張數不變）。</p>
+    <p class="rule-small">↶ <strong>悔牌</strong>：按錯、出錯牌或誤按「不出」時，按上方的「悔牌」就回到您那一手之前，可以連續按；一局結算之後就不能悔牌了。悔牌只會把出過的牌收回，各家的手牌不會重洗。</p>
     <p class="rule-small">📋 <strong>出牌紀錄</strong>：「已出的牌」用白底標出這一局已經出過的牌、金框是您手上的牌、暗的還在別家手上；按「整局紀錄」（放不下的畫面按上方的 📋）可以看整局每一輪誰出了什麼。</p>
   </div><div class="modal-footer"><button class="action-btn primary" data-close>了解，繼續玩</button></div>
 </dialog>
@@ -965,17 +965,14 @@ class BigTwoApp {
   // 悔牌用：您每次出牌或不出之前，把牌局、四家最後的動作和已選的手牌記下來
   snapshot(){return {round:this.round.clone(),lastActions:this.lastActions.slice(),selected:[...this.selected]};}
   // 悔牌：回到您上一次出牌（或不出）之前，那之後電腦出的牌一起收回；可以連續按。一局結算之後不能悔牌。
-  // 電腦三家還沒出的牌會重新洗過（各家張數不變），所以不能靠悔牌偷看電腦的手牌。
+  // 四家手牌照原樣還原、不重洗：悔牌是防按錯用的，不該改變牌局。
   undo(){
     if(this.modal)return;
     if(this.round.over){this.toast('這一局已經結算，不能悔牌了。');return;}
     if(!this.undoStack.length){this.toast('目前沒有可以悔牌的步驟：這一局您還沒出過牌，也沒按過「不出」。');return;}
     clearTimeout(this.timer);this.timer=null;
     const s=this.undoStack.pop();this.round=s.round;this.lastActions=s.lastActions;this.selected=new Set(s.selected);this.hintIndex=0;this.hintKey='';
-    const hands=this.round.hands,pool=[1,2,3].flatMap(seat=>hands[seat]);
-    for(let i=pool.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[pool[i],pool[j]]=[pool[j],pool[i]];}
-    let used=0;for(const seat of [1,2,3]){const n=hands[seat].length;hands[seat]=BigTwo.sortCards(pool.slice(used,used+n));used+=n;}
-    this.render();this.tone(330,.09);this.toast('↶ 已悔牌，回到您出牌之前 · 電腦三家的手牌重新洗過');this.scheduleAI();
+    this.render();this.tone(330,.09);this.toast('↶ 已悔牌，回到您出牌之前');this.scheduleAI();
   }
   hint(){if(this.modal||this.round.over||this.round.turn!==0||this.round.passed[0])return;const r=this.round,key=r.hands[0].map(c=>c.id).join(',')+'|'+(r.lastPlay?r.lastPlay.cards.map(c=>c.id).join(','):'free');const moves=BigTwo.legalMoves(r.hands[0],r.lastPlay,r.opening);if(!moves.length){this.clearSelection();this.toast('目前沒有能壓過的牌，請按「不出」。');return;}if(key!==this.hintKey){this.hintKey=key;this.hintIndex=0;const recommended=BigTwo.chooseMove(r.hands[0],r.lastPlay,{round:r,seat:0});if(recommended){const ids=recommended.map(c=>c.id).sort().join(',');const idx=moves.findIndex(m=>m.cards.map(c=>c.id).sort().join(',')===ids);if(idx>0)moves.unshift(...moves.splice(idx,1));}this.hintMoves=recommended||!r.lastPlay?moves:[null,...moves];}const move=this.hintMoves[this.hintIndex%this.hintMoves.length];this.hintIndex++;if(!move){this.clearSelection();this.toast('建議：這輪先不出，請按「不出」· 再按提示可看能出的牌');return;}this.selected=new Set(move.cards.map(c=>c.id));this.refreshSelected();this.renderSelection();this.toast(`建議：${move.name} · 再按提示可換一組`);}
   scheduleAI(){clearTimeout(this.timer);this.timer=null;if(this.modal||this.round.over||this.round.turn===0)return;const round=this.round,seat=round.turn;this.timer=setTimeout(()=>{this.timer=null;if(this.modal||this.round!==round||round.over||round.turn!==seat)return;const cards=BigTwo.chooseMove(round.hands[seat],round.lastPlay,{round,seat});if(cards&&cards.length)this.performPlay(seat,cards);else this.performPass(seat);},950);}

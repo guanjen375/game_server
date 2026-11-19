@@ -536,7 +536,7 @@
                 <div class="bg-slate-800/80 border border-white/10 rounded-xl p-3.5 text-xs text-slate-300">
                     💡 <strong>貼心設計：</strong>輪到您時，點一下手牌會抬起並顯示「打這張會聽哪些牌、還剩幾張」，場上（牌河、明牌）同一種牌也會跟著閃藍光，方便打別人打過的牌；可以吃碰槓胡時下方會跳出按鈕，不想要就按「過」。點擊上方「出牌提示」可得到電腦建議的出牌。<br>
                     🤖 聽牌後下方會出現「自動胡牌」：按下去就摸什麼打什麼（不吃、不碰、不槓），有人放槍、自摸或可以搶槓時自動胡牌；想自己打就按「取消自動」，每局開始時也會自動關掉。<br>
-                    ↩️ 按錯或打錯牌時，按上方的「悔牌」就回到您上一步（出牌、吃、碰、槓、胡、過，或自動胡牌替您打的那一張）之前，可以連續按；一局結算之後就不能悔牌了。為了公平，悔牌後還沒摸的牌會重新洗過。<br>
+                    ↩️ 按錯或打錯牌時，按上方的「悔牌」就回到您上一步（出牌、吃、碰、槓、胡、過，或自動胡牌替您打的那一張）之前，可以連續按；一局結算之後就不能悔牌了。悔牌只會把牌局退回去，還沒摸的牌不會重洗。<br>
                     ⭐ 手牌中的圈風、門風會在右上角標出金色「+1」（圈風剛好也是門風時是「+2」），代表湊成刻子能加的台數；左側「加台牌」列出這一局的圈風、門風與正花，右側則有聽牌進度與還沒出現的餘牌張數。
                 </div>
             </div>
@@ -2519,7 +2519,8 @@
 
             /**
              * 記下目前的牌局。只在等您決定的時候呼叫：輪到您出牌、可以吃碰槓胡、可以搶槓。
-             * 這些時候沒有排定中的下一步，所以還原之後一樣是停在等您決定
+             * 這些時候沒有排定中的下一步，所以還原之後一樣是停在等您決定。
+             * 牌牆發完牌就不會再變動，只要記摸到哪裡（head／tail）
              */
             pushUndo() {
                 const c = this.claim;
@@ -2533,7 +2534,7 @@
                         hand: p.hand.slice(), melds: p.melds.map(m => ({ ...m, tiles: m.tiles.slice() })),
                         flowers: p.flowers.slice(), discards: p.discards.slice(), drawn: p.drawn
                     })),
-                    wall: this.wall.slice(), head: this.head, tail: this.tail,
+                    head: this.head, tail: this.tail,
                     turn: this.turn, phase: this.phase, turnFlags: { ...this.turnFlags }, noClaims: this.noClaims,
                     lastDiscard: this.lastDiscard && { ...this.lastDiscard }, claim
                 });
@@ -2542,7 +2543,7 @@
             /**
              * 悔牌：回到您上一步（出牌、吃、碰、槓、胡、過，或自動胡牌替您打的那一張）之前，那之後別家摸的、打的牌一起收回；
              * 可以連續按。一局結算之後不能悔牌。
-             * 還沒摸的牌會重新洗過，所以不能靠悔牌偷看接下來會摸到什麼；悔牌後自動胡牌會關掉
+             * 各家手牌和還沒摸的牌都照原樣還原、不重洗：悔牌是防按錯用的，不該改變牌局；悔牌後自動胡牌會關掉
              */
             undo() {
                 if (this.phase === 'end') {
@@ -2557,13 +2558,8 @@
                 this.timer = null;
                 const s = this.undoStack.pop();
                 this.players.forEach((p, i) => Object.assign(p, s.players[i]));
-                this.wall = s.wall;
                 this.head = s.head;
                 this.tail = s.tail;
-                for (let i = this.tail; i > this.head; i--) {
-                    const j = this.head + Math.floor(Math.random() * (i - this.head + 1));
-                    [this.wall[i], this.wall[j]] = [this.wall[j], this.wall[i]];
-                }
                 this.turn = s.turn;
                 this.phase = s.phase;
                 this.turnFlags = s.turnFlags;
@@ -2576,7 +2572,7 @@
                 this.hintTile = null;
                 this.render();
                 this.sound.playSelect();
-                this.showCenterBanner(`↩️ 已悔牌，回到您上一步之前${wasAuto ? '，自動胡牌已關閉' : ''}（還沒摸的牌重新洗過）`, 'bg-sky-500 text-slate-950');
+                this.showCenterBanner(`↩️ 已悔牌，回到您上一步之前${wasAuto ? '，自動胡牌已關閉' : ''}`, 'bg-sky-500 text-slate-950');
             }
 
             /** 自動胡牌開關：聽牌後才能打開；輪到您出牌時打開，會立刻打掉剛摸的牌 */

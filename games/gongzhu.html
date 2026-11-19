@@ -701,7 +701,7 @@
 
                 <div class="bg-slate-800/80 border border-white/10 rounded-xl p-3.5 text-xs text-slate-300">
                     💡 <strong>貼心防呆設計：</strong>輪到您出牌時，系統會自動將可出的合法手牌向上抬起並亮起金框；不合規則的手牌則會半透明鎖定，避免誤出。點擊上方「出牌提示」還可獲得策略建議！<br>
-                    ↩️ <strong>悔牌：</strong>按錯牌或出錯牌時，按上方的「悔牌」就回到您那一張出牌之前，可以連續按；一局結算之後就不能悔牌了。為了公平，悔牌後電腦三家還沒出的手牌會重新洗過（張數與缺門不變）。<br>
+                    ↩️ <strong>悔牌：</strong>按錯牌或出錯牌時，按上方的「悔牌」就回到您那一張出牌之前，可以連續按；一局結算之後就不能悔牌了。悔牌只會把出過的牌收回，各家的手牌不會重洗。<br>
                     🃏 <strong>已出牌：</strong>按上方的「已出牌」可以看這一局哪些牌已經出過（白底）、哪些在您手上（金框）、哪些還在別家手上，以及每一墩誰出了什麼、被誰吃走。
                 </div>
             </div>
@@ -2214,7 +2214,8 @@
             }
 
             /**
-             * 悔牌：回到您上一次出牌之前，那之後電腦出的牌一起收回；可以連續按。一局結算之後不能悔牌
+             * 悔牌：回到您上一次出牌之前，那之後電腦出的牌一起收回；可以連續按。一局結算之後不能悔牌。
+             * 四家手牌照原樣還原、不重洗：悔牌是防按錯用的，不該改變牌局
              */
             undo() {
                 if (this.roundOver) {
@@ -2238,7 +2239,6 @@
                 this.currentTurn = 'south';
                 this.isProcessingTrick = false;
                 this.hintCardId = null;
-                const reshuffled = this.reshuffleHiddenHands();
 
                 // 桌面只留下這一墩在您之前出的牌
                 for (const seat of this.SEAT_ORDER) {
@@ -2248,51 +2248,7 @@
                 this.updateHeaderInfo();
                 this.renderAllPlayers();
                 this.sound.playTone(330, 'sine', 0.09, 0, 0.1);
-                this.showCenterBanner(reshuffled ? '↩️ 已悔牌（電腦的手牌重新洗過）' : '↩️ 已悔牌，回到您出牌之前', 'bg-sky-500 text-slate-950');
-            }
-
-            /**
-             * 悔牌後把電腦三家還沒出的牌重新洗過（各家張數不變；已經缺門的花色不會再拿到），
-             * 這樣不能靠悔牌偷看電腦的手牌。發不出合理的牌時維持原樣並回傳 false
-             */
-            reshuffleHiddenHands() {
-                const bots = this.SEAT_ORDER.filter(seat => this.PLAYERS[seat].isAI);
-                const voids = Object.fromEntries(bots.map(seat => [seat, new Set()]));
-                for (const trick of this.tricksSoFar()) {
-                    for (const entry of trick) {
-                        if (entry.card.suit !== trick[0].card.suit && voids[entry.seat]) voids[entry.seat].add(trick[0].card.suit);
-                    }
-                }
-                const pool = bots.flatMap(seat => this.PLAYERS[seat].hand);
-                const takersOf = suit => bots.filter(seat => !voids[seat].has(suit)).length;
-                for (let attempt = 0; attempt < 200; attempt++) {
-                    for (let i = pool.length - 1; i > 0; i--) {
-                        const j = Math.floor(Math.random() * (i + 1));
-                        [pool[i], pool[j]] = [pool[j], pool[i]];
-                    }
-                    // 能拿的家數最少的花色先發
-                    const order = pool.slice().sort((a, b) => takersOf(a.suit) - takersOf(b.suit));
-                    const left = Object.fromEntries(bots.map(seat => [seat, this.PLAYERS[seat].hand.length]));
-                    const hands = Object.fromEntries(bots.map(seat => [seat, []]));
-                    let ok = true;
-                    for (const card of order) {
-                        const takers = bots.filter(seat => left[seat] > 0 && !voids[seat].has(card.suit));
-                        if (!takers.length) {
-                            ok = false;
-                            break;
-                        }
-                        // 還缺越多張的越容易拿到
-                        let r = Math.random() * takers.reduce((sum, seat) => sum + left[seat], 0);
-                        const seat = takers.find(s => (r -= left[s]) < 0) || takers[takers.length - 1];
-                        hands[seat].push(card);
-                        left[seat]--;
-                    }
-                    if (ok) {
-                        for (const seat of bots) this.PLAYERS[seat].hand = this.sortCards(hands[seat]);
-                        return true;
-                    }
-                }
-                return false;
+                this.showCenterBanner('↩️ 已悔牌，回到您出牌之前', 'bg-sky-500 text-slate-950');
             }
 
             /**

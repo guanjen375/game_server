@@ -71,6 +71,41 @@ test('undo removes abandoned actions and diagnostics before exporting', () => {
     assert.notEqual(saved, before);
 });
 
+test('undo covers a flipped piece again without reshuffling: a square always reveals the same piece', () => {
+    const { game } = controller();
+    game.PLAYERS.north.isAI = false; // Both seats are people here, so every flip can be taken back.
+    const seen = new Map();
+    for (let i = 0; i < 30; i++) {
+        const hidden = [...game.state.board].flatMap((p, sq) => p === 15 ? [sq] : []);
+        const sq = hidden[(i * 7) % hidden.length], before = snapshot(game.state);
+        game.performAction(game.turn, { type: 'flip', sq });
+        const code = game.state.board[sq];
+        assert.equal(code, seen.get(sq) ?? code);
+        seen.set(sq, code);
+        if (i % 3 === 2) continue; // Two of every three flips are taken back and met again later.
+        game.undo();
+        assert.equal(snapshot(game.state), before);
+    }
+    assert.ok(seen.size >= 10 && game.state.hidden === 22);
+});
+
+test('a position swapped in by a test tool reveals only pieces left in its own pool', () => {
+    const { game, Engine } = controller();
+    const st = Engine.createState();
+    for (const [sq, code] of [[0, 8], [5, 14], [9, 1]]) { st.board[sq] = code; st.pool[code]--; st.hidden--; }
+    game.state = st;
+    game.PLAYERS.south.color = 0; game.PLAYERS.north.color = 1;
+    for (let sq = 0; sq < 32; sq++) {
+        if (st.board[sq] !== 15) continue;
+        const pool = [...st.pool];
+        game.gameOver = false;
+        game.performAction('south', { type: 'flip', sq });
+        assert.ok(pool[st.board[sq]] > 0);
+    }
+    assert.equal(st.hidden, 0);
+    assert.ok(st.pool.every(n => n === 0));
+});
+
 test('a first random reveal does not inherit statistics from an earlier search', () => {
     const { game, BanqiAI } = controller();
     BanqiAI.lastSearch = { nodes: 99999 };
