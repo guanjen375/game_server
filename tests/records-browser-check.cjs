@@ -52,13 +52,24 @@ function files() {
         for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
             const full = path.join(dir, entry.name);
             if (entry.isDirectory()) walk(full);
-            else found.push(path.relative(DATA, full));
+            else if (entry.name.endsWith('.json')) found.push(path.relative(DATA, full));
         }
     };
     if (fs.existsSync(DATA)) walk(DATA);
     return found.sort();
 }
 const read = name => JSON.parse(fs.readFileSync(path.join(DATA, name), 'utf8'));
+// Against the live server other people may be playing at the same time: only the rounds sent by this check's
+// own browser (headless, on this machine) are looked at, and only those are deleted at the end.
+const ours = name => {
+    if (!LIVE) return true;
+    try {
+        const record = read(name);
+        return /HeadlessChrome/.test(record.ua) && record.ip === HOST;
+    } catch (error) {
+        return false;
+    }
+};
 
 // Runs inside every page before anything else: speeds the games up and notes what each one hands to the recorder.
 function instrument() {
@@ -235,7 +246,7 @@ function checkFile(name, file, expected, status) {
 
 async function exercise(browser, name) {
     const before = files();
-    const fresh = () => files().filter(file => !before.includes(file));
+    const fresh = () => files().filter(file => !before.includes(file) && ours(file));
     let page = await openGame(browser, name);
 
     // 1. Two rounds played to the end: two files, same session.
@@ -328,7 +339,7 @@ async function exercise(browser, name) {
 // even if the page was closed in between and a different game is opened afterwards.
 async function outage(browser) {
     const before = files();
-    const fresh = () => files().filter(file => !before.includes(file));
+    const fresh = () => files().filter(file => !before.includes(file) && ours(file));
     const page = await openGame(browser, 'gongzhu');
     await stopServer();
     assert.equal((await play(page)).over, true);
@@ -425,8 +436,7 @@ const sparePort = () => new Promise((resolve, reject) => {
     const all = files();
     console.log(`${all.length} files under ${DATA}`);
     if (LIVE) {
-        // Only what this run created: new since the start, sent from this machine by a headless browser.
-        const mine = all.filter(file => !initial.includes(file) && /HeadlessChrome/.test(read(file).ua) && read(file).ip === HOST);
+        const mine = all.filter(file => !initial.includes(file) && ours(file));
         for (const file of mine) fs.unlinkSync(path.join(DATA, file));
         for (const dir of [...new Set(mine.map(file => path.dirname(file)))].sort().reverse()) {
             for (let d = dir; d !== '.'; d = path.dirname(d)) {
