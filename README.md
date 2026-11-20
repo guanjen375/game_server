@@ -80,7 +80,8 @@ python3 train_gpu.py                   # 列出每個遊戲有幾局紀錄、練
   - 訓練途中每 60 秒會自動存檔（`--save-every` 可以改），被強制關掉或當機時，下次執行從最後一次存檔接著練。
 - 建議開在 `tmux` 裡跑（`tmux new -s train`）：斷線了訓練還在，`tmux attach -t train` 回來一樣按 `p`、`q`。放在背景或排程執行、沒有視窗可以按鍵時，改用 `python3 train_gpu.py gongzhu pause`（或 Ctrl+C、kill）暫停。
 - **學什麼**：把每一局重排一遍，在玩家每次要做決定的時候，記下他當時看得到的東西和他選了什麼，讓模型學著猜。只學真人的決定；電腦對手的、按過「提示」才做的、麻將自動胡牌替玩家打的都不學（`--players all`、`--with-hints` 可以改）。`--ip <來源 IP>` 只用某一台裝置玩的紀錄。
-- **產出**在 `train_out/<遊戲>/`：`model.pt`（模型，驗證成績最好的那一輪）、`checkpoint.pt`（訓練進度，接著練用）、`log.csv`（每一輪的成績）、`status.json`（目前狀態）。`train_out/` 列在 `.gitignore` 裡，不會進 git。
+- **產出**在 `train_out/<遊戲>/`：`model.pt`（模型，驗證成績最好的那一輪）、`log.csv`（每一輪的成績）、`checkpoint.pt`（訓練進度，接著練用）、`status.json`（目前狀態）。
+- **分享模型**：`model.pt` 和 `log.csv` 會進 git，練完 `git add train_out`、commit、push，別人拉下來就能用（用模型不需要 GPU，裝了 PyTorch 就行，讀法見 `train_gpu.py` 的 `load_model()`）。訓練進度、狀態這些只在訓練那台用的檔案列在 `.gitignore` 裡，不會進 git。
 - 訓練完會顯示「沒練過的對局裡猜中玩家怎麼選的比例」，旁邊附上亂選的比例當對照。對局越多越準；只有幾十局時模型只能當參考。
 - 之後多了新的對局，再執行一次就會用全部的紀錄重新訓練（上一個模型留成 `model.previous.pt`）；紀錄沒變的話不會重練，要重練加 `--restart`。
 - 訓練的電腦和遊戲伺服器不是同一台時，把 `gaming_data/` 複製過去（它不在 git 裡），或用 `--data-dir` 指到紀錄的資料夾；`--out-dir` 可以改模型放哪裡。其他設定見 `python3 train_gpu.py --help`。

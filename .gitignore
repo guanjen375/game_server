@@ -6,8 +6,15 @@ server.pid
 # 自動記錄的對局資料（裡面有連線裝置的 IP，不要傳上去）
 gaming_data/
 
-# train_gpu.py 訓練出來的模型和訓練進度（檔案大，而且是從對局資料練出來的）
-train_out/
+# train_gpu.py 訓練時只在這台用的檔案：訓練進度、狀態、鎖（進度和狀態裡可能有 --ip 指定的來源 IP，不要傳上去）。
+# 練好的模型 train_out/<遊戲>/model.pt 和每一輪的成績 log.csv 不在這裡面：它們會進 git，別人拉下來就能用
+train_out/*/checkpoint*.pt
+train_out/*/model.previous.pt
+train_out/*/status.json
+train_out/*/error.log
+train_out/*/train.lock
+train_out/*/PAUSE
+train_out/*/*.tmp
 
 # Python 快取
 __pycache__/

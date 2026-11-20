@@ -15,6 +15,7 @@ import os
 import random
 import select
 import shlex
+import shutil
 import signal
 import subprocess
 import sys
@@ -578,6 +579,22 @@ class CommandLine(unittest.TestCase):
         self.assertFalse(self.out.exists())
 
 
+class WhatGoesIntoGit(unittest.TestCase):
+    def test_the_model_is_shared_and_the_working_files_stay_on_the_machine(self):
+        if not shutil.which("git") or not (ROOT / ".git").exists():
+            self.skipTest("not a git checkout")
+
+        def ignored(name):
+            return subprocess.run(["git", "check-ignore", "-q", f"train_out/gongzhu/{name}"], cwd=ROOT).returncode == 0
+
+        for name in ("model.pt", "log.csv"):
+            self.assertFalse(ignored(name), f"{name} is what other people come for")
+        for name in ("checkpoint.pt", "checkpoint.broken.pt", "model.previous.pt", "status.json", "error.log",
+                     "train.lock", "PAUSE", "model.pt.tmp", "checkpoint.pt.tmp", "status.json.tmp", "log.csv.tmp"):
+            self.assertTrue(ignored(name), f"{name} only matters where the training runs")
+        self.assertTrue(subprocess.run(["git", "check-ignore", "-q", "gaming_data/gongzhu/2026-11/x.json"], cwd=ROOT).returncode == 0)
+
+
 @unittest.skipUnless(HAVE_TORCH, "needs PyTorch")
 class Training(unittest.TestCase):
     @classmethod
@@ -642,6 +659,10 @@ class Training(unittest.TestCase):
         folder = self.out / "gongzhu"
         self.assertEqual(sorted(p.name for p in folder.iterdir()),
                          ["checkpoint.pt", "log.csv", "model.pt", "status.json", "train.lock"])
+        shared = json.dumps({k: v for k, v in train_gpu.load_model(folder / "model.pt")[1].items() if k != "state"},
+                            ensure_ascii=False) + (folder / "log.csv").read_text(encoding="utf-8")
+        self.assertNotIn(str(self.out), shared, "nothing about this machine in what gets shared")
+        self.assertNotIn("100.64", shared)
         status = self.status()
         self.assertEqual(status["state"], "finished")
         self.assertGreater(status["best"]["val_acc"], 0.8, "always playing the lowest card is easy to pick up")
@@ -659,6 +680,15 @@ class Training(unittest.TestCase):
         self.assertTrue(bool(mask.gather(1, scores.argmax(1, keepdim=True)).all()), "it only ever picks an allowed card")
         self.assertLess(scores[~mask].max().item(), scores[mask].min().item(), "whatever is not allowed scores below all that is")
         self.assertAlmostEqual((scores.argmax(1) == y).float().mean().item(), saved["result"]["validation_accuracy"], places=5)
+
+    def test_the_model_that_gets_shared_does_not_name_the_devices(self):
+        code, text = self.train("--epochs", "2", "--ip", "100.64.0.1")
+        self.assertEqual(code, 0, text)
+        folder = self.out / "gongzhu"
+        about = {k: v for k, v in train_gpu.load_model(folder / "model.pt")[1].items() if k != "state"}
+        self.assertEqual(about["config"]["ip"], 1, "only how many devices were picked")
+        self.assertNotIn("100.64", json.dumps(about, ensure_ascii=False) + (folder / "log.csv").read_text(encoding="utf-8"))
+        self.assertIn("100.64.0.1", (folder / "status.json").read_text(encoding="utf-8"), "which is why that file stays local")
 
     def test_pausing_and_carrying_on_gives_exactly_what_an_unbroken_run_gives(self):
         whole, broken = self.out / "whole", self.out / "broken"
@@ -857,8 +887,8 @@ class SameWindow(unittest.TestCase):
         self.assertEqual(whole["result"], mine["result"])
 
     def test_p_pauses_and_lets_go_of_everything_and_p_again_carries_on_to_the_same_result(self):
-        whole = self.whole("--epochs", "8")
-        window = self.window("--epochs", "8", "--step-delay", "0.05", "--save-every", "0.2")
+        whole = self.whole("--epochs", "20")        # long enough that both pauses come well before the end
+        window = self.window("--epochs", "20", "--step-delay", "0.05", "--save-every", "0.2")
         window.see("按 p 暫停")
         self.under_way(3)
         for key in (b"p", b"\r"):       # carrying on works with p as well as with Enter
@@ -890,7 +920,8 @@ class SameWindow(unittest.TestCase):
         left = self.status()
         self.assertEqual(left["state"], "paused")
         self.assertFalse(train_gpu.is_training(self.out / "gongzhu"))
-        code, text = run(*self.where, "--cpu", "--epochs", left["epoch"] + 1, "--pause-at-step", left["step"] + 2)
+        # (two more steps may run into the next round, so that one has to be allowed as well)
+        code, text = run(*self.where, "--cpu", "--epochs", left["epoch"] + 2, "--pause-at-step", left["step"] + 2)
         self.assertEqual(code, train_gpu.EXIT_PAUSED, text)
         self.assertIn("接著上次的進度", text)
         self.assertEqual(self.status()["step"], left["step"] + 2)
