@@ -60,8 +60,33 @@ iPhone／iPad 用 Safari 打開遊戲大廳，點「分享」→「加入主畫�
 
 玩家按過「提示」才出的那一手會標 `hint`，麻將「自動胡牌」替玩家打的牌標 `auto`；悔掉的那幾手不會留在紀錄裡。各遊戲的牌、棋子和座位怎麼編號，寫在各遊戲檔裡 `getRecord()` 上面的說明。
 
+## 訓練模型
+
+`train_gpu.py` 用 `gaming_data/` 的對局紀錄，訓練「照玩家的習慣出牌（下棋）」的模型，之後做自己的電腦對手用。要在有 NVIDIA GPU、裝了 [PyTorch](https://pytorch.org/get-started/locally/)（支援 CUDA 的版本）的電腦上執行；找不到 NVIDIA GPU 會直接顯示錯誤，不會改用 CPU。
+
+```bash
+python3 train_gpu.py gongzhu           # 用 gaming_data/gongzhu/ 的紀錄訓練，模型放在 train_out/gongzhu/
+                                       # 訓練中：按 p 暫停／繼續，按 q 存檔後離開
+python3 train_gpu.py gongzhu status    # 看練到哪裡
+python3 train_gpu.py                   # 列出每個遊戲有幾局紀錄、練到哪裡
+```
+
+其他遊戲把 `gongzhu` 換成 `mahjong`、`bigtwo`……（就是 `gaming_data/` 底下的資料夾名稱）。在 Windows 上把開頭的 `python3` 換成 `python`。
+
+- **暫停**都在訓練的那個視窗裡按鍵：
+  - `p`：暫停。訓練把進度存好、把 GPU 完全讓出來，視窗停在暫停；再按一次 `p`（或 Enter）就從暫停的地方接著練。
+  - `q`（或 Ctrl+C）：存檔後離開。之後再執行一次同一個指令，一樣從停下來的地方接著練。
+  - 訓練途中 GPU 出錯也會停在暫停，GPU 可以用了再按 `p` 接著練。
+  - 訓練途中每 60 秒會自動存檔（`--save-every` 可以改），被強制關掉或當機時，下次執行從最後一次存檔接著練。
+- 建議開在 `tmux` 裡跑（`tmux new -s train`）：斷線了訓練還在，`tmux attach -t train` 回來一樣按 `p`、`q`。放在背景或排程執行、沒有視窗可以按鍵時，改用 `python3 train_gpu.py gongzhu pause`（或 Ctrl+C、kill）暫停。
+- **學什麼**：把每一局重排一遍，在玩家每次要做決定的時候，記下他當時看得到的東西和他選了什麼，讓模型學著猜。只學真人的決定；電腦對手的、按過「提示」才做的、麻將自動胡牌替玩家打的都不學（`--players all`、`--with-hints` 可以改）。`--ip <來源 IP>` 只用某一台裝置玩的紀錄。
+- **產出**在 `train_out/<遊戲>/`：`model.pt`（模型，驗證成績最好的那一輪）、`checkpoint.pt`（訓練進度，接著練用）、`log.csv`（每一輪的成績）、`status.json`（目前狀態）。`train_out/` 列在 `.gitignore` 裡，不會進 git。
+- 訓練完會顯示「沒練過的對局裡猜中玩家怎麼選的比例」，旁邊附上亂選的比例當對照。對局越多越準；只有幾十局時模型只能當參考。
+- 之後多了新的對局，再執行一次就會用全部的紀錄重新訓練（上一個模型留成 `model.previous.pt`）；紀錄沒變的話不會重練，要重練加 `--restart`。
+- 訓練的電腦和遊戲伺服器不是同一台時，把 `gaming_data/` 複製過去（它不在 git 裡），或用 `--data-dir` 指到紀錄的資料夾；`--out-dir` 可以改模型放哪裡。其他設定見 `python3 train_gpu.py --help`。
+
 ## 新增遊戲
 
 把單一檔案的網頁遊戲放進 `games/`，檔名就是網址：`games/foo.html` 對應 `http://<IP>:8686/foo`，不用重開伺服器。沒有登記在 `open_server.py` 的 `CATALOG` 裡的遊戲，會用網頁標題列在大廳的「其他」；想指定名稱、分類、圖示和說明，就在 `CATALOG` 加一筆。
 
-新遊戲要自動記錄，得自己交出紀錄：伺服器會在每個遊戲頁面放一個 `window.GameRecorder`，每一局開始時呼叫 `GameRecorder.begin(fn)`（`fn()` 回傳這一局目前的紀錄，打完時帶 `finished: true`；還沒有值得記的內容時回傳 `null`），一局結束、或還沒打完就要換掉這一局之前呼叫 `GameRecorder.end()`。現有七個遊戲的 `getRecord()`、`recordBegin()`、`recordEnd()` 可以照著寫。
+新遊戲要自動記錄，得自己交出紀錄：伺服器會在每個遊戲頁面放一個 `window.GameRecorder`，每一局開始時呼叫 `GameRecorder.begin(fn)`（`fn()` 回傳這一局目前的紀錄，打完時帶 `finished: true`；還沒有值得記的內容時回傳 `null`），一局結束、或還沒打完就要換掉這一局之前呼叫 `GameRecorder.end()`。現有七個遊戲的 `getRecord()`、`recordBegin()`、`recordEnd()` 可以照著寫。要讓 `train_gpu.py` 也能拿新遊戲的紀錄訓練，還要在 `train_gpu.py` 裡替它寫一個 `Game`（怎麼把一局紀錄重排成一個一個的決定），現有七個遊戲的可以參考。

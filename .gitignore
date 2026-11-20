@@ -6,5 +6,8 @@ server.pid
 # 自動記錄的對局資料（裡面有連線裝置的 IP，不要傳上去）
 gaming_data/
 
+# train_gpu.py 訓練出來的模型和訓練進度（檔案大，而且是從對局資料練出來的）
+train_out/
+
 # Python 快取
 __pycache__/

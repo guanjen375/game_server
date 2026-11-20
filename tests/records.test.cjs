@@ -691,3 +691,45 @@ for (const name of ['mahjong', 'mahjong-me']) {
         assert.ok(claims > 0 && kongs > 0 && flowers > 0, 'claims, kongs and flowers all occur');
     });
 }
+
+// train_gpu.py learns from these records, so it has to understand whatever a page records. A few rounds are
+// played on every real page, stored the way the server stores them, and handed to the trainer's own tests
+// (the PageRecords part of tests/test_train_gpu.py): every round must be readable, every decision of the
+// player found, and nothing a player cannot see may reach what the model is shown.
+test('train_gpu.py reads the rounds of every game', () => {
+    const os = require('node:os'), { spawnSync } = require('node:child_process');
+    const folder = fs.mkdtempSync(path.join(os.tmpdir(), 'game-records-'));
+    try {
+        let serial = 0;
+        const store = (name, { finished, ...round }) => {
+            const id = `20261120-${String(120000 + serial).padStart(6, '0')}-${(serial++).toString(36).padStart(6, '0')}`;
+            const saved = { game: name, id, status: finished ? 'finished' : 'unfinished', ip: '127.0.0.1', ua: 'node', ...round };
+            fs.mkdirSync(path.join(folder, name, '2026-11'), { recursive: true });
+            fs.writeFileSync(path.join(folder, name, '2026-11', `${id}.json`), JSON.stringify(saved));
+        };
+        for (const name of GAMES) {
+            const env = open(name, 11);
+            for (let round = 0; round < 3; round++) {
+                playRound(env);
+                store(name, env.recorder.rounds[round]);
+                env.driver.next(env.game);
+            }
+            // ... and a round the player walks away from after a few moves.
+            let left = null;
+            for (let tries = 0; !left; tries++) {
+                assert.ok(tries < 10, `${name}: no round lasts a few moves`);
+                for (let moves = 0; moves < 5 && wait(env); moves++) env.driver.act(env);
+                left = env.recorder.peek();
+                if (!left) env.driver.next(env.game);
+            }
+            store(name, left);
+        }
+        const run = spawnSync('python3', [path.join(ROOT, 'tests', 'test_train_gpu.py'), 'PageRecords'],
+            { env: { ...process.env, TRAIN_GPU_RECORDS: folder }, encoding: 'utf8' });
+        assert.equal(run.status, 0, `tests/test_train_gpu.py PageRecords failed:\n${run.stdout}${run.stderr}`);
+        assert.match(run.stderr, /Ran [1-9]\d* tests/);
+        assert.doesNotMatch(run.stderr, /skipped/, 'the page checks really ran');
+    } finally {
+        fs.rmSync(folder, { recursive: true, force: true });
+    }
+});
