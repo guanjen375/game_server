@@ -3,5 +3,8 @@ server.log
 server.log.1
 server.pid
 
+# 自動記錄的對局資料（裡面有連線裝置的 IP，不要傳上去）
+gaming_data/
+
 # Python 快取
 __pycache__/

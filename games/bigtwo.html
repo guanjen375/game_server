@@ -877,7 +877,7 @@ class BigTwoApp {
     document.addEventListener('keydown',e=>{if(this.modal||e.ctrlKey||e.altKey||e.metaKey||e.repeat)return;const k=e.key.toLowerCase();if(k==='escape'){this.clearSelection();return;}if(k==='enter'){if(e.target.closest('button')&&!e.target.closest('#hand'))return;e.preventDefault();this.playSelected();}else if(k==='p'){e.preventDefault();this.pass();}else if(k==='h'){e.preventDefault();this.hint();}});
   }
   tone(freq=520,duration=.08){if(!this.soundOn)return;try{if(!this.audio){const Audio=window.AudioContext||window.webkitAudioContext;if(!Audio)return;this.audio=new Audio();}if(this.audio.state==='suspended')this.audio.resume().catch(()=>{});const o=this.audio.createOscillator(),g=this.audio.createGain();o.type='sine';o.frequency.value=freq;g.gain.setValueAtTime(.045,this.audio.currentTime);g.gain.exponentialRampToValueAtTime(.001,this.audio.currentTime+duration);o.connect(g);g.connect(this.audio.destination);o.start();o.stop(this.audio.currentTime+duration);}catch(e){}}
-  newRound(){clearTimeout(this.timer);this.timer=null;this.round=new BigTwo.Round();this.selected.clear();this.undoStack=[];this.lastActions=Array(4).fill(null);this.hintIndex=0;this.hintKey='';this.result=null;this.render();this.scheduleAI();}
+  newRound(){this.recordEnd();clearTimeout(this.timer);this.timer=null;this.round=new BigTwo.Round();this.selected.clear();this.undoStack=[];this.lastActions=Array(4).fill(null);this.hintIndex=0;this.hintKey='';this.result=null;this.recordBegin();this.render();this.scheduleAI();}
   nextRound(){this.closeDialog();this.roundNumber++;this.newRound();}
   openDialog(id){clearTimeout(this.timer);this.timer=null;if(this.modal)this.modal.close();this.modal=$(id);this.modal.showModal();}
   closeDialog(){if(!this.modal)return;this.modal.close();this.modal=null;this.scheduleAI();}
@@ -959,9 +959,9 @@ class BigTwoApp {
   renderSelection(){const r=this.round,s=this.selection(),myTurn=r.turn===0&&!r.over&&!r.passed[0];const el=$('selectionInfo');el.className='selection-row';if(r.over){el.textContent='本局已結束，可以查看計分或開始下一局。';}else if(r.passed[0]){el.textContent='您已PASS，本輪不能再出牌，請等待下一輪。';}else if(!myTurn){el.textContent=s.cards.length?`已選 ${s.cards.length} 張 · 等待您的回合`:'等待電腦出牌，您也可以先選好手牌。';}else if(s.error){el.textContent=s.cards.length?s.error:(r.opening?'請選含 ♣3 的合法牌型':r.lastPlay?'選取同牌型接牌或切牌，也可按「不出」':'由您領出，單張或組合都可以');if(s.cards.length)el.classList.add('invalid');}else{el.textContent=`✓ ${s.combo.name} · ${s.cards.length} 張，可以出牌`;el.classList.add('valid');}$('playBtn').disabled=!myTurn||!!s.error;$('passBtn').disabled=!myTurn||!r.lastPlay;$('hintBtn').disabled=!myTurn;$('clearBtn').disabled=!this.selected.size;$('playBtn').textContent=s.cards.length?`出牌（${s.cards.length} 張）`:'出牌';}
   clearSelection(){this.selected.clear();this.refreshSelected();this.renderSelection();}
   playSelected(){if(this.modal||this.round.over||this.round.turn!==0||this.round.passed[0])return;const s=this.selection();if(s.error){this.toast(s.error);return;}this.performPlay(0,s.cards);}
-  performPlay(seat,cards){const combo=BigTwo.classify(cards);const newLead=!this.round.opening&&!this.round.lastPlay;const before=seat===0?this.snapshot():null;const out=this.round.play(seat,cards);if(!out.ok){this.toast(out.error);return false;}if(before)this.undoStack.push(before);if(newLead)this.lastActions=Array(4).fill(null);this.lastActions[seat]={type:'play',label:combo.name+' '+cards.map(c=>SUITS[c.suit].symbol+c.label).join(' ')};if(seat===0)this.selected.clear();this.hintKey='';this.tone(combo.size===5?740:560,.1);if(this.round.over){this.finish();return true;}this.render();this.scheduleAI();return true;}
+  performPlay(seat,cards){const combo=BigTwo.classify(cards);const newLead=!this.round.opening&&!this.round.lastPlay;const before=seat===0?this.snapshot():null;const out=this.round.play(seat,cards);if(!out.ok){this.toast(out.error);return false;}if(before)this.undoStack.push(before);if(seat===0&&this.hintKey)this.round.lastAction.hint=true;if(newLead)this.lastActions=Array(4).fill(null);this.lastActions[seat]={type:'play',label:combo.name+' '+cards.map(c=>SUITS[c.suit].symbol+c.label).join(' ')};if(seat===0)this.selected.clear();this.hintKey='';this.tone(combo.size===5?740:560,.1);if(this.round.over){this.finish();return true;}this.render();this.scheduleAI();return true;}
   pass(){if(this.modal||this.round.over||this.round.turn!==0||this.round.passed[0])return;if(!this.round.lastPlay){this.toast('輪到您自由領出，不能不出。');return;}this.performPass(0);}
-  performPass(seat){const before=seat===0?this.snapshot():null;const out=this.round.pass(seat);if(!out.ok){this.toast(out.error);return false;}if(before)this.undoStack.push(before);this.lastActions[seat]={type:'pass'};if(seat===0)this.selected.clear();this.hintKey='';this.tone(240,.06);if(!this.round.lastPlay){this.toast(`其他三家已PASS，由${SHORT[this.round.turn]}自由領出。`);}this.render();this.scheduleAI();return true;}
+  performPass(seat){const before=seat===0?this.snapshot():null;const out=this.round.pass(seat);if(!out.ok){this.toast(out.error);return false;}if(before)this.undoStack.push(before);if(seat===0&&this.hintKey){const a=this.round.actions;a[a.length-(out.reset?2:1)].hint=true;}this.lastActions[seat]={type:'pass'};if(seat===0)this.selected.clear();this.hintKey='';this.tone(240,.06);if(!this.round.lastPlay){this.toast(`其他三家已PASS，由${SHORT[this.round.turn]}自由領出。`);}this.render();this.scheduleAI();return true;}
   // 悔牌用：您每次出牌或不出之前，把牌局、四家最後的動作和已選的手牌記下來
   snapshot(){return {round:this.round.clone(),lastActions:this.lastActions.slice(),selected:[...this.selected]};}
   // 悔牌：回到您上一次出牌（或不出）之前，那之後電腦出的牌一起收回；可以連續按。一局結算之後不能悔牌。
@@ -976,7 +976,27 @@ class BigTwoApp {
   }
   hint(){if(this.modal||this.round.over||this.round.turn!==0||this.round.passed[0])return;const r=this.round,key=r.hands[0].map(c=>c.id).join(',')+'|'+(r.lastPlay?r.lastPlay.cards.map(c=>c.id).join(','):'free');const moves=BigTwo.legalMoves(r.hands[0],r.lastPlay,r.opening);if(!moves.length){this.clearSelection();this.toast('目前沒有能壓過的牌，請按「不出」。');return;}if(key!==this.hintKey){this.hintKey=key;this.hintIndex=0;const recommended=BigTwo.chooseMove(r.hands[0],r.lastPlay,{round:r,seat:0});if(recommended){const ids=recommended.map(c=>c.id).sort().join(',');const idx=moves.findIndex(m=>m.cards.map(c=>c.id).sort().join(',')===ids);if(idx>0)moves.unshift(...moves.splice(idx,1));}this.hintMoves=recommended||!r.lastPlay?moves:[null,...moves];}const move=this.hintMoves[this.hintIndex%this.hintMoves.length];this.hintIndex++;if(!move){this.clearSelection();this.toast('建議：這輪先不出，請按「不出」· 再按提示可看能出的牌');return;}this.selected=new Set(move.cards.map(c=>c.id));this.refreshSelected();this.renderSelection();this.toast(`建議：${move.name} · 再按提示可換一組`);}
   scheduleAI(){clearTimeout(this.timer);this.timer=null;if(this.modal||this.round.over||this.round.turn===0)return;const round=this.round,seat=round.turn;this.timer=setTimeout(()=>{this.timer=null;if(this.modal||this.round!==round||round.over||round.turn!==seat)return;const cards=BigTwo.chooseMove(round.hands[seat],round.lastPlay,{round,seat});if(cards&&cards.length)this.performPlay(seat,cards);else this.performPass(seat);},950);}
-  finish(){clearTimeout(this.timer);this.timer=null;this.result=this.round.scoreRound();this.stats.totals=this.stats.totals.map((n,i)=>n+this.result.deltas[i]);this.stats.played++;this.stats.history.push({winner:this.round.winner,deltas:this.result.deltas,number:this.stats.played});this.stats.history=this.stats.history.slice(-30);this.render();this.tone(this.round.winner===0?880:440,.3);this.showScore();}
+  finish(){clearTimeout(this.timer);this.timer=null;this.result=this.round.scoreRound();this.stats.totals=this.stats.totals.map((n,i)=>n+this.result.deltas[i]);this.stats.played++;this.stats.history.push({winner:this.round.winner,deltas:this.result.deltas,number:this.stats.played});this.stats.history=this.stats.history.slice(-30);this.recordEnd();this.render();this.tone(this.round.winner===0?880:440,.3);this.showScore();}
+  // 自動記錄用：這一局到目前為止的紀錄。牌的寫法是花色（C 梅花、D 方塊、H 紅心、S 黑桃）加點數，例如 C3 是梅花 3、S2 是黑桃 2。
+  // 座位 0 是您，1、2、3 是東、北、西家。hands 是發牌時四家各拿到的 13 張；actions 依順序是誰出了哪些牌（type 是牌型）或不出（pass）；
+  // 您按過「提示」才出（或不出）的那一手標 hint；totals 是這一局開始前的累計分數；result 的 left 是結束時各家剩下的牌。
+  // 這一局還沒打完、您也還沒出過牌或按過不出時回傳 null（只是打開頁面，不用記）
+  getRecord(){
+    const r=this.round,acts=r.actions.filter(a=>a.type!=='reset'),ids=cards=>cards.map(c=>c.id);
+    if(!r.over&&!acts.some(a=>a.seat===0))return null;
+    const result=r.over&&this.result?this.result:null;
+    return {
+      finished:r.over,round:this.roundNumber,players:NAMES.map((name,seat)=>({name,ai:seat!==0})),
+      hands:r.hands.map((hand,seat)=>ids(BigTwo.sortCards(hand.concat(...acts.filter(a=>a.seat===seat&&a.type==='play').map(a=>a.cards))))),
+      totals:this.stats.totals.map((n,seat)=>n-(result?result.deltas[seat]:0)),
+      actions:acts.map(a=>{const e=a.type==='play'?{seat:a.seat,cards:ids(a.cards),type:a.combo.type}:{seat:a.seat,pass:true};if(a.hint)e.hint=true;return e;}),
+      result:result&&{winner:r.winner,deltas:result.deltas,remaining:result.remaining,multipliers:result.multipliers,left:r.hands.map(ids)}
+    };
+  }
+  // 自動記錄：每一局開始時 recordBegin()，結束（或還沒打完就重新開始）時 recordEnd()，
+  // 紀錄交給遊戲伺服器加在頁面上的 GameRecorder 存檔。單獨開啟這個檔案時沒有 GameRecorder，就不記錄
+  recordBegin(){if(window.GameRecorder)window.GameRecorder.begin(()=>this.getRecord());}
+  recordEnd(){if(window.GameRecorder)window.GameRecorder.end();}
   showScore(){const r=this.round,ended=r.over;const totals=this.stats.totals;let html='';$('scoreTitle').textContent=ended?'🏆 本局結算':'🏆 累計計分板';$('scoreSubtitle').textContent=`已完成 ${this.stats.played} 局`;
     if(ended)html+=`<div class="score-banner"><div class="trophy">${r.winner===0?'🏆':'👏'}</div><h3>${r.winner===0?'恭喜，您贏了！':SHORT[r.winner]+'獲得本局勝利'}</h3><p>先出完手牌，收下本局所有分數。</p></div>`;
     html+='<table class="score-table"><thead><tr><th>玩家</th><th>剩餘手牌</th><th>本局</th><th>累計</th></tr></thead><tbody>';

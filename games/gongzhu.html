@@ -1881,6 +1881,7 @@
              * 開始新的一局
              */
             startRound() {
+                this.recordEnd();
                 this.cancelTimers();
                 const deck = this.createShuffledDeck();
                 this.trickNumber = 1;
@@ -1909,6 +1910,7 @@
                 });
 
                 this.currentTurn = club2Holder;
+                this.recordBegin();
                 this.updateHeaderInfo();
                 this.renderAllPlayers();
 
@@ -1958,14 +1960,15 @@
                 const isLegal = legalCards.some(c => c.id === cardId);
                 if (!isLegal) return;
 
+                const hinted = this.hintCardId !== null;
                 this.hintCardId = null;
-                this.playCardFromSeat('south', cardId);
+                this.playCardFromSeat('south', cardId, hinted);
             }
 
             /**
-             * 執行指定座位的出牌動作
+             * 執行指定座位的出牌動作（hinted：玩家按過「提示」才出這張，自動記錄時會標出來）
              */
-            playCardFromSeat(seat, cardId) {
+            playCardFromSeat(seat, cardId, hinted = false) {
                 const player = this.PLAYERS[seat];
                 const cardIdx = player.hand.findIndex(c => c.id === cardId);
                 if (cardIdx === -1) return;
@@ -1978,7 +1981,7 @@
                     this.leadSuit = card.suit;
                 }
 
-                this.currentTrick.push({ seat, card });
+                this.currentTrick.push(hinted ? { seat, card, hint: true } : { seat, card });
                 this.sound.playCard();
 
                 // 特殊牌出場音效
@@ -2192,8 +2195,65 @@
 
                 this.roundHistory.unshift(roundSummary);
                 this.roundOver = true;
+                this.recordEnd();
                 this.renderAllPlayers();
                 this.openScoreModal(true);
+            }
+
+            /**
+             * 自動記錄用：這一局到目前為止的紀錄。
+             * 牌的寫法是花色（S 黑桃、H 紅心、C 梅花、D 方塊）加點數（2～14，J、Q、K、A 是 11～14），例如 S12 是豬、D11 是羊、C10 是變壓器。
+             * seats 是出牌順序；hands 是發牌時四家各拿到的 13 張；tricks 是每一墩依出牌順序誰出了哪一張
+             * （您按過「提示」才出的那一張標 hint）；totals 是這一局開始前的累計總分。
+             * 這一局還沒打完、您也還沒出過牌時回傳 null（只是打開頁面，不用記）
+             */
+            getRecord() {
+                const tricks = this.tricksSoFar();
+                if (!this.roundOver && !tricks.some(trick => trick.some(t => t.seat === 'south'))) return null;
+                const scores = this.calculateRoundScores();
+                const record = {
+                    finished: this.roundOver,
+                    round: this.roundNumber,
+                    settings: { scoringRuleMode: this.scoringRuleMode },
+                    seats: this.SEAT_ORDER,
+                    players: {},
+                    hands: {},
+                    totals: {},
+                    tricks: tricks.map(trick => trick.map(t => (
+                        t.hint ? { seat: t.seat, card: t.card.id, hint: true } : { seat: t.seat, card: t.card.id }
+                    ))),
+                    result: null
+                };
+                for (const seat of this.SEAT_ORDER) {
+                    const p = this.PLAYERS[seat];
+                    const played = tricks.flatMap(trick => trick.filter(t => t.seat === seat).map(t => t.card));
+                    record.players[seat] = { name: p.name, ai: p.isAI };
+                    record.hands[seat] = this.sortCards(played.concat(p.hand)).map(c => c.id);
+                    record.totals[seat] = p.totalScore - (this.roundOver ? scores[seat].score : 0);
+                }
+                if (this.roundOver) {
+                    record.result = {};
+                    for (const seat of this.SEAT_ORDER) {
+                        record.result[seat] = {
+                            score: scores[seat].score,
+                            formula: scores[seat].formula,
+                            captured: this.PLAYERS[seat].captured.map(c => c.id)
+                        };
+                    }
+                }
+                return record;
+            }
+
+            /**
+             * 自動記錄：每一局開始時 recordBegin()，結束（或還沒打完就重新開始）時 recordEnd()，
+             * 紀錄交給遊戲伺服器加在頁面上的 GameRecorder 存檔。單獨開啟這個檔案時沒有 GameRecorder，就不記錄
+             */
+            recordBegin() {
+                if (window.GameRecorder) window.GameRecorder.begin(() => this.getRecord());
+            }
+
+            recordEnd() {
+                if (window.GameRecorder) window.GameRecorder.end();
             }
 
             /**
@@ -2643,6 +2703,7 @@
              * 重置整場比賽與所有累計分數
              */
             resetFullMatch() {
+                this.recordEnd();
                 this.closeConfirmModal();
                 this.closeScoreModal();
                 this.roundNumber = 1;

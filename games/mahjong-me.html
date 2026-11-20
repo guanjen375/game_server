@@ -1381,6 +1381,9 @@
                 this.autoWin = false;     // 自動胡牌：聽牌後摸什麼打什麼、能胡就胡（每局開始時關掉）
                 this.timer = null;
                 this.undoStack = [];      // 悔牌用：每次等您決定（出牌、吃碰槓胡過）時的牌局，每局開始時清空
+                this.actionLog = [];      // 自動記錄用：這一局依序發生的事（摸牌、補花、打牌、吃碰槓、過），每局開始時清空
+                this.dealt = [];          // 自動記錄用：發完牌、還沒補花時四家的手牌
+                this.hintShown = false;   // 自動記錄用：您這次做決定之前按過「提示」
                 this.history = [];
                 this.lastResult = null;
                 this.htmlCache = new Map();
@@ -1434,9 +1437,24 @@
             }
 
             /**
+             * 自動記錄用：記下這一局發生的一件事（seat 是誰、action 是什麼動作、tile 是哪張牌，寫法見 getRecord）。
+             * 您的決定（打牌、吃碰槓、過）如果是自動胡牌替您做的標 auto，按過「提示」才做的標 hint
+             */
+            log(seat, action, tile, more) {
+                const entry = Object.assign({ s: seat, a: action, t: tile }, more);
+                if (seat === 0 && action !== 'draw' && action !== 'flower') {
+                    if (this.autoWin) entry.auto = true;
+                    else if (this.hintShown) entry.hint = true;
+                }
+                this.hintShown = false;
+                this.actionLog.push(entry);
+            }
+
+            /**
              * 重新開始：分數歸零、擲骰決定起莊，從第一將東風圈打起（不限圈數）
              */
             newMatch() {
+                this.recordEnd();
                 clearTimeout(this.timer);
                 const [base, perTai] = this.settings.stake.split('/').map(Number);
                 this.stake = { base, perTai };
@@ -1458,6 +1476,7 @@
              * 開始新的一局：洗牌、每人發 16 張、從莊家開始補花，莊家摸第 17 張
              */
             startHand() {
+                this.recordEnd();
                 clearTimeout(this.timer);
                 this.undoStack = [];
                 this.handNo++;
@@ -1485,6 +1504,9 @@
                     }
                 }
                 for (const p of this.players) p.hand = sortTiles(p.hand);
+                this.dealt = this.players.map(p => p.hand.slice());
+                this.actionLog = [];
+                this.hintShown = false;
                 this.phase = 'idle';
                 this.turn = this.dealer;
                 this.lastDiscard = null;
@@ -1495,6 +1517,7 @@
                 this.hintTile = null;
                 this.autoWin = false;
                 this.lastResult = null;
+                this.recordBegin();
                 this.render();
                 const dealer = this.players[this.dealer];
                 this.showCenterBanner(`🀄 ${this.roundLabel()} 開始！莊家：${dealer.short}${this.dealerStreak ? `（連 ${this.dealerStreak}）` : ''}`, 'bg-amber-400 text-slate-950');
@@ -1527,6 +1550,7 @@
                         return false;
                     }
                     p.hand.push(t);
+                    this.log(seat, 'draw', t, { back: true });
                 }
                 p.hand = sortTiles(p.hand);
                 return true;
@@ -1536,6 +1560,7 @@
             revealFlower(seat, f) {
                 const p = this.players[seat];
                 p.flowers.push(f);
+                this.log(seat, 'flower', f);
                 this.sound.playFlower();
                 if (p.flowers.length === 8) {
                     if (!this.canWin(seat, null)) return true;
@@ -1570,11 +1595,13 @@
                 const p = this.players[seat];
                 let t = this.takeTile(fromBack);
                 if (t === null) return this.exhaustiveDraw();
+                this.log(seat, 'draw', t, fromBack ? { back: true } : null);
                 while (isFlower(t)) {
                     if (!this.revealFlower(seat, t)) return;
                     this.showCenterBanner(`🌸 ${p.short} 補花：${tileName(t)}`, 'bg-pink-500 text-white');
                     t = this.takeTile(true);
                     if (t === null) return this.exhaustiveDraw();
+                    this.log(seat, 'draw', t, { back: true });
                 }
                 p.hand.push(t);
                 p.drawn = t;
@@ -1642,6 +1669,7 @@
                 if (kind === 'concealed') {
                     for (let k = 0; k < 4; k++) p.hand.splice(p.hand.indexOf(tile), 1);
                     p.melds.push({ type: 'kong', tiles: [tile, tile, tile, tile], concealed: true, from: seat });
+                    this.log(seat, 'concealedKong', tile);
                     this.afterKong(seat, '暗槓');
                     return;
                 }
@@ -1670,6 +1698,7 @@
                 const meld = p.melds.find(m => m.type === 'pung' && m.tiles[0] === tile);
                 meld.type = 'kong';
                 meld.tiles.push(tile);
+                this.log(seat, 'addedKong', tile);
                 this.afterKong(seat, '加槓');
             }
 
@@ -1691,6 +1720,7 @@
                 const p = this.players[from];
                 p.hand.splice(p.hand.indexOf(tile), 1);
                 p.drawn = null;
+                this.log(from, 'addedKong', tile, { robbed: true });
                 this.finishWin({ winners, payer: from, winTile: tile, selfDraw: false, flags: { robKong: true }, addTile: true });
             }
 
@@ -1699,6 +1729,7 @@
                 if (this.phase !== 'rob' || !this.claim) return;
                 this.pushUndo();
                 const { seat, tile, robbers } = this.claim;
+                if (!yes) this.log(0, 'pass', tile, { from: seat, rob: true });
                 const winners = yes ? robbers : robbers.filter(q => q !== 0);
                 if (winners.length) this.robKong(winners, seat, tile);
                 else this.completeAddedKong(seat, tile);
@@ -1713,6 +1744,7 @@
                 p.hand = sortTiles(p.hand);
                 p.drawn = null;
                 p.discards.push(tile);
+                this.log(seat, 'discard', tile);
                 this.lastDiscard = { seat, tile, last: this.drawable() <= 0 };
                 this.selectedIndex = -1;
                 this.hintTile = null;
@@ -1783,6 +1815,7 @@
             humanClaim(action, comboIndex = 0) {
                 if (this.phase !== 'claim' || !this.claim || !this.claim.humanOpt) return;
                 this.pushUndo();
+                if (action === 'pass') this.log(0, 'pass', this.claim.tile, { from: this.claim.seat });
                 const resp = action === 'chow' ? { type: 'chow', combo: this.claim.humanOpt.chows[comboIndex] } : action;
                 this.claim.responses.set(0, resp);
                 this.claim.humanOpt = null;
@@ -1817,6 +1850,7 @@
                     tiles = new Array(n + 1).fill(tile);
                 }
                 p.melds.push({ type: kind, tiles, concealed: false, from, claimed: tile });
+                this.log(q, kind, tile, kind === 'chow' ? { from, using: combo } : { from });
                 p.drawn = null;
                 this.noClaims = false;
                 this.claim = null;
@@ -1924,6 +1958,7 @@
                 result.totals = this.players.map(p => p.score);
                 this.lastResult = result;
                 this.history.unshift(result);
+                this.recordEnd();
 
                 if (result.type === 'draw') {
                     this.sound.playExhausted();
@@ -1963,6 +1998,60 @@
             nextHand() {
                 this.closeModal('resultModal');
                 this.startHand();
+            }
+
+            /**
+             * 自動記錄用：這一局到目前為止的紀錄。
+             * 牌的編號：0～8 一萬到九萬、9～17 一筒到九筒、18～26 一條到九條、27～30 東南西北、31～33 中發白、34～41 春夏秋冬梅蘭竹菊。
+             * 座位 0 是您，1、2、3 依序是下家、對家、上家（players 也照這個順序；score 是這一局開始前的累計分數）。
+             * dealer 是莊家的座位、dealerStreak 是連莊次數、jiang 是第幾將；roundWind（圈風）和各家的 wind（門風）0～3 是東南西北。
+             * wall 是洗好的整副牌：發牌和摸牌從前面拿，補花和槓後補牌從後面拿。dealt 是發完牌、還沒補花時四家的手牌。
+             * actions 依發生的順序，s 是座位、a 是動作、t 是牌：
+             *   draw 摸牌（back：從牌尾補的）、flower 亮出花牌、discard 打牌、
+             *   chow／pung／kong 吃、碰、槓別人打的牌（from 是誰打的，using 是吃牌時用手上的哪兩張）、
+             *   concealedKong 暗槓、addedKong 加槓（robbed：被搶槓，沒槓成）、pass 您按了「過」（rob：可以搶槓但不搶）。
+             *   您的決定如果是自動胡牌替您做的標 auto，按過「提示」才做的標 hint。
+             * 這一局還沒結束、您也還沒做過任何決定時回傳 null（只是打開頁面，不用記）
+             */
+            getRecord() {
+                const r = this.phase === 'end' ? this.lastResult : null;
+                if (!r && !this.actionLog.some(e => e.s === 0 && e.a !== 'draw' && e.a !== 'flower')) return null;
+                return {
+                    finished: !!r,
+                    round: this.handNo,
+                    label: this.roundLabel(),
+                    settings: this.settings,
+                    stake: this.stake,
+                    jiang: this.jiang,
+                    roundWind: this.roundWind,
+                    dealer: this.dealer,
+                    dealerStreak: this.dealerStreak,
+                    players: this.players.map((p, seat) => ({
+                        name: p.short, ai: p.isAI, wind: this.seatWind(seat), score: p.score - (r ? r.delta[seat] : 0),
+                        hand: p.hand, melds: p.melds, flowers: p.flowers, discards: p.discards
+                    })),
+                    wall: this.wall,
+                    dealt: this.dealt,
+                    actions: this.actionLog,
+                    result: r && {
+                        type: r.type,
+                        winners: (r.wins || []).map(w => ({ seat: w.winner, tai: w.tai.tai, items: w.tai.items })),
+                        payer: r.payer, selfDraw: r.selfDraw, winTile: r.winTile, special: r.special,
+                        delta: r.delta, totals: r.totals, notes: r.notes
+                    }
+                };
+            }
+
+            /**
+             * 自動記錄：每一局開始時 recordBegin()，結束（或還沒打完就重新開始）時 recordEnd()，
+             * 紀錄交給遊戲伺服器加在頁面上的 GameRecorder 存檔。單獨開啟這個檔案時沒有 GameRecorder，就不記錄
+             */
+            recordBegin() {
+                if (window.GameRecorder) window.GameRecorder.begin(() => this.getRecord());
+            }
+
+            recordEnd() {
+                if (window.GameRecorder) window.GameRecorder.end();
             }
 
             /* ===================== 畫面繪製 ===================== */
@@ -2550,7 +2639,8 @@
                     })),
                     head: this.head, tail: this.tail,
                     turn: this.turn, phase: this.phase, turnFlags: { ...this.turnFlags }, noClaims: this.noClaims,
-                    lastDiscard: this.lastDiscard && { ...this.lastDiscard }, claim
+                    lastDiscard: this.lastDiscard && { ...this.lastDiscard }, claim,
+                    logLength: this.actionLog.length
                 });
             }
 
@@ -2580,6 +2670,8 @@
                 this.noClaims = s.noClaims;
                 this.lastDiscard = s.lastDiscard;
                 this.claim = s.claim;
+                this.actionLog.length = s.logLength;
+                this.hintShown = false;
                 const wasAuto = this.autoWin;
                 this.autoWin = false;
                 this.selectedIndex = -1;
@@ -2617,6 +2709,7 @@
                 if (this.phase === 'claim' && this.claim && this.claim.humanOpt) {
                     const d = MahjongAI.decideClaim(this, 0, this.claim.humanOpt, this.claim.tile, 'hard');
                     const text = d === 'win' ? '胡！' : d === 'kong' ? '槓' : d === 'pung' ? '碰' : d && d.type === 'chow' ? '吃' : '過（不要）';
+                    this.hintShown = true;
                     this.showCenterBanner(`💡 建議：${text}`, 'bg-sky-500 text-slate-950');
                     return;
                 }
@@ -2624,6 +2717,7 @@
                     this.showCenterBanner('⏳ 輪到您出牌時才能使用提示', 'bg-slate-800 text-amber-300');
                     return;
                 }
+                this.hintShown = true;
                 if (this.selfOptions(0).win) {
                     this.showCenterBanner('💡 可以自摸了！按下「自摸」', 'bg-sky-500 text-slate-950');
                     return;

@@ -14,18 +14,24 @@ Tailscale 內網的裝置用瀏覽器打開 http://<這台的 Tailscale IP>:8686
 每個遊戲有自己的路徑：games/<名稱>.html 對應 http://<IP>:8686/<名稱>。
 新增遊戲只要把 .html 放進 games/，不用重開伺服器。
 
+每一局打完（或打到一半離開）會自動記錄下來，存在 gaming_data/<遊戲>/<年-月>/ 底下，一局一個 JSON 檔；
+--data-dir 可以改存放位置。
+
 這個程式不會設定開機自動啟動；重新開機後要再執行一次。
 """
 
 import argparse
 import errno
 import gzip
+import hashlib
 import html
+import json
 import os
 import re
 import signal
 import subprocess
 import sys
+import threading
 import time
 from datetime import datetime
 from http import HTTPStatus
@@ -40,6 +46,12 @@ GAMES_DIR = BASE_DIR / "games"
 PID_FILE = BASE_DIR / "server.pid"
 LOG_FILE = BASE_DIR / "server.log"
 LOG_MAX_BYTES = 1_000_000
+
+# 對局紀錄：預設存在專案裡的 gaming_data/（不進 git），--data-dir 可以改
+DATA_DIR = BASE_DIR / "gaming_data"
+RECORD_MAX_BYTES = 2_000_000    # 一局紀錄的大小上限（實際上一局只有幾 KB 到幾十 KB）
+RECORD_ID_RE = re.compile(r"\d{8}-\d{6}-[a-z0-9]{6}")    # 開局時間＋亂碼，例如 20261120-164512-k3f9x2
+RECORD_LOCK = threading.Lock()
 
 # 已知遊戲的顯示資料；games/ 裡其他的 .html 會用網頁標題列在「其他」
 CATALOG = {
@@ -214,6 +226,166 @@ HOME_BUTTON = """<script>
 </script>
 """
 
+# 插在每個遊戲頁面的 <head>：自動記錄對局（__GAME__、__BUILD__ 由 add_lobby_links 填入）。
+# 遊戲在每一局開始時呼叫 GameRecorder.begin(fn)，一局結束、或還沒打完就要換掉這一局之前呼叫 GameRecorder.end()；
+# fn() 回傳這一局目前的紀錄。這裡負責編號和送到伺服器，送不出去的先留在瀏覽器，連得上時再送
+RECORDER = """<script>
+/* 遊戲伺服器加入：自動記錄對局 */
+window.GameRecorder = (function () {
+    var API = '/api/records/', GAME = '__GAME__', BUILD = '__BUILD__';
+    var PREFIX = 'game_record:';    // 還沒送到伺服器的紀錄放在 localStorage 的 game_record:<遊戲>:<編號>
+    var RETRY_MS = 60000;
+    var session = token(8), current = null, memory = {}, failed = {}, beaconed = {}, busy = false, timer = null;
+
+    function token(length) {
+        var chars = 'abcdefghijklmnopqrstuvwxyz0123456789', text = '';
+        for (var i = 0; i < length; i++) text += chars.charAt(Math.floor(Math.random() * chars.length));
+        return text;
+    }
+
+    // 玩家裝置上的時間，例如 2026-11-20T16:45:12+08:00
+    function clock() {
+        var d = new Date(), offset = -d.getTimezoneOffset(), minutes = Math.abs(offset);
+        function pad(n) { return (n < 10 ? '0' : '') + n; }
+        return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate())
+            + 'T' + pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds())
+            + (offset < 0 ? '-' : '+') + pad(Math.floor(minutes / 60)) + ':' + pad(minutes % 60);
+    }
+
+    // 瀏覽器不給用 localStorage（無痕模式、空間滿了）時改放在記憶體，這個頁面開著的期間照樣會送
+    function read(key) {
+        if (key in memory) return memory[key];
+        try { return localStorage.getItem(key); } catch (e) { return null; }
+    }
+    function keep(key, text) {
+        try { localStorage.setItem(key, text); delete memory[key]; } catch (e) { memory[key] = text; }
+    }
+    function drop(key) {
+        delete memory[key];
+        delete beaconed[key];
+        try { localStorage.removeItem(key); } catch (e) {}
+    }
+
+    // 還沒送到伺服器的紀錄（包含之前開頁面時留下的），舊的排前面
+    function waiting() {
+        var keys = Object.keys(memory);
+        try {
+            for (var i = 0; i < localStorage.length; i++) {
+                var key = localStorage.key(i);
+                if (key && key.indexOf(PREFIX) === 0 && keys.indexOf(key) < 0) keys.push(key);
+            }
+        } catch (e) {}
+        return keys.sort(function (a, b) {
+            a = a.slice(a.lastIndexOf(':'));
+            b = b.slice(b.lastIndexOf(':'));
+            return a < b ? -1 : a > b ? 1 : 0;
+        });
+    }
+
+    // 之前沒送成功的全部再試一次
+    function retry() {
+        failed = {};
+        send();
+    }
+
+    // 一次送一筆。伺服器收下了，或明講這一筆永遠不收（格式不對、沒有這個遊戲、太大），就從瀏覽器刪掉；
+    // 其他情況（連不上、伺服器出錯）先跳過，一分鐘後（或網路恢復、回到這個頁面時）再試
+    function send() {
+        if (busy) return;
+        var key = waiting().filter(function (k) { return !failed[k]; })[0];
+        if (!key) return;
+        var body = read(key), game = key.split(':')[1];
+        if (!body || !game) { drop(key); send(); return; }
+        busy = true;
+        function done(received) {
+            busy = false;
+            if (!received) {
+                failed[key] = true;
+                if (!timer) timer = setTimeout(function () { timer = null; retry(); }, RETRY_MS);
+            } else if (read(key) === body) {
+                drop(key);      // 送的途中這一局又有新的進度時先不刪，下一輪送新的
+            }
+            send();
+        }
+        try {
+            fetch(API + game, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: body })
+                .then(function (response) {
+                    done(response.ok || response.status === 400 || response.status === 404 || response.status === 413);
+                }, function () { done(false); });
+        } catch (e) {
+            done(false);
+        }
+    }
+
+    // 把這一局目前的樣子存下來準備送出；內容和上次一樣就不用再送
+    function save() {
+        if (!current) return;
+        var record = current.snapshot();
+        if (!record) return;
+        var text = JSON.stringify(record);
+        if (text === current.saved) return;
+        current.saved = text;
+        var out = {
+            id: current.id, seq: ++current.seq, session: session, build: BUILD,
+            status: record.finished ? 'finished' : 'unfinished', started: current.started, ended: clock()
+        };
+        for (var name in record) {
+            if (name !== 'finished' && !(name in out)) out[name] = record[name];
+        }
+        var key = PREFIX + GAME + ':' + current.id;
+        keep(key, JSON.stringify(out));
+        delete failed[key];
+    }
+
+    // 離開頁面（關掉、切到別的 App、回大廳）：先存下打到一半的這一局，再用 sendBeacon 送，頁面關掉了也送得出去。
+    // sendBeacon 不知道伺服器有沒有收到，所以紀錄先留在瀏覽器，下次開頁面時 send() 確認過才刪
+    function leave() {
+        save();
+        var queued = !!navigator.sendBeacon;
+        if (queued) {
+            waiting().slice(-5).forEach(function (key) {
+                var body = read(key);
+                if (!body || beaconed[key] === body) return;
+                if (navigator.sendBeacon(API + key.split(':')[1], body)) beaconed[key] = body;
+                else queued = false;    // 太大或瀏覽器排不進去
+            });
+        }
+        if (!queued) send();
+    }
+
+    // 記錄出錯不可以影響遊戲
+    function quiet(fn) {
+        return function (arg) {
+            try { fn(arg); } catch (e) { if (window.console) console.error('GameRecorder', e); }
+        };
+    }
+
+    document.addEventListener('visibilitychange', quiet(function () {
+        if (document.visibilityState === 'hidden') leave(); else retry();
+    }));
+    window.addEventListener('pagehide', quiet(leave));
+    window.addEventListener('online', quiet(retry));
+    quiet(send)();
+
+    return {
+        // 新的一局開始。snapshot() 回傳這一局目前的紀錄；還沒有值得記的內容時回傳 null
+        begin: quiet(function (snapshot) {
+            var started = clock();
+            current = {
+                id: started.slice(0, 19).replace(/[-:]/g, '').replace('T', '-') + '-' + token(6),
+                started: started, seq: 0, saved: '', snapshot: snapshot
+            };
+        }),
+        // 這一局結束，或還沒打完就要換掉：記下最後的樣子，之後不再更新這一局
+        end: quiet(function () {
+            try { save(); } finally { current = null; }
+            send();
+        })
+    };
+})();
+</script>
+"""
+
 
 def now():
     return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -351,12 +523,81 @@ def insert_before(page, marker, extra, last):
     return page if index < 0 else page[:index] + extra + page[index:]
 
 
+def page_version(page):
+    """遊戲檔的版本編號，記在每一局的紀錄裡（build），之後分得出這一局是哪一版的規則和電腦打的。
+
+    用的是 git 的 blob 編號：`git log --all --find-object=<編號>` 可以查到是哪一次 commit 的檔案。
+    """
+    return hashlib.sha1(b"blob %d\0" % len(page) + page).hexdigest()
+
+
 def add_lobby_links(page, game):
-    """在遊戲頁面加上主畫面名稱、分頁圖示和回大廳按鈕（不改動 games/ 裡的檔案）。"""
+    """在遊戲頁面加上主畫面名稱、分頁圖示、自動記錄和回大廳按鈕（不改動 games/ 裡的檔案）。"""
+    recorder = RECORDER.replace("__GAME__", game["slug"]).replace("__BUILD__", page_version(page))
     head = (f'<meta name="apple-mobile-web-app-title" content="{html.escape(game["name"])}">'
-            f'<link rel="icon" href="{icon_uri(game["icon"])}">')
+            f'<link rel="icon" href="{icon_uri(game["icon"])}">{recorder}')
     page = insert_before(page, b"</head>", head.encode(), last=False)
     return insert_before(page, b"</body>", HOME_BUTTON.encode(), last=True)
+
+
+def dump_record(record):
+    """紀錄寫成 JSON：一個欄位一行；欄位內容是一串動作（或四家的手牌）時一筆一行，直接打開就看得懂。"""
+    def compact(value):
+        return json.dumps(value, ensure_ascii=False, separators=(",", ":"))
+
+    lines = []
+    for key, value in record.items():
+        if isinstance(value, list) and value and all(isinstance(item, (dict, list)) for item in value):
+            text = "[\n" + ",\n".join("  " + compact(item) for item in value) + "\n ]"
+        else:
+            text = compact(value)
+        lines.append(f" {compact(key)}: {text}")
+    return "{\n" + ",\n".join(lines) + "\n}\n"
+
+
+def reject_constant(name):
+    """紀錄裡不收 NaN、Infinity（不是標準 JSON，存下來別的程式讀不了）。"""
+    raise ValueError(name)
+
+
+def store_record(data_dir, game, record, address, agent):
+    """把遊戲頁面送來的一局存成 <data_dir>/<遊戲>/<年-月>/<編號>.json。
+
+    同一局可能送來不只一次（打到一半離開頁面時先存一次進度，回來打完再存一次），只留 seq 最大的那一份。
+    回傳這次有沒有寫入；內容不合格式時丟出 ValueError。
+    """
+    if not isinstance(record, dict):
+        raise ValueError("not an object")
+    record_id, seq = record.get("id"), record.get("seq")
+    if not isinstance(record_id, str) or not RECORD_ID_RE.fullmatch(record_id):
+        raise ValueError("id")
+    datetime.strptime(record_id[:15], "%Y%m%d-%H%M%S")    # 編號開頭要是真的日期時間（也決定存進哪個月的資料夾）
+    if type(seq) is not int or seq < 0:
+        raise ValueError("seq")
+
+    # 這幾欄由伺服器決定，排在最前面；其餘照遊戲頁面送來的內容
+    saved = {
+        "game": game, "id": record_id,
+        "status": "finished" if record.get("status") == "finished" else "unfinished",
+        "started": record.get("started"), "ended": record.get("ended"),
+        "saved": datetime.now().astimezone().isoformat(timespec="seconds"),
+        "ip": address, "ua": agent,
+    }
+    saved.update((key, value) for key, value in record.items() if key not in saved)
+
+    path = data_dir / game / f"{record_id[:4]}-{record_id[4:6]}" / f"{record_id}.json"
+    with RECORD_LOCK:
+        try:
+            previous = json.loads(path.read_text(encoding="utf-8"))
+            if isinstance(previous, dict) and type(previous.get("seq")) is int and previous["seq"] >= seq:
+                return False
+        except (OSError, ValueError):
+            pass    # 還沒存過這一局（或舊檔讀不出來）：直接寫
+        path.parent.mkdir(parents=True, exist_ok=True)
+        temporary = path.with_name(path.name + ".tmp")
+        temporary.write_text(dump_record(saved), encoding="utf-8")
+        os.replace(temporary, path)    # 寫完整份才換上去，不會留下寫到一半的檔案
+    return True
 
 
 class GameHandler(BaseHTTPRequestHandler):
@@ -371,6 +612,52 @@ class GameHandler(BaseHTTPRequestHandler):
 
     def do_HEAD(self):
         self.respond(send_body=False)
+
+    def do_POST(self):
+        path = unquote(urlsplit(self.path).path)
+        if path.startswith("/api/records/"):
+            return self.receive_record(path[len("/api/records/"):])
+        self.send_text(HTTPStatus.NOT_FOUND, "not found")
+
+    def receive_record(self, name):
+        """遊戲頁面送來的一局紀錄（POST /api/records/<遊戲>）：存進對局紀錄資料夾。"""
+        try:
+            length = int(self.headers.get("Content-Length", ""))
+        except ValueError:
+            return self.send_text(HTTPStatus.LENGTH_REQUIRED, "Content-Length required")
+        if length > 10 * RECORD_MAX_BYTES:    # 大得離譜的不收，直接斷線
+            self.close_connection = True
+            return self.send_text(HTTPStatus.REQUEST_ENTITY_TOO_LARGE, "record too large")
+        body = self.rfile.read(max(length, 0))    # 先把內容收完再回應，對方才收得到被拒絕的原因
+        if length > RECORD_MAX_BYTES:
+            return self.send_text(HTTPStatus.REQUEST_ENTITY_TOO_LARGE, "record too large")
+        # 只收遊戲頁面自己送來的：別的網站的網頁不能叫瀏覽器往這裡寫資料
+        origin = self.headers.get("Origin")
+        if origin is not None and urlsplit(origin).netloc != self.headers.get("Host"):
+            return self.send_text(HTTPStatus.FORBIDDEN, "cross-site request")
+        game = find_game(name)
+        if game is None:
+            return self.send_text(HTTPStatus.NOT_FOUND, "unknown game")
+        try:
+            record = json.loads(body, parse_constant=reject_constant)
+            written = store_record(self.server.data_dir, game["slug"], record,
+                                   self.client_address[0], self.headers.get("User-Agent", ""))
+        except (ValueError, RecursionError) as e:
+            return self.send_text(HTTPStatus.BAD_REQUEST, f"bad record: {e}")
+        except OSError as e:
+            print(f"[{now()}] 對局紀錄寫入失敗：{e}", flush=True)
+            return self.send_text(HTTPStatus.INTERNAL_SERVER_ERROR, "cannot save the record")
+        self.send_text(HTTPStatus.OK, "saved" if written else "already saved")
+
+    def send_text(self, status, text):
+        body = text.encode()
+        self.send_response(status)
+        self.send_header("Content-Type", "text/plain; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("X-Content-Type-Options", "nosniff")
+        self.end_headers()
+        self.wfile.write(body)
 
     def respond(self, send_body):
         path = unquote(urlsplit(self.path).path)
@@ -413,6 +700,7 @@ class GameHandler(BaseHTTPRequestHandler):
 class GameServer(ThreadingHTTPServer):
     daemon_threads = True
     allow_reuse_port = False  # 同一個 port 不能被第二個伺服器搶走
+    data_dir = DATA_DIR       # 對局紀錄存放的資料夾
 
     def handle_error(self, request, client_address):
         # 手機切換 App 或關掉分頁時常會中斷連線，不必印出錯誤
@@ -460,7 +748,7 @@ def log_tail(lines=10):
         return ""
 
 
-def run(host, port):
+def run(host, port, data_dir=DATA_DIR):
     """在前景執行伺服器，直到 Ctrl+C 或收到 SIGTERM。"""
     GAMES_DIR.mkdir(exist_ok=True)
     deadline = time.monotonic() + 60
@@ -480,10 +768,12 @@ def run(host, port):
                 print(f"無法開啟伺服器：{e}", flush=True)
             return 1
 
+    server.data_dir = data_dir
     PID_FILE.write_text(f"{os.getpid()} {host} {port}\n")
     signal.signal(signal.SIGTERM, lambda *_: sys.exit(0))
     print(f"[{now()}] 遊戲伺服器已啟動", flush=True)
     print_urls(host, port)
+    print(f"對局紀錄存放在：{data_dir}", flush=True)
     try:
         server.serve_forever()
     except KeyboardInterrupt:
@@ -499,7 +789,7 @@ def run(host, port):
     return 0
 
 
-def start(host, port):
+def start(host, port, data_dir=DATA_DIR):
     """在背景開啟伺服器（新的 session，關掉終端機也不會停）。"""
     running = read_pid_file()
     if running:
@@ -510,7 +800,8 @@ def start(host, port):
     rotate_log()
     with LOG_FILE.open("ab") as log:
         proc = subprocess.Popen(
-            [sys.executable, "-u", str(SCRIPT_PATH), "run", "--host", host, "--port", str(port)],
+            [sys.executable, "-u", str(SCRIPT_PATH), "run", "--host", host, "--port", str(port),
+             "--data-dir", str(data_dir)],
             cwd=BASE_DIR, stdin=subprocess.DEVNULL, stdout=log, stderr=subprocess.STDOUT,
             start_new_session=True,
         )
@@ -525,6 +816,7 @@ def start(host, port):
         if running and running[0] == proc.pid:
             print(f"遊戲伺服器已在背景啟動（PID {proc.pid}），紀錄檔：{LOG_FILE}")
             print_urls(host, port)
+            print(f"對局紀錄存放在：{data_dir}")
             return 0
         time.sleep(0.2)
     print(f"遊戲伺服器正在等待 Tailscale 連線（PID {proc.pid}），稍後用 `python3 {SCRIPT_PATH.name} status` 查看。")
@@ -566,6 +858,7 @@ def main():
                         help="start（預設，背景執行）、stop、status、restart、run（前景執行）")
     parser.add_argument("--port", type=int, help=f"port（預設 {DEFAULT_PORT}）")
     parser.add_argument("--host", help="監聽的位址（預設：自動抓這台的 Tailscale IP，只有 Tailscale 內網連得到）")
+    parser.add_argument("--data-dir", help="對局紀錄存放的資料夾（預設：這個程式旁邊的 gaming_data/）")
     args = parser.parse_args()
 
     if args.command == "status":
@@ -583,9 +876,10 @@ def main():
     if args.command == "restart":
         stop()
     port = args.port or (previous[2] if previous else DEFAULT_PORT)
+    data_dir = Path(args.data_dir).expanduser().resolve() if args.data_dir else DATA_DIR
     if args.command == "run":
-        return run(host, port)
-    return start(host, port)
+        return run(host, port, data_dir)
+    return start(host, port, data_dir)
 
 
 if __name__ == "__main__":

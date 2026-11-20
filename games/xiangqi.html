@@ -1547,6 +1547,7 @@
              * 開始新的一局：32 枚棋子擺回原位，紅方先走
              */
             startRound() {
+                this.recordEnd();
                 this.cancelAI();
                 const side = this.settings.side;
                 const southColor = side === 'red' ? RED : side === 'black' ? BLACK : (this.roundNumber % 2 === 1 ? RED : BLACK);
@@ -1580,6 +1581,7 @@
                 this.movingId = null;
                 this.freshCapture = null;
                 XiangqiAI.reset();
+                this.recordBegin();
 
                 this.drawBoardLines();
                 this.buildPieces();
@@ -1633,6 +1635,7 @@
                 const mover = this.pieces[this.idAt[from]];
                 if (!player.isAI) this.pushUndo();
 
+                const hinted = !player.isAI && this.hint !== null;
                 const notation = this.notation(from, to);
                 const capId = this.idAt[to];
                 let captured = null;
@@ -1657,11 +1660,13 @@
                 this.movingId = mover.id;
 
                 const givesCheck = Engine.kingAttacked(this.rulesState(), opp);
-                this.moveLog.push({
-                    ply: this.ply, color, text: notation,
+                const entry = {
+                    ply: this.ply, color, from, to, kind: mover.kind, text: notation,
                     captured: captured ? { color: captured.color, kind: captured.kind } : null,
                     check: givesCheck
-                });
+                };
+                if (hinted) entry.hint = true;
+                this.moveLog.push(entry);
                 this.history.push({ key: positionKey(this.board, opp), check: givesCheck, color });
 
                 // 音效與中央提示
@@ -1754,6 +1759,7 @@
                     colors: { south: this.PLAYERS.south.color, north: this.PLAYERS.north.color },
                     names: { south: this.PLAYERS.south.name, north: this.PLAYERS.north.name }
                 });
+                this.recordEnd();
 
                 if (!winnerSeat) {
                     this.sound.playDraw();
@@ -1768,6 +1774,41 @@
                 setTimeout(() => {
                     if (this.gameOver) this.openScoreModal();
                 }, 1700);
+            }
+
+            /**
+             * 自動記錄用：這一局到目前為止的紀錄。
+             * moves 每一手：color 0 紅、1 黑；from／to 是棋盤上的點（列 × 9 ＋ 行，第 0 列是黑方底線、第 9 列是紅方底線）；
+             * kind 1～7 是帥仕相傌俥炮兵；text 是中文棋譜；玩家按過「提示」才走的那一手標 hint。
+             * 這一局還沒下完、玩家也還沒走過任何一手時回傳 null（只是打開頁面，不用記）
+             */
+            getRecord() {
+                if (!this.gameOver && !this.moveLog.some(m => !this.playerOf(m.color).isAI)) return null;
+                const players = {};
+                for (const seat of this.SEATS) {
+                    const p = this.PLAYERS[seat];
+                    players[seat] = { name: p.name, ai: p.isAI, color: p.color };
+                }
+                return {
+                    finished: this.gameOver,
+                    round: this.roundNumber,
+                    settings: this.settings,
+                    players,
+                    moves: this.moveLog,
+                    result: this.result
+                };
+            }
+
+            /**
+             * 自動記錄：每一局開始時 recordBegin()，結束（或還沒下完就重新開始）時 recordEnd()，
+             * 紀錄交給遊戲伺服器加在頁面上的 GameRecorder 存檔。單獨開啟這個檔案時沒有 GameRecorder，就不記錄
+             */
+            recordBegin() {
+                if (window.GameRecorder) window.GameRecorder.begin(() => this.getRecord());
+            }
+
+            recordEnd() {
+                if (window.GameRecorder) window.GameRecorder.end();
             }
 
             /**
@@ -2413,6 +2454,7 @@
              * 重置整場比賽與雙方戰績
              */
             resetFullMatch() {
+                this.recordEnd();
                 this.closeConfirmModal();
                 this.closeScoreModal();
                 this.roundNumber = 1;

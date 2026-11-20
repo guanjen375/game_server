@@ -1523,6 +1523,7 @@
              * 開始新的一局：中央交叉擺好黑白各 2 子，先手方執黑
              */
             startRound() {
+                this.recordEnd();
                 this.cancelAI();
                 this.board = Engine.createBoard();
                 this.moveNumber = 1;
@@ -1544,6 +1545,7 @@
                 this.PLAYERS[this.other(starter)].color = WHITE;
                 this.turn = starter;
 
+                this.recordBegin();
                 this.renderAll();
                 this.showCenterBanner(`⚫ 第 ${this.roundNumber} 局開始！由【${this.PLAYERS[starter].name}】執黑先下`, 'bg-amber-400 text-slate-950');
                 this.scheduleAI(1300);
@@ -1585,12 +1587,14 @@
                 if (!flips.length) return false;
                 if (!player.isAI) this.pushUndo();
 
+                const entry = { n: this.moveNumber, seat, color, sq, flips: flips.length };
+                if (!player.isAI && this.hint >= 0) entry.hint = true;
                 this.hint = -1;
                 this.board[sq] = color;
                 for (const f of flips) this.board[f] = color;
                 this.lastMove = { sq, color };
                 this.pendingAnim = { sq, flips };
-                this.moveLog.push({ n: this.moveNumber, seat, color, sq, flips: flips.length });
+                this.moveLog.push(entry);
                 this.moveNumber++;
 
                 // 落子聲，接著依距離一圈一圈的翻面聲
@@ -1655,6 +1659,7 @@
                     colors: { south: this.PLAYERS.south.color, north: this.PLAYERS.north.color },
                     names: { south: this.PLAYERS.south.name, north: this.PLAYERS.north.name }
                 });
+                this.recordEnd();
                 this.renderAll();
 
                 const scoreText = `黑 ${black} : 白 ${white}`;
@@ -1674,6 +1679,41 @@
                 setTimeout(() => {
                     if (this.gameOver) this.openScoreModal(true);
                 }, 2300);
+            }
+
+            /**
+             * 自動記錄用：這一局到目前為止的紀錄。
+             * moves 每一手：color 1 黑、2 白；sq 是下在哪一格（列 × 8 ＋ 行，左上角是 0）；flips 是翻了幾子；
+             * 沒地方下而跳過的那一手是 { pass: true }；玩家按過「提示」才下的那一手標 hint。
+             * 這一局還沒下完、玩家也還沒下過任何一手時回傳 null（只是打開頁面，不用記）
+             */
+            getRecord() {
+                if (!this.gameOver && !this.moveLog.some(e => !e.pass && !this.PLAYERS[e.seat].isAI)) return null;
+                const players = {};
+                for (const seat of this.SEATS) {
+                    const p = this.PLAYERS[seat];
+                    players[seat] = { name: p.name, ai: p.isAI, color: p.color };
+                }
+                return {
+                    finished: this.gameOver,
+                    round: this.roundNumber,
+                    settings: this.settings,
+                    players,
+                    moves: this.moveLog,
+                    result: this.result
+                };
+            }
+
+            /**
+             * 自動記錄：每一局開始時 recordBegin()，結束（或還沒下完就重新開始）時 recordEnd()，
+             * 紀錄交給遊戲伺服器加在頁面上的 GameRecorder 存檔。單獨開啟這個檔案時沒有 GameRecorder，就不記錄
+             */
+            recordBegin() {
+                if (window.GameRecorder) window.GameRecorder.begin(() => this.getRecord());
+            }
+
+            recordEnd() {
+                if (window.GameRecorder) window.GameRecorder.end();
             }
 
             onCellClick(sq) {
@@ -2149,6 +2189,7 @@
              * 重置整場比賽與雙方戰績
              */
             resetFullMatch() {
+                this.recordEnd();
                 this.closeConfirmModal();
                 this.closeScoreModal();
                 this.roundNumber = 1;

@@ -1863,6 +1863,7 @@
              * 開始新的一局：32 枚棋子全部蓋牌，先手方翻棋決定陣營
              */
             startRound() {
+                this.recordEnd();
                 this.cancelAI();
                 this.state = Engine.createState();
                 this.dealHidden();
@@ -1888,6 +1889,7 @@
                     : (this.roundNumber % 2 === 1 ? 'south' : 'north');
                 this.turn = starter;
 
+                this.recordBegin();
                 this.renderAll();
                 this.showCenterBanner(`♟️ 第 ${this.roundNumber} 局開始！由【${this.PLAYERS[starter].name}】先翻棋`, 'bg-amber-400 text-slate-950');
                 this.scheduleAI(1300);
@@ -1951,6 +1953,36 @@
                 setTimeout(() => URL.revokeObjectURL(url), 1000);
             }
 
+            /**
+             * 自動記錄用：這一局到目前為止的紀錄，內容和「匯出本局棋譜」一樣，另外寫明雙方是誰、下完了沒。
+             * moves 每一手：kind 是 flip（翻棋）、move（走子）或 capture（吃子）；sq、from、to 是格子（列 × 8 ＋ 行，左上角是 0）；
+             * code 是棋子（1～7 紅方帥仕相俥傌炮兵，8～14 黑方將士象車馬包卒）；color 0 紅、1 黑；電腦走的那一手附上它的思考統計（analysis）；
+             * 玩家按過「提示」才走的那一手標 hint。
+             * 這一局還沒下完、玩家也還沒走過任何一手時回傳 null（只是打開頁面，不用記）
+             */
+            getRecord() {
+                if (!this.gameOver && !this.moveLog.some(e => !this.PLAYERS[e.seat].isAI)) return null;
+                const record = this.getPublicRecord();
+                record.finished = this.gameOver;
+                record.players = {};
+                for (const seat of this.SEATS) {
+                    record.players[seat] = { name: this.PLAYERS[seat].name, ai: this.PLAYERS[seat].isAI };
+                }
+                return record;
+            }
+
+            /**
+             * 自動記錄：每一局開始時 recordBegin()，結束（或還沒下完就重新開始）時 recordEnd()，
+             * 紀錄交給遊戲伺服器加在頁面上的 GameRecorder 存檔。單獨開啟這個檔案時沒有 GameRecorder，就不記錄
+             */
+            recordBegin() {
+                if (window.GameRecorder) window.GameRecorder.begin(() => this.getRecord());
+            }
+
+            recordEnd() {
+                if (window.GameRecorder) window.GameRecorder.end();
+            }
+
             // 給電腦參考的本局紀錄（避免重複走同樣的路線）
             aiHistory() {
                 return { positions: this.positionHistory, log: this.moveLog };
@@ -1993,9 +2025,11 @@
                 const oppSeat = this.other(seat), opponent = this.PLAYERS[oppSeat];
                 if (!player.isAI) this.pushUndo();
 
+                const hinted = !player.isAI && this.hint !== null;
                 this.hint = null;
                 this.selectedSq = -1;
                 const entry = { n: this.moveNumber, seat, kind: action.type };
+                if (hinted) entry.hint = true;
                 if (analysis) entry.analysis = JSON.parse(JSON.stringify(analysis));
 
                 if (action.type === 'flip') {
@@ -2121,6 +2155,7 @@
                     colors: { south: this.PLAYERS.south.color, north: this.PLAYERS.north.color },
                     names: { south: this.PLAYERS.south.name, north: this.PLAYERS.north.name }
                 });
+                this.recordEnd();
 
                 if (!winnerSeat) {
                     this.sound.playDraw();
@@ -2777,6 +2812,7 @@
              * 重置整場比賽與雙方戰績
              */
             resetFullMatch() {
+                this.recordEnd();
                 this.closeConfirmModal();
                 this.closeScoreModal();
                 this.roundNumber = 1;
