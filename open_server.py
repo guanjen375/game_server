@@ -17,6 +17,10 @@ Tailscale 內網的裝置用瀏覽器打開 http://<這台的 Tailscale IP>:8686
 每一局打完（或打到一半離開）會自動記錄下來，存在 gaming_data/<遊戲>/<年-月>/ 底下，一局一個 JSON 檔；
 --data-dir 可以改存放位置。
 
+train_out/<遊戲>/model.pt（train_gpu.py 練出來的模型）放著就能用：那個遊戲裡「電腦的打法」多了模型可以選
+（正常、較弱兩種），選了之後電腦每一手都照模型出牌。模型檔換了不用重開伺服器；--model-dir 可以改放模型的資料夾。
+用 status 可以看現在哪些遊戲有模型可以選。
+
 這個程式不會設定開機自動啟動；重新開機後要再執行一次。
 """
 
@@ -33,11 +37,19 @@ import subprocess
 import sys
 import threading
 import time
+import traceback
+import urllib.request
 from datetime import datetime
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import quote, unquote, urlsplit
+
+try:
+    import model_bot
+except Exception as error:      # 訓練程式出問題時伺服器照常開，只是遊戲裡沒有模型可以選
+    model_bot = None
+    print(f"照模型出牌的功能沒有開（{type(error).__name__}：{error}）", flush=True)
 
 DEFAULT_PORT = 8686
 SCRIPT_PATH = Path(__file__).resolve()
@@ -182,6 +194,11 @@ h2::after { content: ""; flex: 1; height: 1px; background: rgba(251, 191, 36, 0.
     align-self: flex-start; margin-top: 3px; padding: 1px 8px; border-radius: 6px;
     font: 600 12px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
     color: #fcd34d; background: rgba(251, 191, 36, 0.12);
+}
+/* 這個遊戲的電腦可以改成照訓練好的模型出牌 */
+.model {
+    align-self: flex-start; margin-top: 3px; padding: 1px 8px; border-radius: 6px;
+    font-size: 12px; font-weight: 700; color: #bae6fd; background: rgba(56, 189, 248, 0.16);
 }
 .empty { color: #a7d3b8; }
 /* 中文在標點處換行，不把「不允許」這類詞拆開 */
@@ -386,6 +403,100 @@ window.GameRecorder = (function () {
 </script>
 """
 
+# 插在每個遊戲頁面的 <head>：讓電腦照訓練好的模型出牌（__GAME__ 由 add_lobby_links 填入）。
+# 玩家在遊戲裡選了模型的話，遊戲輪到電腦時呼叫 GameBot.choose(這一局到目前為止的紀錄, 輪到的座位, 打法)，
+# 拿到的是模型選的那一手；伺服器上沒有模型、連不上、太久沒回答時拿到 null，遊戲就用自己原本的電腦。
+# 遊戲頁面不用它也沒關係
+BOT = """<script>
+/* 遊戲伺服器加入：電腦照訓練好的模型出牌 */
+window.GameBot = (function () {
+    var API = '/api/bot/__GAME__';
+    var WAIT_MS = 2500;     // 等伺服器回答最久多久，超過就當作連不上
+    var REST_MS = 30000;    // 連不上之後隔多久才再問；這段時間電腦用遊戲自己的打法，不會每一手都卡住
+    var model = null, why = null, restUntil = 0, watchers = [];
+
+    function changed() {
+        watchers.forEach(function (fn) {
+            try { fn(); } catch (e) { if (window.console) console.error('GameBot', e); }
+        });
+    }
+    function learn(next, reason) {
+        var before = JSON.stringify([model, why]);
+        model = next || null;
+        why = reason || null;
+        if (JSON.stringify([model, why]) !== before) changed();
+    }
+    function rest() {
+        restUntil = Date.now() + REST_MS;
+        setTimeout(changed, REST_MS + 50);
+        changed();
+    }
+
+    // 問伺服器一次。回傳 Promise：{ status, body }；連不上、太久沒回答、回的不是 JSON 都是 null
+    function ask(options) {
+        return new Promise(function (resolve) {
+            var settled = false, abort = window.AbortController ? new AbortController() : null;
+            function settle(value) {
+                if (settled) return;
+                settled = true;
+                clearTimeout(timer);
+                resolve(value);
+            }
+            var timer = setTimeout(function () {
+                settle(null);
+                if (abort) abort.abort();
+            }, WAIT_MS);
+            if (abort) options.signal = abort.signal;
+            try {
+                fetch(API, options).then(function (response) {
+                    return response.json().then(function (body) { settle({ status: response.status, body: body }); });
+                }).catch(function () { settle(null); });
+            } catch (e) {
+                settle(null);
+            }
+        });
+    }
+
+    var api = {
+        // 伺服器上這個遊戲的模型：{ id, saved, rounds, decisions, accuracy, chance, finished }；沒有可以用的是 null
+        model: function () { return model; },
+        // 有模型檔卻不能用的原因；沒有這種情況是 null
+        why: function () { return why; },
+        // 剛剛連不上伺服器，暫時不問
+        resting: function () { return Date.now() < restUntil; },
+        // 模型換了、沒了，或連不上、恢復的時候呼叫 fn()
+        watch: function (fn) { watchers.push(fn); },
+        // 問伺服器現在有沒有模型。遊戲每一局開始時要問一次（沒問過就當作沒有模型）；模型換了不用重新整理頁面
+        refresh: function () {
+            return ask({ method: 'GET' }).then(function (answer) {
+                if (answer && answer.body) learn(answer.status === 200 && answer.body.model, answer.body.why);
+            });
+        },
+        // 這一手模型出什麼。record：這一局到目前為止的紀錄；seat：輪到的那一家；mode：'normal'（正常）或 'weak'（較弱）。
+        // 回傳 Promise：{ play: 寫進紀錄的那一筆, mode, model: 模型的編號 }；沒有模型、連不上、伺服器不收時是 null
+        choose: function (record, seat, mode) {
+            if (!model || api.resting()) return Promise.resolve(null);
+            var body;
+            try {
+                body = JSON.stringify({ record: record, seat: seat, mode: mode });
+            } catch (e) {
+                return Promise.resolve(null);
+            }
+            var options = { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: body };
+            return ask(options).then(function (answer) {
+                if (!answer || answer.status >= 500) { rest(); return null; }
+                if (answer.status === 404) { learn(null, null); return null; }      // 模型被拿掉了
+                if (answer.status !== 200 || !answer.body || !answer.body.play) return null;
+                if (model && answer.body.model !== model.id) api.refresh();        // 模型換了一個：更新說明
+                return answer.body;
+            });
+        }
+    };
+    return api;
+})();
+</script>
+"""
+
 
 def now():
     return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -478,19 +589,22 @@ def page_shell(title, icon, body):
 </html>"""
 
 
-def game_card(game):
+def game_card(game, modelled=False):
+    tag = '<span class="model">可以和模型對打</span>' if modelled else ""
     return (f'<a class="card" href="/{game["slug"]}">'
             f'<span class="icon {game["style"]}">{html.escape(game["icon"])}</span>'
             f'<span class="info"><span class="name">{html.escape(game["name"])}</span>'
             f'<span class="desc">{html.escape(game["desc"])}</span>'
-            f'<span class="path">/{game["slug"]}</span></span></a>')
+            f'<span class="path">/{game["slug"]}</span>{tag}</span></a>')
 
 
-def lobby_page(address):
+def lobby_page(address, bots=None):
+    """bots：伺服器的模型（model_bot.Bots）；有模型可以選的遊戲在卡片上標出來。"""
     games = find_games()
     sections = []
     for category in dict.fromkeys(game["category"] for game in games):
-        cards = "".join(game_card(game) for game in games if game["category"] == category)
+        cards = "".join(game_card(game, bool(bots and bots.info(game["slug"])["model"]))
+                        for game in games if game["category"] == category)
         sections.append(f'<section><h2>{html.escape(category)}</h2><div class="grid">{cards}</div></section>')
     content = "".join(sections) or '<p class="empty">games/ 資料夾裡還沒有遊戲。</p>'
     body = f"""<header class="top">
@@ -532,10 +646,10 @@ def page_version(page):
 
 
 def add_lobby_links(page, game):
-    """在遊戲頁面加上主畫面名稱、分頁圖示、自動記錄和回大廳按鈕（不改動 games/ 裡的檔案）。"""
+    """在遊戲頁面加上主畫面名稱、分頁圖示、自動記錄、照模型出牌和回大廳按鈕（不改動 games/ 裡的檔案）。"""
     recorder = RECORDER.replace("__GAME__", game["slug"]).replace("__BUILD__", page_version(page))
     head = (f'<meta name="apple-mobile-web-app-title" content="{html.escape(game["name"])}">'
-            f'<link rel="icon" href="{icon_uri(game["icon"])}">{recorder}')
+            f'<link rel="icon" href="{icon_uri(game["icon"])}">{recorder}{BOT.replace("__GAME__", game["slug"])}')
     page = insert_before(page, b"</head>", head.encode(), last=False)
     return insert_before(page, b"</body>", HOME_BUTTON.encode(), last=True)
 
@@ -617,10 +731,12 @@ class GameHandler(BaseHTTPRequestHandler):
         path = unquote(urlsplit(self.path).path)
         if path.startswith("/api/records/"):
             return self.receive_record(path[len("/api/records/"):])
+        if path.startswith("/api/bot/"):
+            return self.bot_play(path[len("/api/bot/"):])
         self.send_text(HTTPStatus.NOT_FOUND, "not found")
 
-    def receive_record(self, name):
-        """遊戲頁面送來的一局紀錄（POST /api/records/<遊戲>）：存進對局紀錄資料夾。"""
+    def read_body(self):
+        """遊戲頁面 POST 過來的內容。不收的（沒寫長度、太大、別的網站的網頁送來的）回應原因後回傳 None。"""
         try:
             length = int(self.headers.get("Content-Length", ""))
         except ValueError:
@@ -635,6 +751,13 @@ class GameHandler(BaseHTTPRequestHandler):
         origin = self.headers.get("Origin")
         if origin is not None and urlsplit(origin).netloc != self.headers.get("Host"):
             return self.send_text(HTTPStatus.FORBIDDEN, "cross-site request")
+        return body
+
+    def receive_record(self, name):
+        """遊戲頁面送來的一局紀錄（POST /api/records/<遊戲>）：存進對局紀錄資料夾。"""
+        body = self.read_body()
+        if body is None:
+            return
         game = find_game(name)
         if game is None:
             return self.send_text(HTTPStatus.NOT_FOUND, "unknown game")
@@ -649,6 +772,52 @@ class GameHandler(BaseHTTPRequestHandler):
             return self.send_text(HTTPStatus.INTERNAL_SERVER_ERROR, "cannot save the record")
         self.send_text(HTTPStatus.OK, "saved" if written else "already saved")
 
+    def bot_info(self, name, send_body=True):
+        """這個遊戲現在有沒有模型可以用（GET /api/bot/<遊戲>）：{"model": 模型的說明或 null, "why": 不能用的原因}。"""
+        game = find_game(name)
+        if game is None:
+            return self.send_json(HTTPStatus.NOT_FOUND, {"error": "unknown game"}, send_body)
+        bots = self.server.bots
+        self.send_json(HTTPStatus.OK, bots.info(game["slug"]) if bots else {"model": None, "why": None}, send_body)
+
+    def bot_play(self, name):
+        """輪到電腦，問模型這一手出什麼（POST /api/bot/<遊戲>，內容是 {"record": 這一局到目前為止的紀錄,
+        "seat": 輪到的座位, "mode": "normal" 或 "weak"}）。這個遊戲沒有模型時回 404，遊戲頁面就用自己的電腦。"""
+        body = self.read_body()
+        if body is None:
+            return
+        game, bots = find_game(name), self.server.bots
+        if game is None:
+            return self.send_json(HTTPStatus.NOT_FOUND, {"error": "unknown game"})
+        if not bots:
+            return self.send_json(HTTPStatus.NOT_FOUND, {"error": "no model"})
+        try:
+            asked = json.loads(body, parse_constant=reject_constant)
+            if not isinstance(asked, dict):
+                raise ValueError("not an object")
+            answer = bots.play(game["slug"], asked.get("record"), asked.get("seat"), asked.get("mode", "normal"))
+        except (ValueError, RecursionError) as e:
+            return self.send_json(HTTPStatus.BAD_REQUEST, {"error": f"bad request: {e}"})
+        except model_bot.Refused as e:
+            return self.send_json(HTTPStatus.BAD_REQUEST, {"error": str(e)})
+        except Exception:       # 模型算到一半出錯：記下來，遊戲頁面會改用自己的電腦
+            print(f"[{now()}] 模型出牌失敗（{game['slug']}）：\n{traceback.format_exc()}", flush=True)
+            return self.send_json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": "the model failed"})
+        if not answer:
+            return self.send_json(HTTPStatus.NOT_FOUND, {"error": "no model"})
+        self.send_json(HTTPStatus.OK, answer)
+
+    def send_json(self, status, value, send_body=True):
+        body = json.dumps(value, ensure_ascii=False).encode()
+        self.send_response(status)
+        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("X-Content-Type-Options", "nosniff")
+        self.end_headers()
+        if send_body:
+            self.wfile.write(body)
+
     def send_text(self, status, text):
         body = text.encode()
         self.send_response(status)
@@ -662,7 +831,9 @@ class GameHandler(BaseHTTPRequestHandler):
     def respond(self, send_body):
         path = unquote(urlsplit(self.path).path)
         if path in ("/", "/index.html"):
-            return self.send_page(HTTPStatus.OK, lobby_page(self.headers.get("Host", "")), send_body)
+            return self.send_page(HTTPStatus.OK, lobby_page(self.headers.get("Host", ""), self.server.bots), send_body)
+        if path.startswith("/api/bot/"):
+            return self.bot_info(path[len("/api/bot/"):], send_body)
         if path == "/favicon.ico":
             self.send_response(HTTPStatus.NO_CONTENT)
             self.end_headers()
@@ -693,6 +864,12 @@ class GameHandler(BaseHTTPRequestHandler):
         if send_body:
             self.wfile.write(body)
 
+    def log_request(self, code="-", size="-"):
+        # 電腦每出一張牌就問一次模型：問成功的不記（不然紀錄檔全是這個），出錯的照記
+        if getattr(self, "path", "").startswith("/api/bot/") and getattr(code, "value", code) == HTTPStatus.OK:
+            return
+        super().log_request(code, size)
+
     def log_message(self, format, *args):
         print(f"[{now()}] {self.client_address[0]} {format % args}", flush=True)
 
@@ -701,6 +878,7 @@ class GameServer(ThreadingHTTPServer):
     daemon_threads = True
     allow_reuse_port = False  # 同一個 port 不能被第二個伺服器搶走
     data_dir = DATA_DIR       # 對局紀錄存放的資料夾
+    bots = None               # 訓練好的模型（model_bot.Bots）；None＝沒有模型可以選，電腦都用遊戲頁面自己的打法
 
     def handle_error(self, request, client_address):
         # 手機切換 App 或關掉分頁時常會中斷連線，不必印出錯誤
@@ -733,6 +911,44 @@ def print_urls(host, port):
         print(f"  {base}/{game['slug']:<12}{game['name']}", flush=True)
 
 
+def describe_model(info):
+    """一個遊戲的模型寫成一行人看的話（info 是 GET /api/bot/<遊戲> 的內容）；沒有模型檔時回傳 None。"""
+    model = info.get("model")
+    if not model:
+        return f"有模型檔但不能用：{info['why']}" if info.get("why") else None
+    text = f"用 {model.get('rounds')} 局練的模型"
+    if model.get("saved"):
+        text += f"（{str(model['saved'])[:16].replace('T', ' ')} 存檔）"
+    if model.get("accuracy") is not None:
+        text += f"，沒練過的對局裡猜中 {model['accuracy']:.1%}"
+    return text + ("" if model.get("finished") else "，還沒練完")
+
+
+def print_models(infos, folder=None):
+    """哪些遊戲有模型可以選。infos：{遊戲的顯示名稱: GET /api/bot/<遊戲> 的內容}。"""
+    lines = [f"  {name}：{text}" for name, text in ((name, describe_model(info)) for name, info in infos.items()) if text]
+    where = f"（{folder}）" if folder else ""
+    if lines:
+        print(f"可以選模型當電腦的遊戲{where}（在遊戲的規則說明或計分板裡選「電腦的打法」）：", flush=True)
+        for line in lines:
+            print(line, flush=True)
+    else:
+        print(f"還沒有訓練好的模型{where}：電腦都是遊戲內建的打法。"
+              "train_out/<遊戲>/model.pt 放進來，遊戲裡就能選模型當電腦。", flush=True)
+
+
+def ask_models(host, port):
+    """問執行中的伺服器它現在用哪些模型（它自己最清楚用的是哪個資料夾）；問不到（例如還是舊版）回傳 None。"""
+    infos = {}
+    for game in find_games():
+        try:
+            with urllib.request.urlopen(f"http://{host}:{port}/api/bot/{quote(game['slug'])}", timeout=3) as response:
+                infos[game["name"]] = json.load(response)
+        except (OSError, ValueError):
+            return None
+    return infos
+
+
 def rotate_log():
     try:
         if LOG_FILE.stat().st_size > LOG_MAX_BYTES:
@@ -748,7 +964,7 @@ def log_tail(lines=10):
         return ""
 
 
-def run(host, port, data_dir=DATA_DIR):
+def run(host, port, data_dir=DATA_DIR, model_dir=None):
     """在前景執行伺服器，直到 Ctrl+C 或收到 SIGTERM。"""
     GAMES_DIR.mkdir(exist_ok=True)
     deadline = time.monotonic() + 60
@@ -769,11 +985,14 @@ def run(host, port, data_dir=DATA_DIR):
             return 1
 
     server.data_dir = data_dir
+    server.bots = model_bot.Bots(model_dir) if model_bot else None
     PID_FILE.write_text(f"{os.getpid()} {host} {port}\n")
     signal.signal(signal.SIGTERM, lambda *_: sys.exit(0))
     print(f"[{now()}] 遊戲伺服器已啟動", flush=True)
     print_urls(host, port)
     print(f"對局紀錄存放在：{data_dir}", flush=True)
+    if server.bots:
+        print_models({game["name"]: server.bots.info(game["slug"]) for game in find_games()}, server.bots.folder)
     try:
         server.serve_forever()
     except KeyboardInterrupt:
@@ -789,7 +1008,7 @@ def run(host, port, data_dir=DATA_DIR):
     return 0
 
 
-def start(host, port, data_dir=DATA_DIR):
+def start(host, port, data_dir=DATA_DIR, model_dir=None):
     """在背景開啟伺服器（新的 session，關掉終端機也不會停）。"""
     running = read_pid_file()
     if running:
@@ -801,7 +1020,7 @@ def start(host, port, data_dir=DATA_DIR):
     with LOG_FILE.open("ab") as log:
         proc = subprocess.Popen(
             [sys.executable, "-u", str(SCRIPT_PATH), "run", "--host", host, "--port", str(port),
-             "--data-dir", str(data_dir)],
+             "--data-dir", str(data_dir), *(["--model-dir", str(model_dir)] if model_dir else [])],
             cwd=BASE_DIR, stdin=subprocess.DEVNULL, stdout=log, stderr=subprocess.STDOUT,
             start_new_session=True,
         )
@@ -817,6 +1036,9 @@ def start(host, port, data_dir=DATA_DIR):
             print(f"遊戲伺服器已在背景啟動（PID {proc.pid}），紀錄檔：{LOG_FILE}")
             print_urls(host, port)
             print(f"對局紀錄存放在：{data_dir}")
+            infos = ask_models(host, port)
+            if infos is not None:
+                print_models(infos)
             return 0
         time.sleep(0.2)
     print(f"遊戲伺服器正在等待 Tailscale 連線（PID {proc.pid}），稍後用 `python3 {SCRIPT_PATH.name} status` 查看。")
@@ -848,6 +1070,11 @@ def status():
         return 1
     print(f"遊戲伺服器執行中（PID {running[0]}）")
     print_urls(running[1], running[2])
+    infos = ask_models(running[1], running[2])
+    if infos is None:
+        print(f"問不到這個伺服器有哪些模型。它如果是更新之前開的，要重新啟動才能選模型：python3 {SCRIPT_PATH.name} restart")
+    else:
+        print_models(infos)
     return 0
 
 
@@ -859,6 +1086,7 @@ def main():
     parser.add_argument("--port", type=int, help=f"port（預設 {DEFAULT_PORT}）")
     parser.add_argument("--host", help="監聽的位址（預設：自動抓這台的 Tailscale IP，只有 Tailscale 內網連得到）")
     parser.add_argument("--data-dir", help="對局紀錄存放的資料夾（預設：這個程式旁邊的 gaming_data/）")
+    parser.add_argument("--model-dir", help="訓練好的模型放在哪個資料夾（預設：這個程式旁邊的 train_out/）")
     args = parser.parse_args()
 
     if args.command == "status":
@@ -877,9 +1105,10 @@ def main():
         stop()
     port = args.port or (previous[2] if previous else DEFAULT_PORT)
     data_dir = Path(args.data_dir).expanduser().resolve() if args.data_dir else DATA_DIR
+    model_dir = Path(args.model_dir).expanduser().resolve() if args.model_dir else None    # None：train_out/
     if args.command == "run":
-        return run(host, port, data_dir)
-    return start(host, port, data_dir)
+        return run(host, port, data_dir, model_dir)
+    return start(host, port, data_dir, model_dir)
 
 
 if __name__ == "__main__":

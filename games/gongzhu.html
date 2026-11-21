@@ -699,6 +699,21 @@
                     </select>
                 </div>
 
+                <!-- 電腦的打法（伺服器上有訓練好的模型時才能選模型，見 README「讓電腦照模型出牌」） -->
+                <div data-bot-setting class="hidden">
+                    <div class="bg-slate-800/90 border border-sky-400/30 rounded-xl p-3.5">
+                        <label for="botModeSelectRules" class="block text-xs font-black text-sky-300 mb-1.5">
+                            🤖 電腦的打法（切換後從電腦的下一張牌開始套用，這台裝置會記住）：
+                        </label>
+                        <select id="botModeSelectRules" data-bot-mode onchange="game.setBotMode(this.value)" class="w-full bg-slate-950 border border-white/20 rounded-lg px-3 py-2 text-xs sm:text-sm font-bold text-white focus:outline-none focus:border-sky-400">
+                            <option value="builtin">原本的電腦（遊戲內建的算法）【預設】</option>
+                            <option value="normal">模型・正常：完全照訓練好的模型出牌</option>
+                            <option value="weak">模型・較弱：一樣照模型，但有時改出它的第二、第三選擇</option>
+                        </select>
+                        <p data-bot-note class="mt-1.5 text-[11px] text-slate-400 leading-relaxed"></p>
+                    </div>
+                </div>
+
                 <div class="bg-slate-800/80 border border-white/10 rounded-xl p-3.5 text-xs text-slate-300">
                     💡 <strong>貼心防呆設計：</strong>輪到您出牌時，系統會自動將可出的合法手牌向上抬起並亮起金框；不合規則的手牌則會半透明鎖定，避免誤出。點擊上方「出牌提示」還可獲得策略建議！<br>
                     ↩️ <strong>悔牌：</strong>按錯牌或出錯牌時，按上方的「悔牌」就回到您那一張出牌之前，可以連續按；一局結算之後就不能悔牌了。悔牌只會把出過的牌收回，各家的手牌不會重洗。<br>
@@ -737,6 +752,23 @@
                         <option value="strict_swap">嚴格豬羊對調（有人收全紅時全桌豬+100、羊-100，16張全吃特獎 +800 分）</option>
                         <option value="super_slam">超級大滿貫模式（有人收全紅時全桌豬+100、羊-100，16張全吃特獎 +1000 分）</option>
                     </select>
+                </div>
+
+                <!-- 電腦的打法快速切換列（伺服器上有訓練好的模型時才能選模型） -->
+                <div data-bot-setting class="hidden">
+                    <div class="bg-slate-950/80 border border-sky-400/30 rounded-xl px-3.5 py-2.5">
+                        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                            <label for="botModeSelectScoreboard" class="text-xs font-black text-sky-300 whitespace-nowrap flex items-center gap-1.5">
+                                <span>🤖</span> 電腦的打法：
+                            </label>
+                            <select id="botModeSelectScoreboard" data-bot-mode onchange="game.setBotMode(this.value)" class="flex-1 bg-slate-900 border border-white/20 rounded-lg px-2.5 py-1.5 text-xs font-bold text-white focus:outline-none focus:border-sky-400">
+                                <option value="builtin">原本的電腦（遊戲內建的算法）</option>
+                                <option value="normal">模型・正常：完全照訓練好的模型出牌</option>
+                                <option value="weak">模型・較弱：一樣照模型，但有時改出它的第二、第三選擇</option>
+                            </select>
+                        </div>
+                        <p data-bot-note class="mt-1.5 text-[11px] text-slate-400 leading-relaxed"></p>
+                    </div>
                 </div>
 
                 <!-- 本局四家結算明細表 -->
@@ -1629,6 +1661,13 @@
                 this.roundOver = false; // 這一局是否已經結算（結算後不能悔牌）
                 this.undoStack = [];    // 悔牌用：您每次出牌之前的牌局
                 this.timers = new Set(); // 排定中的下一步（電腦出牌、收墩）
+
+                // 電腦的打法：'builtin' 原本的電腦（GongZhuAI）；伺服器上有訓練好的模型時還可以選
+                // 'normal'（完全照模型出牌）或 'weak'（照模型，較弱）。選了之後這台裝置會記住
+                this.botMode = this.rememberedBotMode();
+                this.botTicket = 0;     // 問模型的編號：牌局被悔牌或重新發牌換掉之後，先前問的答案就不用了
+                this.botLookup = null;  // 正在問伺服器有沒有模型（每一局開始時問一次）；問到之前電腦先不出牌
+                this.roundModel = null; // 這一局出牌的是哪一個模型（模型檔的編號，記進對局紀錄）
             }
 
             /**
@@ -1646,13 +1685,64 @@
             cancelTimers() {
                 for (const id of this.timers) clearTimeout(id);
                 this.timers.clear();
+                this.botTicket++;
             }
 
             /**
              * 初始化並啟動第一局
              */
             init() {
+                // 伺服器上的模型換了、連不上或恢復時，更新「電腦的打法」那一欄
+                if (window.GameBot) window.GameBot.watch(() => this.renderBotSetting());
+                this.renderBotSetting();
                 this.startRound();
+            }
+
+            /**
+             * 這台裝置上次選的電腦打法；沒選過（或瀏覽器不給用 localStorage）就是原本的電腦
+             */
+            rememberedBotMode() {
+                try {
+                    const mode = localStorage.getItem('game_setting:gongzhu:bot');
+                    return mode === 'normal' || mode === 'weak' ? mode : 'builtin';
+                } catch (e) {
+                    return 'builtin';
+                }
+            }
+
+            /**
+             * 切換電腦的打法：'builtin' 原本的電腦、'normal' 完全照模型出牌、'weak' 照模型但較弱
+             * （有時改出模型的第二、第三選擇）。選了模型而伺服器上沒有模型、或連不上時，還是原本的電腦在出牌
+             */
+            setBotMode(mode) {
+                this.botMode = mode === 'normal' || mode === 'weak' ? mode : 'builtin';
+                try { localStorage.setItem('game_setting:gongzhu:bot', this.botMode); } catch (e) {}
+                this.renderBotSetting();
+            }
+
+            /**
+             * 「電腦的打法」那一欄（規則說明和計分板各有一個）：單獨開啟這個檔案時沒有 GameBot，整欄不顯示
+             */
+            renderBotSetting() {
+                const bot = window.GameBot;
+                const model = bot ? bot.model() : null;
+                const wanted = this.botMode !== 'builtin';
+                let note = '';
+                if (model) {
+                    const saved = String(model.saved || '').slice(0, 16).replace('T', ' ');
+                    const hit = typeof model.accuracy === 'number' ? `，沒練過的對局裡猜中玩家出牌的比例 ${Math.round(model.accuracy * 100)}%` : '';
+                    note = wanted && bot.resting() ? '⚠️ 暫時連不上模型，先由原本的電腦出牌，稍後會自動再試。'
+                        : `伺服器上的模型：用 ${model.rounds} 局對局練的${saved ? `（${saved} 存檔）` : ''}${hit}。`;
+                } else if (bot) {
+                    note = (bot.why() ? `伺服器上的模型不能用（${bot.why()}）` : '伺服器上還沒有訓練好的模型')
+                        + (wanted ? '，現在是原本的電腦在出牌。' : '，只能選原本的電腦。');
+                }
+                document.querySelectorAll('[data-bot-setting]').forEach(el => el.classList.toggle('hidden', !bot));
+                document.querySelectorAll('[data-bot-mode]').forEach(el => {
+                    el.querySelectorAll('option').forEach(option => { option.disabled = option.value !== 'builtin' && !model; });
+                    el.value = this.botMode;
+                });
+                document.querySelectorAll('[data-bot-note]').forEach(el => { el.textContent = note; });
             }
 
             /**
@@ -1892,6 +1982,13 @@
                 this.trickHistory = [];
                 this.roundOver = false;
                 this.undoStack = [];
+                this.roundModel = null;
+                if (window.GameBot) {
+                    // 伺服器上的模型換了的話，這一局就用新的。選了模型的話，問到之前電腦先等著（見 executeAITurn），
+                    // 不會先用原本的打法出牌
+                    const found = () => { if (this.botLookup === lookup) this.botLookup = null; };
+                    const lookup = this.botLookup = window.GameBot.refresh().then(found, found);
+                }
 
                 // 清空桌面出牌區
                 for (const seat of this.SEAT_ORDER) {
@@ -1966,9 +2063,10 @@
             }
 
             /**
-             * 執行指定座位的出牌動作（hinted：玩家按過「提示」才出這張，自動記錄時會標出來）
+             * 執行指定座位的出牌動作（hinted：玩家按過「提示」才出這張；bot：這張是模型替電腦選的，
+             * 值是當時的打法 'normal' 或 'weak'。兩種自動記錄時都會標出來）
              */
-            playCardFromSeat(seat, cardId, hinted = false) {
+            playCardFromSeat(seat, cardId, hinted = false, bot = null) {
                 const player = this.PLAYERS[seat];
                 const cardIdx = player.hand.findIndex(c => c.id === cardId);
                 if (cardIdx === -1) return;
@@ -1981,7 +2079,10 @@
                     this.leadSuit = card.suit;
                 }
 
-                this.currentTrick.push(hinted ? { seat, card, hint: true } : { seat, card });
+                const play = { seat, card };
+                if (hinted) play.hint = true;
+                if (bot) play.bot = bot;
+                this.currentTrick.push(play);
                 this.sound.playCard();
 
                 // 特殊牌出場音效
@@ -2011,7 +2112,7 @@
             }
 
             /**
-             * 電腦出牌（出牌提示也用這個）：交給 GongZhuAI，只提供自己的手牌與桌上公開的資訊
+             * 電腦自己算的出牌（出牌提示也用這個）：交給 GongZhuAI，只提供自己的手牌與桌上公開的資訊
              */
             chooseBestCardForAI(seat) {
                 const idx = s => this.SEAT_ORDER.indexOf(s);
@@ -2028,17 +2129,41 @@
             }
 
             /**
-             * 執行 AI 出牌回合
+             * 執行 AI 出牌回合。電腦的打法選了模型時問模型（GameBot 是遊戲伺服器加在頁面上的，
+             * 見 open_server.py）；選的是原本的電腦、伺服器上沒有模型、或連不上的時候用 GongZhuAI 自己算
              */
             executeAITurn() {
                 if (this.isProcessingTrick) return;
                 const seat = this.currentTurn;
                 if (!this.PLAYERS[seat].isAI) return;
 
-                const chosenCard = this.chooseBestCardForAI(seat);
-                if (chosenCard) {
-                    this.playCardFromSeat(seat, chosenCard.id);
+                const bot = window.GameBot;
+                if (!bot || this.botMode === 'builtin') return this.playComputerCard(seat, null);
+                if (this.botLookup) {
+                    const waiting = ++this.botTicket;
+                    this.botLookup.then(() => { if (waiting === this.botTicket) this.executeAITurn(); });
+                    return;
                 }
+                if (!bot.model() || bot.resting()) return this.playComputerCard(seat, null);
+                const ticket = ++this.botTicket;
+                bot.choose(this.roundSoFar(), seat, this.botMode).then(answer => {
+                    // 等答案的時候悔牌或重新發牌了：這個答案是舊牌局的，不用
+                    if (ticket === this.botTicket) this.playComputerCard(seat, answer);
+                });
+            }
+
+            /**
+             * 電腦出一張牌。answer 是模型的答案（{ play: { seat, card }, mode, model }）；
+             * 沒有答案、或答案不是這一家現在能出的牌，就用 GongZhuAI 自己算
+             */
+            playComputerCard(seat, answer) {
+                if (this.isProcessingTrick || this.roundOver || this.currentTurn !== seat) return;
+                const wanted = answer && answer.play && answer.play.seat === seat ? answer.play.card : null;
+                const fromModel = wanted ? this.getLegalCards(seat).find(c => c.id === wanted) : null;
+                const card = fromModel || this.chooseBestCardForAI(seat);
+                if (!card) return;
+                if (fromModel) this.roundModel = answer.model;
+                this.playCardFromSeat(seat, card.id, false, fromModel ? answer.mode : null);
             }
 
             /**
@@ -2204,12 +2329,20 @@
              * 自動記錄用：這一局到目前為止的紀錄。
              * 牌的寫法是花色（S 黑桃、H 紅心、C 梅花、D 方塊）加點數（2～14，J、Q、K、A 是 11～14），例如 S12 是豬、D11 是羊、C10 是變壓器。
              * seats 是出牌順序；hands 是發牌時四家各拿到的 13 張；tricks 是每一墩依出牌順序誰出了哪一張
-             * （您按過「提示」才出的那一張標 hint）；totals 是這一局開始前的累計總分。
+             * （您按過「提示」才出的那一張標 hint；模型替電腦選的那一張標 bot，值是當時的打法 normal 或 weak，
+             * 沒標的是 GongZhuAI 算的）；有模型出的牌時 model 是那個模型檔的編號；totals 是這一局開始前的累計總分。
              * 這一局還沒打完、您也還沒出過牌時回傳 null（只是打開頁面，不用記）
              */
             getRecord() {
+                if (!this.roundOver && !this.tricksSoFar().some(trick => trick.some(t => t.seat === 'south'))) return null;
+                return this.roundSoFar();
+            }
+
+            /**
+             * 這一局到目前為止的紀錄：自動記錄存的、問模型下一手出什麼時送給伺服器的，都是這一份
+             */
+            roundSoFar() {
                 const tricks = this.tricksSoFar();
-                if (!this.roundOver && !tricks.some(trick => trick.some(t => t.seat === 'south'))) return null;
                 const scores = this.calculateRoundScores();
                 const record = {
                     finished: this.roundOver,
@@ -2219,11 +2352,15 @@
                     players: {},
                     hands: {},
                     totals: {},
-                    tricks: tricks.map(trick => trick.map(t => (
-                        t.hint ? { seat: t.seat, card: t.card.id, hint: true } : { seat: t.seat, card: t.card.id }
-                    ))),
+                    tricks: tricks.map(trick => trick.map(t => {
+                        const play = { seat: t.seat, card: t.card.id };
+                        if (t.hint) play.hint = true;
+                        if (t.bot) play.bot = t.bot;
+                        return play;
+                    })),
                     result: null
                 };
+                if (tricks.some(trick => trick.some(t => t.bot))) record.model = this.roundModel;
                 for (const seat of this.SEAT_ORDER) {
                     const p = this.PLAYERS[seat];
                     const played = tricks.flatMap(trick => trick.filter(t => t.seat === seat).map(t => t.card));

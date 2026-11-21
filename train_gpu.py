@@ -158,6 +158,12 @@ class Game:
     def decisions(self, record):
         raise NotImplementedError
 
+    def upcoming(self, record):
+        """還沒做的下一個決定，讓模型替電腦出牌用（見 model_bot.py）：
+        (輪到的座位, x, mask, 把選的動作寫成一筆紀錄的函式)。x、mask 和 decisions() 交出來的是同一種東西。
+        這一局已經打完、或紀錄前後對不起來就丟 Skip。還沒有接上的遊戲一律丟 Skip。"""
+        raise Skip(f"{self.title}還沒有接上：模型還不能替電腦出牌")
+
 
 class GongZhu(Game):
     """拱豬。動作：出哪一張牌（52 種）。牌的編號＝花色（黑桃、紅心、梅花、方塊）× 13 ＋ 點數 − 2。"""
@@ -204,6 +210,9 @@ class GongZhu(Game):
         rank = int(name[1:])
         need(2 <= rank <= 14, f"沒有 {name} 這張牌")
         return self.SUITS.index(name[0]) * 13 + rank - 2
+
+    def card_name(self, card):
+        return f"{self.SUITS[card // 13]}{card % 13 + 2}"
 
     def legal(self, hand, table, trick):
         if not table:
@@ -277,6 +286,15 @@ class GongZhu(Game):
         return x
 
     def decisions(self, record):
+        return self.walk(record)
+
+    def upcoming(self, record):
+        (seat, x, mask), = self.walk(record, upcoming=True)
+        return seat, x, mask, lambda card: {"seat": seat, "card": self.card_name(card)}
+
+    def walk(self, record, upcoming=False):
+        """把一局從頭重排一遍，交出紀錄裡的每一手（decisions() 要的那三樣）。
+        upcoming 是 True 時紀錄裡的不交，走完之後只交出還沒出的下一手：(輪到的座位, x, mask)。"""
         seats = record["seats"]
         need(len(seats) == 4 and len(set(seats)) == 4, "座位不是四家")
         hands = [{self.card(name) for name in record["hands"][seat]} for seat in seats]
@@ -290,6 +308,7 @@ class GongZhu(Game):
         led = [0] * 4       # 每個花色已經被帶頭出過幾墩
         leader = next(seat for seat in range(4) if self.C2 in hands[seat])
         tricks = record["tricks"]
+        table = []
         for number, trick in enumerate(tricks):
             need(len(trick) == 4 or (0 < len(trick) < 4 and number == len(tricks) - 1 and not finished), "有一墩不是四張")
             table = []
@@ -299,8 +318,9 @@ class GongZhu(Game):
                 card = self.card(play["card"])
                 legal = self.legal(hands[seat], table, number)
                 need(card in legal, f"{play['seat']} 出了不能出的 {play['card']}")
-                x = self.view(seat, hands[seat], table, played, taken, void, led, number, totals, mode)
-                yield human[seat], "hint" if play.get("hint") else "", [(x, self.choice(legal), card)]
+                if not upcoming:
+                    x = self.view(seat, hands[seat], table, played, taken, void, led, number, totals, mode)
+                    yield human[seat], "hint" if play.get("hint") else "", [(x, self.choice(legal), card)]
                 hands[seat].remove(card)
                 if table and card // 13 != table[0][1] // 13:
                     void[seat][table[0][1] // 13] = True
@@ -318,6 +338,15 @@ class GongZhu(Game):
             for seat, name in enumerate(seats):
                 captured = {self.SCORING[self.card(card)] for card in record["result"][name]["captured"]}
                 need(taken[seat] == captured, "吃到的計分牌和結果對不起來")
+        if upcoming:
+            if len(table) == 4:     # 上一墩收完了：輪到吃下它的那一家帶頭
+                table = []
+            number = len(tricks) - bool(table)
+            need(not finished and number < 13, "這一局已經打完了")
+            seat = (leader + len(table)) % 4
+            legal = self.legal(hands[seat], table, number)
+            x = self.view(seat, hands[seat], table, played, taken, void, led, number, totals, mode)
+            yield seats[seat], x, self.choice(legal)
 
 
 class BigTwo(Game):
@@ -1748,6 +1777,9 @@ class Trainer:
                 f"（每次亂選一個可以選的：約 {data.chance[1] / data.decisions[1]:.1%}）")
         say(f"  練過的對局裡猜中的比例：{accuracy:.1%}")
         say(f"  模型：{self.out / 'model.pt'}")
+        if type(self.game).upcoming is not Game.upcoming:
+            say(f"  要在{self.game.title}裡和這個模型對打：把 train_out/ 推上 git，遊戲伺服器那台拉下來（不用重開伺服器），"
+                "再到遊戲的「電腦的打法」選模型（見 README「讓電腦照模型出牌」）。")
         return EXIT_DONE
 
 
