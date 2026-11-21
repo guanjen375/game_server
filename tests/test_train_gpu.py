@@ -398,6 +398,76 @@ class ReadingRecords(unittest.TestCase):
         self.assertEqual(game.about(card("S12"))[17:], [True, False, False, 0])
         self.assertEqual(game.about(card("H14"))[17:], [False, False, False, 1.0])
         self.assertEqual(game.about(card("H4"))[20], 0)
+        self.assertEqual((field(game, x, "hearts"), field(game, x, "sweep"), field(game, x, "big")), ([0] * 4, [0] * 4, [0] * 12))
+        self.assertEqual((each("keeps"), each("splits")), ({s3: 0, s9: 0, h2: 0}, {s3: 0, s9: 0, h2: 0}), "nobody is collecting hearts")
+
+    def test_gongzhu_tells_who_is_collecting_the_hearts_and_what_each_card_would_do_about_it(self):
+        # The player plays differently once one opponent holds every heart taken so far (throws fewer hearts on
+        # that player's tricks, takes more heart tricks). Training mostly hides the card-by-card "taken" field,
+        # so the model is told plainly who is collecting, and for each card where the hearts of this trick would go.
+        game = train_gpu.GongZhu()
+        card, level = game.card, train_gpu.level
+        nobody = [set() for _ in range(4)]
+
+        def scoring(*names):
+            return {game.SCORING[card(name)] for name in names}
+
+        def view(me, hand, table, taken):
+            return game.view(me, {card(c) for c in hand}, [(seat, card(c)) for seat, c in table], nobody, taken,
+                             [[False] * 4 for _ in range(4)], [0, 0, 0, 0], 6, [0, 0, 0, 0], "classic")
+
+        def marks(x, hand):
+            return {c: "keeps" * x[game.each["keeps"] + card(c)] + "splits" * x[game.each["splits"] + card(c)] for c in hand}
+
+        # seat 2 has taken every heart so far (five of them) and the pig; seat 1 has the sheep
+        taken = [set(), scoring("D11"), scoring("H13", "H12", "H6", "H4", "H2", "S12"), set()]
+        hand = ["H9", "S3"]
+        x = view(0, hand, [(2, "C13"), (3, "C3")], taken)       # clubs led, seat 2 is winning, the player has none
+        self.assertEqual(field(game, x, "hearts"), [0, 0, level(5, 0, 13), 0], "self, next, opposite, previous")
+        self.assertEqual(field(game, x, "sweep"), [0, 0, 1, 0])
+        self.assertEqual(field(game, x, "big"), [0, 0, 0,  0, 1, 0,  1, 0, 0,  0, 0, 0])
+        self.assertEqual(marks(x, hand), {"H9": "keeps", "S3": ""}, "a heart thrown now goes to the collector")
+        x = view(0, hand, [(2, "C3"), (3, "C13")], taken)       # ... but seat 3 is winning
+        self.assertEqual(marks(x, hand), {"H9": "splits", "S3": ""}, "thrown on somebody else it breaks the collection")
+        hand = ["C14", "C4", "S3"]
+        x = view(0, hand, [(1, "C5"), (2, "C13"), (3, "H7")], taken)       # seat 3 has thrown a heart on the collector's king
+        self.assertEqual(marks(x, hand), {"C14": "splits", "C4": "keeps", "S3": "keeps"},
+                         "with a heart in the trick already, only taking the trick keeps it from the collector")
+        hand = ["H9", "S3"]
+
+        x = view(3, hand, [(2, "C13")], taken)                  # the same table seen by seat 3
+        self.assertEqual(field(game, x, "sweep"), [0, 0, 0, 1], "seat 2 plays just before seat 3")
+        self.assertEqual(field(game, x, "hearts"), [0, 0, 0, level(5, 0, 13)])
+        self.assertEqual(field(game, x, "big"), [0, 0, 0,  0, 0, 0,  0, 1, 0,  1, 0, 0])
+
+        hand = ["H11", "H3", "S3"]
+        x = view(0, hand, [(2, "H10")], taken)                  # the collector leads a heart
+        self.assertEqual(marks(x, hand), {"H11": "splits", "H3": "keeps", "S3": "keeps"}, "taking the trick stops it, ducking does not")
+
+        hand = ["H14", "H5", "S3"]                              # leading: only a card nothing can beat is sure to take its trick
+        x = view(0, hand, [], taken)
+        self.assertEqual(marks(x, hand), {"H14": "splits", "H5": "", "S3": ""})
+        mine = [scoring("H13", "H12", "H6"), set(), set(), set()]
+        x = view(0, hand, [], mine)
+        self.assertEqual(field(game, x, "sweep"), [1, 0, 0, 0])
+        self.assertEqual(marks(x, hand), {"H14": "keeps", "H5": "", "S3": ""}, "collecting oneself, the same lead keeps it going")
+        x = view(0, hand, [(2, "H10")], mine)
+        self.assertEqual(marks(x, hand), {"H14": "keeps", "H5": "splits", "S3": "splits"})
+
+        split = [scoring("H3"), set(), scoring("H13", "H12", "H6", "H4", "H2"), set()]
+        x = view(0, ["H9", "S3"], [(2, "C13"), (3, "C3")], split)
+        self.assertEqual(field(game, x, "hearts"), [level(1, 0, 13), 0, level(5, 0, 13), 0])
+        self.assertEqual(field(game, x, "sweep"), [0, 0, 0, 0], "the hearts are split already")
+        self.assertEqual(marks(x, ["H9", "S3"]), {"H9": "", "S3": ""})
+        x = view(0, ["H9", "S3"], [(2, "C13"), (3, "C3")], nobody)
+        self.assertEqual((field(game, x, "hearts"), field(game, x, "sweep")), ([0] * 4, [0] * 4), "no heart has been taken yet")
+        self.assertEqual(marks(x, ["H9", "S3"]), {"H9": "", "S3": ""})
+
+        for name in ("hearts", "sweep", "big"):                 # told plainly; "taken" stays among the mostly hidden details
+            start, count = game.fields[name]
+            self.assertFalse(any(game.detail[start:start + count]), name)
+        start, count = game.fields["taken"]
+        self.assertTrue(all(game.detail[start:start + count]))
 
     def test_a_concealed_kong_shows_its_tiles_only_to_its_owner(self):
         game = train_gpu.Mahjong()
@@ -1074,6 +1144,17 @@ class PageRecords(unittest.TestCase):
                 kinds = [sum(field(game, x, "each." + name)) for name in ("win", "duck", "off")]
                 self.assertEqual(sum(kinds), 0 if field(game, x, "lead")[4] else sum(hand))
                 self.assertEqual(sum(field(game, x, "trick")), 1)
+                # who is collecting the hearts is the same story as the card-by-card list of what each player took
+                taken = field(game, x, "taken")
+                hearts = [sum(taken[place * 16:place * 16 + 13]) for place in range(4)]
+                self.assertEqual(field(game, x, "hearts"), [train_gpu.level(count, 0, 13) for count in hearts])
+                self.assertEqual(field(game, x, "big"), [taken[place * 16 + 13 + k] for place in range(4) for k in range(3)])
+                sweep = field(game, x, "sweep")
+                self.assertEqual(sweep, [int(sum(hearts) > 0 and count == sum(hearts)) for count in hearts])
+                keeps, splits = field(game, x, "each.keeps"), field(game, x, "each.splits")
+                self.assertTrue(all(k + s <= held for k, s, held in zip(keeps, splits, hand)), "a card in hand goes one way at most")
+                if not sum(sweep):
+                    self.assertEqual(sum(keeps) + sum(splits), 0, "nothing to keep or split while nobody is collecting")
 
         game = train_gpu.BigTwo()
         for record in self.records("bigtwo"):

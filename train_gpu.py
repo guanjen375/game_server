@@ -167,7 +167,7 @@ class Game:
 
 class GongZhu(Game):
     """拱豬。動作：出哪一張牌（52 種）。牌的編號＝花色（黑桃、紅心、梅花、方塊）× 13 ＋ 點數 − 2。"""
-    slug, title, version, actions = "gongzhu", "拱豬", 1, 52
+    slug, title, version, actions = "gongzhu", "拱豬", 2, 52
     SUITS = "SHCD"
     MODES = ("classic", "strict_swap", "super_slam")
     C2, PIG, SHEEP, TRANSFORMER = 26, 10, 48, 34    # 梅花 2、黑桃 Q、方塊 J、梅花 10
@@ -175,10 +175,12 @@ class GongZhu(Game):
     SCORING = [card - 13 if 13 <= card < 26 else {10: 13, 48: 14, 34: 15}.get(card) for card in range(52)]
     # 手上的每一張牌：出了會是這一墩最大的／跟了但比較小／墊牌；是自己這個花色裡最小的／最大的；
     # 外面沒有更大的了／沒有更小的了；外面還有幾張比它大／比它小；自己這個花色有幾張；
-    # 另外三家有幾家這個花色已經沒牌；這個花色已經被帶頭出過幾墩
+    # 另外三家有幾家這個花色已經沒牌；這個花色已經被帶頭出過幾墩；
+    # 被吃走的紅心全在同一家手上的時候（有人可能想收全紅）：出這張，這一墩的紅心會照舊落到那一家／會落到別人手上
     EACH = (("win", 1), ("duck", 1), ("off", 1), ("lowest", 1), ("highest", 1), ("boss", 1), ("bottom", 1),
-            ("higher", 1 / 255), ("lower", 1 / 255), ("length", 1 / 255), ("voids", 1 / 255), ("led", 1 / 255))
-    SUMMARY = ("lead", "winning", "void", "trick", "special", "counts", "totals", "mode")
+            ("higher", 1 / 255), ("lower", 1 / 255), ("length", 1 / 255), ("voids", 1 / 255), ("led", 1 / 255),
+            ("keeps", 1), ("splits", 1))
+    SUMMARY = ("lead", "winning", "void", "trick", "special", "counts", "totals", "mode", "hearts", "sweep", "big")
 
     def define(self):
         add = self.add
@@ -195,6 +197,10 @@ class GongZhu(Game):
         self.COUNTS = add("counts", 6, 1 / 255)     # 四個花色外面各還有幾張；桌上有幾張紅心；外面還有幾張紅心
         self.TOTALS = add("totals", 4, 1 / 255)     # 累計分數：自己比平均多多少、另外三家比自己多多少
         self.MODE = add("mode", 3)                  # 計分流派
+        # 玩家看到有人快收全紅會改打法。「誰吃了哪些計分牌」是細節欄位、訓練時多半被遮掉，所以另外明白講出來：
+        self.HEARTS = add("hearts", 4, 1 / 255)     # 四家各吃了幾張紅心（自己、下家、對家、上家）
+        self.SWEEP = add("sweep", 4)                # 被吃走的紅心全在同一家手上：是哪一家（還沒有人吃到、或已經分散了就都不是）
+        self.BIG = add("big", 4 * 3)                # 誰吃了豬、羊、變壓器
 
     def about(self, card):
         """花色、點數、是不是豬羊變壓器、紅心扣幾分。"""
@@ -227,6 +233,8 @@ class GongZhu(Game):
         seen.update(on_table)
         unseen = [card for card in range(52) if card not in seen]
         hearts = [card for card in on_table if card // 13 == 1]
+        took = [sum(1 for scoring in taken[seat] if scoring < 13) for seat in range(4)]     # 四家各吃了幾張紅心
+        collector = took.index(sum(took)) if sum(took) and max(took) == sum(took) else None    # 全在他手上的那一家
         for card in hand:
             x[self.HAND + card] = 1
         for card in unseen:
@@ -254,6 +262,11 @@ class GongZhu(Game):
                         x[self.VOID + (place - 1) * 4 + suit] = 1
             behind = totals[me] - sum(totals) / 4 if seat == me else totals[seat] - totals[me]
             x[self.TOTALS + place] = level(behind, -1500, 1500)
+            x[self.HEARTS + place] = level(took[seat], 0, 13)
+            for k in range(3):
+                x[self.BIG + place * 3 + k] = int(13 + k in taken[seat])
+        if collector is not None:
+            x[self.SWEEP + (collector - me) % 4] = 1
         x[self.TRICK + trick] = 1
         for k, card in enumerate((self.PIG, self.SHEEP, self.TRANSFORMER)):
             x[self.SPECIAL + k] = int(card in on_table)
@@ -283,6 +296,11 @@ class GongZhu(Game):
             x[each["length"] + card] = level(len(mine), 0, 13)
             x[each["voids"] + card] = level(sum(1 for seat in range(4) if seat != me and void[seat][suit]), 0, 3)
             x[each["led"] + card] = level(led[suit], 0, 4)
+            # 這一墩有紅心（或這張就是紅心）時，紅心會落到誰手上：跟牌、墊牌看出了這張之後誰最大；
+            # 自己帶頭時，只有出外面沒有更大的牌才確定是自己吃，其他的不知道就不標
+            if collector is not None and (hearts or suit == 1) and (lead is not None or not higher):
+                winner = me if lead is None or (suit == lead and card > top_card) else top_seat
+                x[each["keeps" if winner == collector else "splits"] + card] = 1
         return x
 
     def decisions(self, record):
