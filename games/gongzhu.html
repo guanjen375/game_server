@@ -959,6 +959,13 @@
             PIG: 10, SHEEP: 48, TRANS: 34,           // ♠Q、♦J、♣10
             HEART_POINTS: [0, 0, 0, -10, -10, -10, -10, -10, -10, -20, -30, -40, -50],   // ♥2 ~ ♥A
             BUDGET_MS: 160, MIN_SAMPLES: 24, MAX_SAMPLES: 400,
+            // 電腦估「自己收全紅」原本太樂觀，沒收成就抱著紅心連豬和變壓器一起賠。拿 538 局實際對局對過之後修了兩處：
+            //  1. sweepForecast：已經吃到的紅心張數原本直接當成機率（吃到 8 張就當成六成），實際上電腦說六成多的時候
+            //     只收成兩成、說八成多的時候只收成三成。現在張數只算 OWN_SWEEP_SHARE，手上有大紅心可領才往上加。
+            //  2. playout：模擬裡有一半的對手只顧閃分、不會去擋，模擬出來的收成比例（35%）比實際（23%）高出一半。
+            //     現在被吃走的紅心全在自己手上時，模擬裡的對手都照分差打，會去擋（改完是 26%）。
+            // 只修「自己收」。別家在收的機率照舊，寧可高估，才會去擋。
+            OWN_SWEEP_SHARE: 0.3,
             RANK_COUNT: (() => {
                 const count = new Uint8Array(1 << 13);
                 for (let mask = 1; mask < count.length; mask++) count[mask] = 1 + count[mask & (mask - 1)];
@@ -1320,7 +1327,10 @@
                         for (const line of lines) if (line[p] > best[p]) best = line;
                         return best[me];
                     }
-                    card = this.policy(p, hands[p], trick, cap, live, voids, match, caution[p]);
+                    // 被吃走的紅心全在 me 手上時，偏重閃分的對手也改照分差打：真的對手不會放著 me 收全紅不擋
+                    // （數字見 OWN_SWEEP_SHARE 的說明）。別家在收的時候不動，各家照原本排好的打法。
+                    const alert = p !== me && cap[me].hearts > 0 && cap.every((c, q) => q === me || !c.hearts);
+                    card = this.policy(p, hands[p], trick, cap, live, voids, match, alert ? 0 : caution[p]);
                 }
                 return this.standingValue(me, this.finalTotals(cap, match));
             },
@@ -1333,7 +1343,7 @@
                     if (seat >= 0) return null;
                     seat = q;
                 }
-                if (seat >= 0 && cap[seat].hearts === 13) return { seat, chance: 1 };
+                if (seat >= 0 && cap[seat].hearts === 13) return { seat, chance: 1, credit: 1 };
 
                 // 自己有幾張連續最大的紅心可領，以及其餘三家一共有幾張紅心要跟。
                 const masters = this.RANK_COUNT[held[1] >>> (32 - Math.clz32(outside[1]))];
@@ -1346,12 +1356,13 @@
                 // 不同墩持續由同一家吃紅心，比一墩剛好吃到多張更值得留意。
                 const repeats = Math.max(0, pile.heartTricks - 1);
                 let chance = (pile.hearts + repeats) / (13 + repeats);
+                let control = 0;
                 if (masters) {
                     // 大紅心能帶出幾張外面的紅心，取決於還有幾家能跟。還要取得並保持領牌權。
                     const heartSeats = Math.max(1, voids.filter((mask, q) => q !== p && !(mask & (1 << 1))).length);
                     const draws = masters * heartSeats;
                     const exposed = Math.max(0, otherHearts - masters) + 1;
-                    let control = (draws / (draws + exposed)) ** 2;
+                    control = (draws / (draws + exposed)) ** 2;
                     // 評估實際出牌及回看歷史時，另算能否以旁門大牌上手，連收全部紅心。
                     // 假設外面每張紅心等機會落到未缺門的各家，估計有一家比連續大牌更長的機率上界。
                     if (entryTrick) {
@@ -1373,9 +1384,15 @@
                         }
                         control += (1 - control) * entry * Math.max(0, 1 - blocked);
                     }
-                    chance = seat === p ? chance + (1 - chance) * control : chance * (1 - control);
                 }
-                return { seat, chance };
+                // 別家在收：照吃到的張數算，自己有大紅心能擋就調低。這裡不打折，寧可高估，
+                // 才會去擋，也才會顧好自己的豬羊和變壓器。
+                if (seat !== p) return { seat, chance: chance * (1 - control), credit: 1 };
+                // 自己在收：外面的紅心只要被別家吃走一張就破局，所以吃到的張數要打折（credit）。
+                // 手上沒有大紅心可領時只算 OWN_SWEEP_SHARE；大紅心領得動全部時照算。
+                const credit = this.OWN_SWEEP_SHARE + (1 - this.OWN_SWEEP_SHARE) * control;
+                chance *= this.OWN_SWEEP_SHARE;
+                return { seat, chance: chance + (1 - chance) * control, credit };
             },
 
             // 各家模擬時只看自己的手牌及公牌，分別試算「紅心拆開」和「這家全紅」兩種分差。
@@ -1463,7 +1480,10 @@
                     const heartsInTrick = after.hearts - cap[taker].hearts;
                     if (heartsInTrick) {
                         if (taker !== seat) return ordinary;
-                        weight += (1 - weight) * heartsInTrick / (13 - cap[seat].hearts);
+                        // 這一墩吃下還沒收到的紅心裡的幾成，機率就往 1 靠近幾成。自己在收的時候同樣要打折
+                        // （sweepForecast 的 credit），除非這一墩就把 13 張收齊。
+                        const part = heartsInTrick / (13 - cap[seat].hearts);
+                        weight += (1 - weight) * (part < 1 ? sweep.credit : 1) * part;
                     }
                     // 保有領牌權可以繼續收紅心；是否有利仍由四家的分差決定。
                     if (taker === seat && after.hearts < 13) weight += 0.1 * weight * (1 - weight);

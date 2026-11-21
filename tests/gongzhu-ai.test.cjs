@@ -303,3 +303,74 @@ test('endgame hypotheses respect public voids and an expensive voluntary capture
     assert.ok(weight([27, 39]) < weight([38, 39])); // A C3 could have ducked. A CA could not.
     assert.ok(weight([27, 39]) > 0);
 });
+
+// A pile of hearts is not a sweep. South took eight hearts in two tricks but holds none: the ace, king, queen
+// and jack are all outside, and one of them landing in another pile ends it. Over 538 recorded rounds the computers
+// completed about one such attempt in five, and paid for the pig and the transformer in the rest.
+const stranded = ['H5 H6 H9 H7', 'D4 D9 DK D8', 'H2 H4 H10 H8'];
+test('without the top hearts, eight hearts in the pile are no reason to take the pig or the transformer', () => {
+    for (const [history, trick, hand, expected] of [
+        [['C2 CA C7 C5', ...stranded, 'C3 C6 C9 C4'], 'S5 SQ', 'SA S3 D2 D5 D7 C8 CJ DQ', 'S3'],
+        [['S2 SA S7 S5', ...stranded, 'S3 S6 S9 S4'], 'C5 C10', 'CA C3 D2 D5 D7 S8 SJ DQ', 'C3']
+    ]) {
+        assert.equal(position({ history, trick, hand })(0), expected);
+        for (const seed of [1, 19, 73]) assert.equal(position({ history, trick, hand, seed })(32), expected);
+    }
+});
+
+test('holding the four top hearts the sweep is on: take the pig for the lead, in the simulation as well', () => {
+    const state = {
+        history: ['C2 CA C7 C5', 'H5 H6 H9 H7', 'D4 D9 DK D8'], trick: 'S5 SQ', hand: 'SA S3 HA HK HQ HJ D2 D5 C8 CJ'
+    };
+    assert.equal(position(state)(0), 'SA');
+    for (const seed of [1, 19, 73]) assert.equal(position({ ...state, seed })(32), 'SA');
+});
+
+test('only a seat\'s own sweep is discounted: the same pile in an opponent\'s hands is feared in full', () => {
+    const { ai } = load({}, Math);
+    // Seat 0 took eight hearts in two tricks. H3, HJ, HQ, HK and HA are still out and neither seat asked holds one.
+    const cap = [[13, 15, 16, 17, 18, 19, 20, 21], [], [], []].map(cards => ai.newCap(cards));
+    cap[0].heartTricks = 2;
+    const outside = [8191, 0b1111000000010, 8191, 8191];
+    const share = 9 / 14;
+    const close = (a, b) => assert.ok(Math.abs(a - b) < 1e-9, a + ' != ' + b);
+    const own = ai.sweepForecast(0, [0, 0, 0, 0], outside, cap, [0, 0, 0, 0], null);
+    const feared = ai.sweepForecast(1, [0, 0, 0, 0], outside, cap, [0, 0, 0, 0], null);
+    assert.equal(own.seat, 0);
+    assert.equal(feared.seat, 0);
+    close(feared.chance, share);
+    close(feared.credit, 1);
+    close(own.chance, ai.OWN_SWEEP_SHARE * share);
+    close(own.credit, ai.OWN_SWEEP_SHARE);
+    assert.ok(ai.OWN_SWEEP_SHARE > 0 && ai.OWN_SWEEP_SHARE < 0.5);
+
+    // With the four top hearts in hand and one small heart out, the same seat counts its hearts almost in full.
+    const sure = ai.sweepForecast(0, [0, 0b1111000000000, 0, 0], [8191, 0b10, 8191, 8191], cap, [0, 0, 0, 0], null);
+    assert.ok(sure.credit > 0.85 && sure.chance > 0.85, JSON.stringify(sure));
+});
+
+// In the recorded rounds the simulation ended with all thirteen hearts half again as often as really happened:
+// half of the simulated opponents only avoid penalties and never step in.
+test('simulated opponents do not sit back while the seat that is deciding holds every heart taken so far', () => {
+    const { ai } = load({}, Math);
+    const hands = [[12, 39, 42, 32], [0, 40, 43, 27], [1, 41, 44, 28], [2, 45, 46, 29]];
+    const live = [0, 0, 0, 0];
+    for (const c of hands.flat()) live[Math.floor(c / 13)] |= 1 << (c % 13);
+    const match = { totals: [0, 0, 0, 0], mode: 'classic' };
+    const styles = piles => {
+        const cap = piles.map(cards => ai.newCap(cards));
+        const seen = [];
+        const policy = ai.policy;
+        ai.policy = function (p, hand, trick, taken, left, voids, game, caution) {
+            if (p !== 0) seen.push(caution);
+            return policy.apply(this, arguments);
+        };
+        ai.playout(hands, [], 39, 0, cap, live, [0, 0, 0, 0], match, [0, 0.75, 0.75, 0.75]);
+        ai.policy = policy;
+        assert.ok(seen.length >= 3);
+        return new Set(seen);
+    };
+    assert.deepEqual([...styles([[13, 15, 16], [], [], []])], [0]);        // seat 0 alone holds hearts: everyone watches it
+    assert.deepEqual([...styles([[13, 15, 16], [14], [], []])], [0.75]);   // hearts already split: styles as dealt out
+    assert.deepEqual([...styles([[], [14, 15], [], []])], [0.75]);         // someone else is collecting: styles as dealt out
+});
