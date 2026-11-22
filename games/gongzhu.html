@@ -83,11 +83,11 @@
 
         /* 可出牌高亮狀態 */
         .card-playable {
-            transform: translateY(-12px);
+            transform: translateY(-8px);
             box-shadow: 0 8px 18px rgba(0, 0, 0, 0.45), 0 0 0 2px #fbbf24;
         }
         .card-playable:hover {
-            transform: translateY(-26px) scale(1.06);
+            transform: translateY(calc(-1 * var(--hand-preview-lift)));
             box-shadow: 0 14px 24px rgba(0, 0, 0, 0.55), 0 0 12px rgba(251, 191, 36, 0.9);
             z-index: 40 !important;
         }
@@ -98,7 +98,7 @@
         }
         @keyframes hintPulse {
             0% { box-shadow: 0 8px 18px rgba(0,0,0,0.5), 0 0 0 3px #38bdf8; }
-            100% { box-shadow: 0 14px 26px rgba(56,189,248,0.7), 0 0 0 5px #38bdf8; transform: translateY(-24px); }
+            100% { box-shadow: 0 14px 26px rgba(56,189,248,0.7), 0 0 0 5px #38bdf8; transform: translateY(calc(-1 * var(--hand-preview-lift))); }
         }
 
         /* 不可出的牌保留不透明底色，重疊時牌面仍然清楚。 */
@@ -299,7 +299,11 @@
         .gz-mat .floating-banner { width: max-content; max-width: 84%; white-space: normal; }
         .gz-mat:has(.trick-face) .trick-guide { visibility: hidden; }
         .gz-hand { grid-area: hand; min-width: 0; }
-        .gz-hand-scroll { width: 100%; overflow-x: auto; padding: 24px 4px 4px; }
+        .gz-hand-scroll {
+            --hand-preview-lift: 18px;
+            width: 100%; overflow-x: auto;
+            padding: calc(var(--hand-preview-lift) + 14px) 4px 4px;
+        }
         #playerHandContainer { width: max-content; margin-inline: auto; }
 
         .played-tracker {
