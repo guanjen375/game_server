@@ -28,9 +28,11 @@ h1, h2, h3, p { margin: 0; }
     color: var(--letter); border: 1px solid var(--rule); border-radius: 9px; background: var(--card);
 }
 .appearance select {
-    appearance: none; border: 0; background: transparent; color: inherit; font: 650 13px var(--sans);
+    appearance: none; border: 0; background-color: var(--card); color: var(--letter); font: 650 13px var(--sans);
     padding: 0 29px 0 36px; height: 100%; margin: 0 -13px; border-radius: inherit;
 }
+.appearance option { background-color: var(--card); color: var(--letter); }
+.appearance option:checked { background-color: var(--brand); color: var(--brand-text); }
 .appearance .ui-icon { position: absolute; pointer-events: none; font-size: 15px; left: 13px; }
 .appearance .i-chevron-down { left: auto; right: 11px; font-size: 11px; }
 .appearance:focus-within { outline: 2px solid var(--brand); outline-offset: 2px; }

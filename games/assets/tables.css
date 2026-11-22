@@ -52,7 +52,7 @@ body.felt-table, .app {
 /* 六款共用 Tailwind 的遊戲：面板與彈窗即使由遊戲重繪，仍會套用同一組配色。 */
 .felt-table :is(div.bg-slate-900, select.bg-slate-900, [class~="bg-slate-900/50"],
     [class~="bg-slate-900/75"], [class~="bg-slate-900/80"], [class~="bg-slate-900/90"],
-    .played-tracker, .played-strip) {
+    .played-tracker) {
     background: var(--surface);
     border-color: var(--line);
 }
@@ -328,7 +328,6 @@ body.felt-table, .app {
     font-family: var(--serif); font-weight: 750; border-radius: 8px;
 }
 .felt-table .floating-banner { text-align: center; }
-.trick-spade { font: 48px/1 var(--serif); }
 .mj-north-count, .mj-info-button { display: none; }
 .mj-info-button {
     align-items: center; justify-content: center; gap: 9px; min-height: 38px; border: 1px solid var(--line);
@@ -353,42 +352,25 @@ body.felt-table, .app {
 }
 @media (max-width: 639px) {
     .felt-table .floating-banner { width: max-content; max-width: 95%; white-space: normal; border-radius: 9px; padding: 5px 9px; }
-    .mj-layout, .gz-layout { display: grid; gap: 6px; align-items: stretch; }
+    .mj-layout { display: grid; gap: 6px; align-items: stretch; }
     .mj-layout {
         grid-template-columns: repeat(3, minmax(0, 1fr));
         grid-template-rows: auto minmax(130px, 1fr) auto auto;
         grid-template-areas: "west north east" "river river river" "info info info" "hand hand hand";
     }
-    .mj-north, .mj-middle, .mj-side, .gz-north, .gz-middle { display: contents; }
-    .mj-layout #panel-1, .gz-layout #panel-east { grid-area: east; }
-    .mj-layout #panel-2, .gz-layout #panel-north { grid-area: north; }
-    .mj-layout #panel-3, .gz-layout #panel-west { grid-area: west; }
+    .mj-north, .mj-middle, .mj-side { display: contents; }
+    .mj-layout #panel-1 { grid-area: east; }
+    .mj-layout #panel-2 { grid-area: north; }
+    .mj-layout #panel-3 { grid-area: west; }
     .mj-river { grid-area: river; }
     .mj-layout :is(#valueCard, #statusCard) { display: none; }
     .mj-layout .mj-info-button { grid-area: info; display: flex; }
-    .mj-layout #mySeat, .gz-hand { grid-area: hand; }
+    .mj-layout #mySeat { grid-area: hand; }
     .mj-layout :is(#panel-1, #panel-2, #panel-3) { padding: 6px 7px; max-height: 115px; overflow: auto; }
     .mj-layout .mj-backs, .mj-layout [data-backs], .mj-layout .seat-initial { display: none; }
     .mj-layout .mj-north-count { display: block; color: var(--muted); margin-top: 4px; font-size: 10px; }
     .mj-layout #panel-2 > div { display: block; }
     .mj-layout .mj-river { border-radius: 14px; }
-    .gz-layout {
-        grid-template-columns: repeat(3, minmax(0, 1fr));
-        grid-template-rows: auto minmax(0, 1fr) auto;
-        grid-template-areas: "west north east" "trick trick trick" "hand hand hand";
-    }
-    .gz-layout :is(#panel-north, #panel-west, #panel-east) { display: block; padding: 7px; width: auto; max-height: 142px; overflow: auto; }
-    .gz-layout .seat-initial:not(#panel-south .seat-initial) { display: none; }
-    .gz-layout :is(#panel-west, #panel-east) .sr-only { position: static; width: auto; height: auto; clip: auto; overflow: visible; }
-    .gz-layout #panel-north > div:first-child { align-items: start; flex-direction: column; gap: 4px; }
-    .gz-layout #panel-north .text-right { text-align: start; }
-    .gz-layout [id^="captured-"] { justify-content: start; }
-    .gz-layout #panel-north [id^="captured-"] { min-height: 0; margin-top: 5px; }
-    .gz-trick { grid-area: trick; }
-    .gz-layout .gz-mat { height: min(100%, 310px); width: min(100%, 310px); max-width: none; }
-    .gz-layout .gz-mat [id^="trick-slot-"] { width: 66px; height: 92px; }
-    .gz-layout #trick-slot-west { left: 8%; }
-    .gz-layout #trick-slot-east { right: 8%; }
 }
 
 @media (max-width: 350px) {
