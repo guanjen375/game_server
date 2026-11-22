@@ -113,48 +113,118 @@ FONT_LINKS = (
     '&amp;family=Noto+Serif+TC:wght@700;900&amp;display=swap" rel="stylesheet">'
 )
 
-PAGE_CSS = """
+THEMES = {"felt": "經典牌桌", "paper": "紙上棋室", "night": "東京夜色"}
+
+THEME_COLORS = """
+:root {
+    color-scheme: dark;
+    --canvas: #072b18;
+    --backdrop: radial-gradient(circle at 50% 35%, #196c3e 0%, #0e4b28 60%, #072915 100%);
+    --vignette: inset 0 0 80px rgba(0, 0, 0, 0.75);
+    --ink: #fef3c7; --muted: #bde3cd; --accent: #fcd34d;
+    --line: rgba(251, 191, 36, 0.22); --hover-line: rgba(251, 191, 36, 0.6);
+    --surface: rgba(0, 0, 0, 0.28); --hover-surface: rgba(0, 0, 0, 0.4);
+    --tint: rgba(251, 191, 36, 0.12);
+    --mark: linear-gradient(135deg, #fbbf24, #d97706); --mark-ink: #881337;
+    --model-ink: #bae6fd; --model-bg: rgba(56, 189, 248, 0.16);
+}
+/* 紙上棋室的暖紙色與藍墨色取自 Solarized 的淺色系。 */
+:root[data-theme="paper"] {
+    color-scheme: light;
+    --canvas: #fdf6e3;
+    --backdrop: linear-gradient(rgba(88, 110, 117, 0.06) 1px, transparent 1px) center / 28px 28px,
+                linear-gradient(90deg, rgba(88, 110, 117, 0.06) 1px, transparent 1px) center / 28px 28px,
+                linear-gradient(145deg, #fdf6e3, #eee8d5);
+    --vignette: none;
+    --ink: #073642; --muted: #455e65; --accent: #155977;
+    --line: #c2b99d; --hover-line: #547887;
+    --surface: #fffcf2; --hover-surface: #fffef9; --tint: #e3ece9;
+    --mark: linear-gradient(135deg, #225f70, #073642); --mark-ink: #fdf6e3;
+    --model-ink: #63490e; --model-bg: #f7e9b9;
+}
+/* 東京夜色採用 Tokyo Night 的靛藍底色、淡紫與冰藍。 */
+:root[data-theme="night"] {
+    color-scheme: dark;
+    --canvas: #1a1b26;
+    --backdrop: radial-gradient(ellipse at 90% 0%, rgba(117, 78, 161, 0.38), transparent 52%),
+                radial-gradient(ellipse at 8% 85%, rgba(46, 102, 143, 0.32), transparent 55%), #1a1b26;
+    --vignette: none;
+    --ink: #e2e8ff; --muted: #adb8db; --accent: #bb9af7;
+    --line: #434c6e; --hover-line: #7dcfff;
+    --surface: #24283b; --hover-surface: #2d344d; --tint: #39324f;
+    --mark: linear-gradient(135deg, #7dcfff, #bb9af7); --mark-ink: #1a1b26;
+    --model-ink: #7dcfff; --model-bg: #233c52;
+}
+"""
+
+PAGE_CSS = THEME_COLORS + """
 * { box-sizing: border-box; }
-html { background: #072b18; -webkit-text-size-adjust: 100%; }
+html { background: var(--canvas); -webkit-text-size-adjust: 100%; }
 body {
-    margin: 0; min-height: 100vh; min-height: 100dvh; color: #ecfdf5;
+    margin: 0; min-height: 100vh; min-height: 100dvh; color: var(--ink);
     font-family: 'Noto Sans TC', 'PingFang TC', 'Microsoft JhengHei', sans-serif;
     -webkit-tap-highlight-color: transparent;
 }
-/* 和遊戲一樣的綠色絨布牌桌背景 */
 body::before {
     content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none;
-    background: radial-gradient(circle at 50% 35%, #196c3e 0%, #0e4b28 60%, #072915 100%);
-    box-shadow: inset 0 0 80px rgba(0, 0, 0, 0.75);
+    background: var(--backdrop); box-shadow: var(--vignette);
 }
 .wrap {
     max-width: 880px; margin: 0 auto;
     padding: max(28px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right))
              max(28px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
 }
-.top { display: flex; align-items: center; gap: 14px; }
+.top { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 18px; }
+.brand { display: flex; align-items: center; gap: 14px; max-width: 100%; }
 .logo {
     flex: none; width: 52px; height: 52px; border-radius: 14px; display: grid; place-items: center;
-    background: linear-gradient(135deg, #fbbf24, #d97706); color: #881337;
+    background: var(--mark); color: var(--mark-ink);
     font: 900 28px 'Noto Serif TC', serif; box-shadow: 0 6px 16px rgba(0, 0, 0, 0.35);
 }
-h1 { margin: 0; font-size: 26px; font-weight: 900; letter-spacing: 0.08em; color: #fcd34d; }
-.sub { margin: 2px 0 0; font-size: 13px; color: #9fd3b4; }
+h1 { margin: 0; font-size: 26px; font-weight: 900; letter-spacing: 0.08em; color: var(--accent); }
+.sub { margin: 2px 0 0; font-size: 13px; color: var(--muted); overflow-wrap: anywhere; }
+.theme-picker { margin: 0; padding: 0; border: 0; min-width: 0; }
+:root:not([data-theme]) .theme-picker { display: none; }
+.theme-picker legend { margin-bottom: 5px; padding: 0; color: var(--muted); font-size: 12px; font-weight: 700; }
+.theme-options { display: flex; flex-wrap: wrap; gap: 5px; }
+.theme-options label { position: relative; flex: 1 0 auto; cursor: pointer; }
+.theme-options input { position: absolute; width: 1px; height: 1px; margin: 0; clip-path: inset(50%); }
+.theme-option {
+    display: flex; align-items: center; justify-content: center; gap: 6px; padding: 0 9px; min-height: 44px;
+    border: 1px solid var(--line); border-radius: 10px; background: var(--surface);
+    color: var(--muted); font-size: 13px; font-weight: 700;
+}
+.swatch {
+    width: 16px; height: 16px; border-radius: 50%; display: grid; place-items: center;
+    background: linear-gradient(135deg, #196c3e 55%, #fcd34d 55%);
+    box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.18);
+}
+input[value="paper"] + .theme-option .swatch { background: linear-gradient(135deg, #fdf6e3 55%, #155977 55%); }
+input[value="night"] + .theme-option .swatch { background: linear-gradient(135deg, #343b58 55%, #bb9af7 55%); }
+.theme-options label:hover .theme-option { border-color: var(--hover-line); }
+.theme-options input:checked + .theme-option { color: var(--accent); border-color: var(--accent); background: var(--hover-surface); }
+.theme-options input:checked + .theme-option .swatch { color: var(--canvas); background: var(--accent); }
+.theme-options input:checked + .theme-option .swatch::after { content: "✓"; font: bold 12px/1 sans-serif; }
+.theme-options input:focus-visible + .theme-option, .card:focus-visible, .back:focus-visible {
+    outline: 2px solid var(--accent); outline-offset: 3px;
+}
 h2 {
     display: flex; align-items: center; gap: 10px; margin: 30px 0 12px;
-    font-size: 14px; font-weight: 700; letter-spacing: 0.2em; color: #9fd3b4;
+    font-size: 14px; font-weight: 700; letter-spacing: 0.2em; color: var(--muted);
 }
-h2::after { content: ""; flex: 1; height: 1px; background: rgba(251, 191, 36, 0.22); }
-.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
+h2::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr)); gap: 12px; }
 .card {
     display: flex; align-items: center; gap: 16px; min-height: 92px; padding: 14px 16px;
-    border-radius: 18px; border: 1px solid rgba(251, 191, 36, 0.22); background: rgba(0, 0, 0, 0.28);
+    border-radius: 18px; border: 1px solid var(--line); background: var(--surface);
     color: inherit; text-decoration: none;
-    transition: transform 0.15s, background-color 0.15s, border-color 0.15s;
+    transition: transform 0.15s;
 }
-.card:hover { background: rgba(0, 0, 0, 0.4); border-color: rgba(251, 191, 36, 0.6); transform: translateY(-2px); }
+.card:hover { background: var(--hover-surface); border-color: var(--hover-line); transform: translateY(-2px); }
 .card:active { transform: scale(0.98); }
-.card:focus-visible { outline: 2px solid #fbbf24; outline-offset: 3px; }
+[data-theme="paper"] .card, [data-theme="paper"] .logo { border-radius: 6px; box-shadow: 2px 3px 0 #d4cbb2; }
+[data-theme="paper"] h1, [data-theme="paper"] .name { font-family: 'Noto Serif TC', 'Songti TC', serif; }
+[data-theme="night"] .card { box-shadow: inset 0 1px 0 rgba(192, 202, 245, 0.1), 0 5px 14px rgba(10, 12, 26, 0.3); }
 .icon {
     flex: none; position: relative; width: 56px; height: 56px; display: grid; place-items: center;
     font: 900 27px 'Noto Serif TC', serif;
@@ -188,33 +258,113 @@ h2::after { content: ""; flex: 1; height: 1px; background: rgba(251, 191, 36, 0.
     box-shadow: 0 4px 10px rgba(0, 0, 0, 0.45), inset 0 -3px 0 rgba(0, 0, 0, 0.25);
 }
 .info { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
-.name { font-size: 18px; font-weight: 900; color: #fef3c7; }
-.desc { font-size: 13px; line-height: 1.5; color: #a7d3b8; }
+.name { font-size: 18px; font-weight: 900; color: var(--ink); text-wrap: balance; }
+.desc { font-size: 13px; line-height: 1.5; color: var(--muted); }
 .path {
     align-self: flex-start; margin-top: 3px; padding: 1px 8px; border-radius: 6px;
     font: 600 12px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-    color: #fcd34d; background: rgba(251, 191, 36, 0.12);
+    color: var(--accent); background: var(--tint);
 }
 /* 這個遊戲的電腦可以改成照訓練好的模型出牌 */
 .model {
     align-self: flex-start; margin-top: 3px; padding: 1px 8px; border-radius: 6px;
-    font-size: 12px; font-weight: 700; color: #bae6fd; background: rgba(56, 189, 248, 0.16);
+    font-size: 12px; font-weight: 700; color: var(--model-ink); background: var(--model-bg);
 }
-.empty { color: #a7d3b8; }
+.empty { color: var(--muted); }
 /* 中文在標點處換行，不把「不允許」這類詞拆開 */
 .desc, footer { word-break: keep-all; overflow-wrap: anywhere; }
 footer {
-    margin-top: 36px; padding-top: 14px; border-top: 1px solid rgba(251, 191, 36, 0.22);
-    font-size: 12.5px; line-height: 1.8; color: #8fbfa3;
+    margin-top: 36px; padding-top: 14px; border-top: 1px solid var(--line);
+    font-size: 12.5px; line-height: 1.8; color: var(--muted);
 }
 .missing { text-align: center; padding-top: 18vh; }
-.missing p { color: #a7d3b8; }
+.missing p { color: var(--muted); }
 .back {
     display: inline-block; margin-top: 10px; padding: 10px 22px; border-radius: 12px;
-    background: linear-gradient(135deg, #fbbf24, #d97706); color: #3b0a16; font-weight: 900; text-decoration: none;
+    background: var(--mark); color: var(--mark-ink); font-weight: 900; text-decoration: none;
+}
+@media (max-width: 600px) {
+    .theme-picker { width: 100%; }
+    .theme-option { padding-inline: 5px; }
 }
 @media (prefers-reduced-motion: reduce) { .card { transition: none; } }
 """
+
+THEME_SCRIPT = """<script>
+(() => {
+    const themes = __THEMES__;
+    const storageKey = 'game-lobby-theme';
+    const root = document.documentElement;
+    const gameStyle = document.getElementById('game-theme-style');
+    let browserColor = document.querySelector('meta[name="theme-color"]');
+    if (!browserColor) {
+        browserColor = document.createElement('meta');
+        browserColor.name = 'theme-color';
+        browserColor.content = '#072b18';
+        document.head.append(browserColor);
+    }
+    const classicColor = browserColor.content;
+    let gamePicker;
+
+    function applyTheme(value) {
+        const theme = themes.includes(value) ? value : themes[0];
+        root.dataset.theme = theme;
+        if (gameStyle) gameStyle.media = theme === 'felt' ? 'not all' : 'all';
+        browserColor.content = theme === 'felt' ? classicColor : getComputedStyle(root).getPropertyValue('--canvas').trim();
+        if (gamePicker) gamePicker.value = theme;
+        for (const radio of document.querySelectorAll('input[name="lobby-theme"]')) {
+            radio.checked = radio.value === theme;
+        }
+    }
+
+    function savedTheme() {
+        try { return localStorage.getItem(storageKey); } catch { return root.dataset.theme; }
+    }
+    applyTheme(savedTheme());
+
+    document.addEventListener('DOMContentLoaded', () => {
+        const template = document.getElementById('game-theme-control');
+        if (template) {
+            const rules = document.querySelector('#rulesModal .overflow-y-auto, #rulesDialog .modal-body');
+            if (rules) {
+                gamePicker = template.content.querySelector('select');
+                rules.prepend(template.content);
+            }
+        }
+        applyTheme(root.dataset.theme);
+        const picker = gamePicker || document.getElementById('lobby-themes');
+        if (!picker) return;
+        picker.addEventListener('change', event => {
+            applyTheme(event.target.value);
+            try { localStorage.setItem(storageKey, root.dataset.theme); } catch { /* 本頁仍可切換 */ }
+        });
+    });
+    window.addEventListener('storage', event => {
+        if (event.key === storageKey || event.key === null) applyTheme(savedTheme());
+    });
+    window.addEventListener('pageshow', event => { if (event.persisted) applyTheme(savedTheme()); });
+})();
+</script>""".replace("__THEMES__", json.dumps(list(THEMES)))
+
+# 只有選了紙上棋室或東京夜色才啟用這張樣式表。各遊戲原本的經典外觀由自己的 HTML 提供。
+try:
+    GAME_THEME_CSS = (GAMES_DIR / "themes.css").read_text(encoding="utf-8")
+except OSError:
+    GAME_THEME_CSS = ""  # 只有伺服器腳本或遊戲資料夾缺少佈景時，仍可開啟大廳和原版遊戲
+
+GAME_THEME_HEAD = (
+    f'<style id="game-theme-style" media="not all">{THEME_COLORS}{GAME_THEME_CSS}</style>'
+    + """<style>
+.game-theme-setting { display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    margin-bottom: 16px; font-size: 14px; font-weight: 700; }
+.game-theme-setting select { min-height: 40px; padding: 4px 10px; font: inherit;
+    border: 1px solid var(--line, #64748b); border-radius: 8px;
+    background: var(--surface, #1e293b); color: var(--ink, #f8fafc); }
+.game-theme-setting select:focus-visible { outline: 2px solid var(--accent, #fbbf24); outline-offset: 2px; }
+</style><template id="game-theme-control"><label class="game-theme-setting">遊戲主題<select>"""
+    + "".join(f'<option value="{key}">{name}</option>' for key, name in THEMES.items())
+    + '</select></label></template>' + THEME_SCRIPT
+) if GAME_THEME_CSS else ""
 
 # 插在每個遊戲頁面最後：點左上角的遊戲圖示回到大廳（手機「加入主畫面」後沒有上一頁按鈕）
 HOME_BUTTON = """<script>
@@ -231,8 +381,9 @@ HOME_BUTTON = """<script>
     var badge = document.createElement('span');
     badge.setAttribute('aria-hidden', 'true');
     badge.style.cssText = 'position:absolute;left:-5px;bottom:-5px;width:17px;height:17px;border-radius:50%;'
-        + 'display:flex;align-items:center;justify-content:center;background:#0e4b28;border:1.5px solid #fbbf24;';
-    badge.innerHTML = '<svg viewBox="0 0 16 16" width="9" height="9" fill="#fcd34d"><path d="M8 1.5 1 7.5h2.2V14h3.6v-4h2.4v4h3.6V7.5H15z"/></svg>';
+        + 'display:flex;align-items:center;justify-content:center;background:var(--canvas,#0e4b28);'
+        + 'border:1.5px solid var(--accent,#fbbf24);color:var(--accent,#fcd34d);';
+    badge.innerHTML = '<svg viewBox="0 0 16 16" width="9" height="9" fill="currentColor"><path d="M8 1.5 1 7.5h2.2V14h3.6v-4h2.4v4h3.6V7.5H15z"/></svg>';
     logo.appendChild(badge);
     function goHome() {
         if (confirm('回到遊戲大廳？目前這一局不會保存。')) location.href = '/';
@@ -568,7 +719,7 @@ def icon_uri(char):
     return "data:image/svg+xml," + quote(svg)
 
 
-def page_shell(title, icon, body):
+def page_shell(title, icon, body, head_script=""):
     return f"""<!DOCTYPE html>
 <html lang="zh-Hant">
 <head>
@@ -578,8 +729,9 @@ def page_shell(title, icon, body):
 <meta name="theme-color" content="#072b18">
 <title>{html.escape(title)}</title>
 <link rel="icon" href="{icon_uri(icon)}">
-{FONT_LINKS}
 <style>{PAGE_CSS}</style>
+{head_script}
+{FONT_LINKS}
 </head>
 <body>
 <main class="wrap">
@@ -607,19 +759,30 @@ def lobby_page(address, bots=None):
                         for game in games if game["category"] == category)
         sections.append(f'<section><h2>{html.escape(category)}</h2><div class="grid">{cards}</div></section>')
     content = "".join(sections) or '<p class="empty">games/ 資料夾裡還沒有遊戲。</p>'
+    theme_options = "".join(
+        f'<label><input type="radio" name="lobby-theme" value="{key}">'
+        f'<span class="theme-option"><span class="swatch" aria-hidden="true"></span>{name}</span></label>'
+        for key, name in THEMES.items()
+    )
     body = f"""<header class="top">
-  <div class="logo">遊</div>
-  <div>
-    <h1>遊戲大廳</h1>
-    <p class="sub">Tailscale 內網 · {html.escape(address)}</p>
+  <div class="brand">
+    <div class="logo" aria-hidden="true">遊</div>
+    <div>
+      <h1>遊戲大廳</h1>
+      <p class="sub">Tailscale 內網 · {html.escape(address)}</p>
+    </div>
   </div>
+  <fieldset class="theme-picker" id="lobby-themes">
+    <legend>大廳主題</legend>
+    <div class="theme-options">{theme_options}</div>
+  </fieldset>
 </header>
 {content}
 <footer>
   iPhone／iPad：用 Safari 打開這頁，點「分享」→「加入主畫面」，就能像 App 一樣開啟。<br>
   進入遊戲後，點左上角的圖示可以回到大廳。
 </footer>"""
-    return page_shell("遊戲大廳", "遊", body)
+    return page_shell("遊戲大廳", "遊", body, THEME_SCRIPT)
 
 
 def not_found_page():
@@ -646,10 +809,12 @@ def page_version(page):
 
 
 def add_lobby_links(page, game):
-    """在遊戲頁面加上主畫面名稱、分頁圖示、自動記錄、照模型出牌和回大廳按鈕（不改動 games/ 裡的檔案）。"""
+    """組裝伺服器提供的外觀與功能。對局版本始終取自原始遊戲 HTML。"""
     recorder = RECORDER.replace("__GAME__", game["slug"]).replace("__BUILD__", page_version(page))
     head = (f'<meta name="apple-mobile-web-app-title" content="{html.escape(game["name"])}">'
             f'<link rel="icon" href="{icon_uri(game["icon"])}">{recorder}{BOT.replace("__GAME__", game["slug"])}')
+    if game["slug"] in CATALOG:
+        head += GAME_THEME_HEAD
     page = insert_before(page, b"</head>", head.encode(), last=False)
     return insert_before(page, b"</body>", HOME_BUTTON.encode(), last=True)
 

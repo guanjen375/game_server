@@ -39,6 +39,8 @@ python3 open_server.py run        # 在前景執行（Ctrl+C 結束），除錯�
 
 iPhone／iPad 用 Safari 打開遊戲大廳，點「分享」→「加入主畫面」，就能像 App 一樣開啟；進入遊戲後點左上角的圖示可以回到大廳。
 
+在大廳的「大廳主題」可選經典牌桌（預設）、紙上棋室或東京夜色。七款遊戲都會沿用這個外觀。對局中也可以打開規則說明，在「遊戲主題」直接切換並繼續這一局。同一個瀏覽器會記住選擇。後兩款的配色分別參考 [Solarized](https://ethanschoonover.com/solarized/) 與 [Tokyo Night](https://github.com/tokyo-night/tokyo-night-vscode-theme)。
+
 ## 對局紀錄
 
 每一局都會自動記錄下來，不用按任何按鈕（之後分析打牌習慣、訓練電腦用）：
