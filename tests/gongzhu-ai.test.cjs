@@ -11,7 +11,7 @@ const load = compileFunction(script + '\nreturn { game, ai: GongZhuAI };', ['win
 const name = card => card.suit + card.label;
 
 // Replay the public tricks in play order. The bot only gets its own remaining hand.
-function position({ history = [], trick, hand, totals = [0, 0, 0, 0], leader = 1, mode = 'classic', seed = 1 }) {
+function position({ history = [], trick, hand, totals = [0, 0, 0, 0], leader = 1, seed = 1 }) {
     const math = Object.create(Math);
     math.random = () => {
         seed = (Math.imul(1664525, seed) + 1013904223) >>> 0;
@@ -28,7 +28,6 @@ function position({ history = [], trick, hand, totals = [0, 0, 0, 0], leader = 1
     const seats = game.SEAT_ORDER;
     for (let q = 0; q < seats.length; q++) game.PLAYERS[seats[q]].totalScore = totals[q];
     const plays = cards => take(cards).map((card, i) => ({ seat: seats[(leader + i) % 4], card }));
-    game.scoringRuleMode = mode;
     for (const cards of history) {
         const entries = plays(cards);
         const winner = game.trickWinner(entries).seat;
@@ -59,9 +58,9 @@ test('first trick: a running heart hand gives the sheep to the transformer holde
     assert.notEqual(weak(32), 'DJ');
 });
 
-test('after a single zero-point heart, the simulation already breaks the possible sweep whatever the standings', () => {
+test('after a single heart, the simulation already breaks the possible sweep whatever the standings', () => {
     const early = {
-        history: ['C2 CA C3 H4'], trick: 'H8 H2 H3', hand: 'H5 H9 S2 S4 S6 S8 D2 D4 D6 D8 C4 C6'
+        history: ['C2 CA C3 H4'], trick: 'H8 H2 H3', hand: 'H5 H9 S2 S4 S7 S8 D2 D4 D6 D8 C4 C6'
     };
     // An empty sample set exercises the same policy that plays every simulated turn.
     assert.equal(position(early)(0), 'H9');
@@ -71,8 +70,8 @@ test('after a single zero-point heart, the simulation already breaks the possibl
 
 // After four tricks all hearts are out. Moving just the first heart to a second
 // player changes the value of the sheep and pig for the entire table.
-const swept = ['C2 CA C7 H2', 'HA H3 H4 H5', 'HK H6 H7 H8', 'HQ H9 H10 HJ'];
-const split = ['C2 C7 CA H2', 'H3 H4 H5 HA', 'HK H6 H7 H8', 'HQ H9 H10 HJ'];
+const swept = ['C2 CA C10 H2', 'HA H3 H4 H5', 'HK H6 H7 H8', 'HQ H9 H10 HJ'];
+const split = ['C2 C10 CA H2', 'H3 H4 H5 HA', 'HK H6 H7 H8', 'HQ H9 H10 HJ'];
 test('with no clubs, discard the flipped sheep or the ordinary pig onto a known winner', () => {
     for (const [history, expected] of [[swept, 'DJ'], [split, 'SQ']]) {
         const pick = position({
@@ -99,7 +98,7 @@ test('take a flipped pig already on the table and duck it when hearts are split'
     }
 });
 
-// With only the zero-point H2 left to score, the bot can duck with C3 or take
+// With only H2 left to score, the bot can duck with C3 or take
 // with CA. Only the owners of scoring cards in the opening tricks differ.
 const ending = [
     'HA H3 H4 H5', 'HK H6 H7 H8', 'HQ H9 H10 HJ', 'SK S2 S5 S6',
@@ -118,26 +117,18 @@ test('allow or break the same opponent sweep according to the final score margin
 
 test('keep the flipped sheep when giving it away would complete an opponent grand slam', () => {
     const history = ['C2 C10 H2 SQ', ...swept.slice(1)];
-    for (const mode of ['classic', 'strict_swap', 'super_slam']) {
-        const pick = position({ history, trick: 'DA D2', hand: 'DJ D3 D4 S3 S5 S7 S9 SJ SK', mode });
-        assert.notEqual(pick(0), 'DJ');
-        assert.notEqual(pick(32), 'DJ');
-    }
+    const pick = position({ history, trick: 'DA D2', hand: 'DJ D3 D4 S3 S5 S8 S9 SJ SK' });
+    assert.notEqual(pick(0), 'DJ');
+    assert.notEqual(pick(32), 'DJ');
 });
 
 test('a last-place player is stopped one card short of a slam, however far behind', () => {
     const history = [
         'C2 CQ C5 C10', 'SA S3 S4 SQ', 'DA D6 D5 DJ',
-        'HK H3 H4 H5', 'HQ H6 H7 H8', 'HJ H9 H10 H2', ...ending.slice(3)
+        'HK H3 H4 H5', 'HQ H6 H7 H8', 'HJ H9 H10 H2', 'SK S2 S5 S7', 'S6 S8 S9 SJ', ...ending.slice(5)
     ];
-    for (const [totals, mode] of [
-        [[100, 80, -1200, 60], 'super_slam'], // Even +1000 leaves them last. Stopping it still costs us only the 50 for HA.
-        [[100, 80, -100, 60], 'super_slam'],
-        [[100, 80, -800, 60], 'classic'],
-        [[100, 80, -800, 60], 'super_slam'],
-        [[100, 1500, -400, 0], 'classic']
-    ]) {
-        const pick = position({ history, trick: 'C4 CK HA', hand: 'C3 CA', totals, mode });
+    for (const totals of [[100, 80, -1200, 60], [100, 80, -100, 60], [100, 80, -800, 60], [100, 1500, -400, 0]]) {
+        const pick = position({ history, trick: 'C4 CK HA', hand: 'C3 CA', totals });
         assert.equal(pick(0), 'CA');
         assert.equal(pick(32), 'CA');
     }
@@ -154,13 +145,13 @@ test('a penalty is worth the same on every opponent, and cumulative totals do no
     assert.ok(worth(2) < -2 * worth(0)); // Eating the pig costs three times what giving it away gains.
 });
 
-// West leads S6, South throws HJ and East plays SA. North is last, holding the pig and five low spades.
+// East leads S6, South throws HJ and West plays SA. North is last, holding the pig and five lower spades.
 test('the pig goes under a spade ace already on the table whoever leads the match', () => {
     const tucked = {
         history: ['C2 CA CK C5', 'D8 D5 D7 D2', 'S10 SK S5 SJ'], trick: 'S6 HJ SA',
-        hand: 'SQ S8 S7 S4 S3 S2 C8 C7 C3 D3'
+        hand: 'SQ S9 S8 S4 S3 S2 C8 C7 C3 D3'
     };
-    // South first with North second, East (the ace) first, all level, South far ahead, North first.
+    // South first with North second, West (the ace) first, all level, South far ahead, North first.
     for (const totals of [[130, -50, 60, -340], [-50, 130, 60, -340], [0, 0, 0, 0], [600, -50, 60, -340], [60, -50, 130, -340]]) {
         assert.equal(position({ ...tucked, totals })(0), 'SQ');
         for (const seed of [1, 19, 73]) assert.equal(position({ ...tucked, totals, seed })(32), 'SQ');
@@ -172,45 +163,45 @@ test('the score projections match game settlement for ordinary hands, flipped sp
     const deck = game.createShuffledDeck();
     const hearts = deck.filter(c => c.suit === 'H').sort((a, b) => a.rank - b.rank);
     const specials = ['SQ', 'DJ', 'C10'].map(key => deck.find(c => name(c) === key));
-    for (const mode of ['classic', 'strict_swap', 'super_slam']) {
-        game.scoringRuleMode = mode;
-        for (let mask = 0; mask < 8; mask++) {
-            const kept = specials.filter((_, i) => mask & (1 << i));
-            const fullScore = game.calculatePlayerScore(kept.concat(hearts), true).score;
-            for (const count of [0, 1, 12, 13]) {
-                const cards = kept.concat(hearts.slice(0, count));
-                const cap = ai.newCap(cards.map(c => ai.toInt(c)));
-                assert.equal(ai.score(cap, count === 13, mode), game.calculatePlayerScore(cards, count === 13).score);
-                assert.equal(ai.score(cap, true, mode, true), fullScore);
-                if (!count) assert.equal(ai.score(cap, true, mode), game.calculatePlayerScore(cards, true).score);
-            }
+    // Bits select the pig, sheep and transformer in that order.
+    const sweepScores = [200, 300, 100, 500, 500, 500, 500, 1000];
+    for (const [mask, expected] of sweepScores.entries()) {
+        const kept = specials.filter((_, i) => mask & (1 << i));
+        const full = game.calculatePlayerScore(kept.concat(hearts));
+        assert.equal(full.score, expected);
+        assert.equal(full.isGrandSlam, mask === 7);
+        if (expected === 500) assert.match(full.formula, /特殊規則.*\+500/);
+        for (const count of [0, 1, 12, 13]) {
+            const cards = kept.concat(hearts.slice(0, count));
+            const cap = ai.newCap(cards.map(c => ai.toInt(c)));
+            assert.equal(ai.score(cap, count === 13), game.calculatePlayerScore(cards, count === 13).score);
+            assert.equal(ai.score(cap, true, true), expected);
         }
     }
 });
 
-test('all four seats start with 50 and only card points are doubled or replaced by a slam', () => {
+test('card values, doubling and table-wide color changes are applied to their holders', () => {
     const { game } = load({}, Math);
     const deck = game.createShuffledDeck();
-    const hearts = deck.filter(c => c.suit === 'H');
+    const hearts = deck.filter(c => c.suit === 'H').sort((a, b) => a.rank - b.rank);
     const [pig, sheep, transformer] = ['SQ', 'DJ', 'C10'].map(key => deck.find(c => name(c) === key));
-    const scores = captures => game.SEAT_ORDER.map(seat => captures[seat].score);
-    assert.deepEqual(scores(game.calculateRoundScores()), [50, 50, 50, 50]);
-    for (const [mode, bonus] of [['classic', 800], ['strict_swap', 800], ['super_slam', 1000]]) {
-        game.scoringRuleMode = mode;
-        for (const [piles, expected] of [
-            [{ south: [pig, transformer], east: [sheep] }, [-150, 150, 50, 50]],
-            [{ south: [transformer], east: [pig] }, [100, -50, 50, 50]],
-            [{ south: [...hearts, sheep, transformer], east: [pig] }, [250, 150, 50, 50]],
-            [{ west: [...hearts, pig, sheep, transformer] }, [50, 50, 50, 50 + bonus]]
-        ]) {
-            const round = game.calculateRoundScores(piles);
-            assert.deepEqual(scores(round), expected);
-            for (const seat of game.SEAT_ORDER) assert.match(round[seat].formula, /^底分\(\+50\)/);
-        }
+    assert.deepEqual(hearts.map(card => game.calculatePlayerScore([card]).score),
+        [-2, -3, -10, -5, -6, -7, -8, -9, -10, -20, -30, -40, -50]);
+    for (const [piles, expected] of [
+        [{}, [0, 0, 0, 0]],
+        [{ south: [pig, transformer], west: [sheep] }, [-200, 100, 0, 0]],
+        [{ south: [transformer], east: [pig] }, [50, 0, 0, -100]],
+        [{ south: hearts, west: [pig], north: [sheep, transformer] }, [200, 100, -200, 0]],
+        [{ south: [...hearts, transformer], west: [pig], north: [sheep] }, [500, 100, -100, 0]],
+        [{ south: [...hearts, pig, sheep], east: [transformer] }, [500, 0, 0, 50]],
+        [{ south: [...hearts.slice(1), pig, sheep, transformer], east: [hearts[0]] }, [-396, 0, 0, -2]]
+    ]) {
+        const round = game.calculateRoundScores(piles);
+        assert.deepEqual(game.SEAT_ORDER.map(seat => round[seat].score), expected);
     }
 });
 
-test('settling twice and recalculating history credit the base only once per seat per round', () => {
+test('settlement credits a grand slam and a special sweep only once and records each round', () => {
     const document = { getElementById: id => id.startsWith('trick-slot-') ? {} : null };
     const { game } = load({}, Math, document);
     game.sound.enabled = false;
@@ -220,19 +211,26 @@ test('settling twice and recalculating history credit the base only once per sea
     game.finishRound();
     game.finishRound();
     assert.equal(game.roundHistory.length, 1);
-    assert.deepEqual(totals(), [50, 850, 50, 50]);
+    assert.deepEqual(totals(), [0, 0, 0, 1000]);
 
     game.closeScoreModal = game.updateHeaderInfo = game.later = () => {};
     game.startNextRound();
-    assert.deepEqual(totals(), [50, 850, 50, 50]);
-    game.PLAYERS.south.captured = game.createShuffledDeck().filter(c => c.isScoring);
+    assert.deepEqual(totals(), [0, 0, 0, 1000]);
+    const opener = game.currentTurn;
+    assert.ok(game.PLAYERS[opener].hand.some(c => c.id === 'S7'));
+    assert.deepEqual(game.getLegalCards(opener), game.PLAYERS[opener].hand);
+    const deck = game.createShuffledDeck();
+    game.PLAYERS.south.captured = deck.filter(c => c.suit === 'H' || c.id === 'C10');
+    game.PLAYERS.west.captured = [deck.find(c => c.id === 'S12')];
+    game.PLAYERS.north.captured = [deck.find(c => c.id === 'D11')];
     game.finishRound();
-    for (const [mode, total] of [['super_slam', 1100], ['super_slam', 1100], ['classic', 900]]) {
-        game.setScoringRuleMode(mode);
-        assert.deepEqual(totals(), [total, total, 100, 100]);
-        assert.equal(game.roundHistory.length, 2);
-        assert.equal(game.roundHistory[0].scores.south, total - 50);
-    }
+    game.finishRound();
+    assert.deepEqual(totals(), [500, 100, -100, 1000]);
+    assert.deepEqual(game.roundHistory.map(round => round.scores.south), [500, 0]);
+    const record = game.getRecord();
+    assert.equal(record.result.south.score, 500);
+    assert.match(record.result.south.formula, /特殊規則/);
+    assert.equal(record.totals.east, 1000);
 });
 
 test('avoid doubling a pig, use another winner if forced, and double a sheep when it pays', () => {
@@ -251,7 +249,7 @@ test('avoid doubling a pig, use another winner if forced, and double a sheep whe
 test('do not lead the transformer into more penalties after taking HA and HJ', () => {
     const state = {
         leader: 0, history: ['C2 C6 CK CQ', 'H3 HA HJ C9'], trick: '',
-        hand: 'SA SK S7 H10 H4 CJ C10 C4 C3 D3 D2'
+        hand: 'SA SK S8 H10 H4 CJ C10 C4 C3 D3 D2'
     };
     for (const seed of [1, 19, 73]) assert.notEqual(position({ ...state, seed })(32), 'C10');
 });
@@ -260,7 +258,7 @@ test('cash the club ace on an empty trick or duck if the last player has shown a
     for (const [lastCard, expected] of [['C7', 'CA'], ['H2', 'C3']]) {
         const pick = position({
             leader: 0, history: ['C2 CK C5 ' + lastCard, 'H9 H4 H6 H3', 'H10 H7 H5 HJ'],
-            trick: 'C4 C6', hand: 'C3 CA S2 S5 S7 S9 D2 D4 D6 H8'
+            trick: 'C4 C6', hand: 'C3 CA S2 S5 S8 S9 D2 D4 D6 H8'
         });
         assert.equal(pick(0), expected);
         assert.equal(pick(32), expected);
@@ -280,7 +278,7 @@ test('place an ordinary sheep with the known ace winner when keeping it risks th
     const pick = position({
         leader: 3, history: ['C2 CA C4 CQ', 'S2 S3 SJ S10', 'H7 H2 HA HQ', 'D5 DQ D8 D10',
             'H6 H4 HJ H8', 'C5 C9 C8 C7', 'S5 S8 SA S6', 'H3 H5 D9 C6', 'C10 D3 C3 HK',
-            'S4 S7 S9 H10', 'SQ H9 D7 SK'], trick: 'DA CK', hand: 'DJ D4'
+            'S7 S4 S9 H10', 'SQ H9 D7 SK'], trick: 'DA CK', hand: 'DJ D4'
     });
     assert.equal(pick(24), 'DJ');
 });
@@ -299,19 +297,19 @@ test('endgame hypotheses respect public voids and an expensive voluntary capture
     const live = [8191, 8191, 8191, 8191];
     for (const c of [13, 14, ...trick.map(t => t.c)]) live[Math.floor(c / 13)] &= ~(1 << (c % 13));
     const clue = { p: 3, card: 37, known: [37], trick, cap, live, voids: [0, 4, 0, 0] }; // CK took the pig.
-    const weight = held => ai.dealWeight([[], [], [], held], [clue], { mode: 'classic', totals: [0, 0, 0, 0] });
+    const weight = held => ai.dealWeight([[], [], [], held], [clue], { totals: [0, 0, 0, 0] });
     assert.ok(weight([27, 39]) < weight([38, 39])); // A C3 could have ducked. A CA could not.
     assert.ok(weight([27, 39]) > 0);
 });
 
-// A pile of hearts is not a sweep. South took eight hearts in two tricks but holds none: the ace, king, queen
-// and jack are all outside, and one of them landing in another pile ends it. Over 538 recorded rounds the computers
+// South took eight hearts in two tricks but holds none. High hearts are still outside,
+// and one of them landing in another pile ends the sweep. Over 538 recorded rounds the computers
 // completed about one such attempt in five, and paid for the pig and the transformer in the rest.
 const stranded = ['H5 H6 H9 H7', 'D4 D9 DK D8', 'H2 H4 H10 H8'];
 test('without the top hearts, eight hearts in the pile are no reason to take the pig or the transformer', () => {
     for (const [history, trick, hand, expected] of [
         [['C2 CA C7 C5', ...stranded, 'C3 C6 C9 C4'], 'S5 SQ', 'SA S3 D2 D5 D7 C8 CJ DQ', 'S3'],
-        [['S2 SA S7 S5', ...stranded, 'S3 S6 S9 S4'], 'C5 C10', 'CA C3 D2 D5 D7 S8 SJ DQ', 'C3']
+        [['S7 SA S2 S5', ...stranded.slice(0, 2), 'H2 H4 HJ H8', 'S3 S6 S9 S4'], 'C5 C10', 'CA C3 D2 D5 D7 S8 SJ DQ', 'C3']
     ]) {
         assert.equal(position({ history, trick, hand })(0), expected);
         for (const seed of [1, 19, 73]) assert.equal(position({ history, trick, hand, seed })(32), expected);
@@ -356,7 +354,7 @@ test('simulated opponents do not sit back while the seat that is deciding holds 
     const hands = [[12, 39, 42, 32], [0, 40, 43, 27], [1, 41, 44, 28], [2, 45, 46, 29]];
     const live = [0, 0, 0, 0];
     for (const c of hands.flat()) live[Math.floor(c / 13)] |= 1 << (c % 13);
-    const match = { totals: [0, 0, 0, 0], mode: 'classic' };
+    const match = { totals: [0, 0, 0, 0] };
     const styles = piles => {
         const cap = piles.map(cards => ai.newCap(cards));
         const seen = [];

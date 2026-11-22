@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-    <title>經典拱豬 Gong Zhu - 網頁撲克牌遊戲</title>
+    <title>拱豬｜特殊規則</title>
     <link rel="stylesheet" href="assets/layout.css">
     <style>
         * {
@@ -420,7 +420,7 @@
                     </div>
                     <div class="text-right">
                         <div class="text-[11px] text-slate-300">累計 <span id="total-north" class="font-black text-sm text-amber-300">0</span></div>
-                        <div class="text-[10px] text-slate-400">本局 <span id="live-north" class="font-bold text-white">+50</span></div>
+                        <div class="text-[10px] text-slate-400">本局 <span id="live-north" class="font-bold text-white">0</span></div>
                     </div>
                 </div>
                 <!-- 北家已吃到的計分牌（亮牌區） -->
@@ -444,7 +444,7 @@
                 </div>
                 <div class="mt-1.5 flex flex-col items-start sm:flex-row sm:justify-between sm:items-center text-[11px] bg-black/30 px-1.5 sm:px-2 py-1 rounded-lg">
                     <span class="text-slate-300">累計 <strong id="total-west" class="text-amber-300">0</strong></span>
-                    <span class="text-slate-400">本局 <strong id="live-west" class="text-white">+50</strong></span>
+                    <span class="text-slate-400">本局 <strong id="live-west" class="text-white">0</strong></span>
                 </div>
                 <div id="turn-badge-west" class="hidden mt-1 text-center text-[10px] py-0.5 rounded bg-amber-400 text-slate-950 font-black">思考出牌中...</div>
                 <!-- 西家亮牌區 -->
@@ -498,7 +498,7 @@
                 </div>
                 <div class="mt-1.5 flex flex-col items-start sm:flex-row sm:justify-between sm:items-center text-[11px] bg-black/30 px-1.5 sm:px-2 py-1 rounded-lg">
                     <span class="text-slate-300">累計 <strong id="total-east" class="text-amber-300">0</strong></span>
-                    <span class="text-slate-400">本局 <strong id="live-east" class="text-white">+50</strong></span>
+                    <span class="text-slate-400">本局 <strong id="live-east" class="text-white">0</strong></span>
                 </div>
                 <div id="turn-badge-east" class="hidden mt-1 text-center text-[10px] py-0.5 rounded bg-amber-400 text-slate-950 font-black">思考出牌中...</div>
                 <!-- 東家亮牌區 -->
@@ -550,7 +550,7 @@
                     <div class="flex items-center gap-3 text-right">
                         <div class="bg-black/35 px-2.5 py-1 rounded-lg border border-white/10">
                             <span class="text-[11px] text-slate-400">本局 </span>
-                            <span id="live-south" class="text-xs sm:text-sm font-black text-white">+50</span>
+                            <span id="live-south" class="text-xs sm:text-sm font-black text-white">0</span>
                         </div>
                         <div class="bg-amber-500/20 px-2.5 py-1 rounded-lg border border-amber-400/30">
                             <span class="text-[11px] text-amber-200">累計 </span>
@@ -575,82 +575,51 @@
         <div class="bg-slate-900 border border-emerald-500/40 rounded-3xl max-w-2xl w-full modal-h-88 flex flex-col shadow-2xl overflow-hidden">
             <div class="px-6 py-4 bg-gradient-to-r from-emerald-900 to-slate-900 border-b border-white/10 flex items-center justify-between">
                 <h2 class="text-lg sm:text-xl font-black text-amber-300 flex items-center gap-2" id="rulesModalHeading">
-                    <span>📖</span> 經典拱豬（Gong Zhu）規則說明
+                    拱豬特殊規則
                 </h2>
                 <button aria-label="關閉視窗" onclick="game.closeRulesModal()" class="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white font-bold">✕</button>
             </div>
             <div class="p-6 overflow-y-auto space-y-5 text-sm text-slate-200 leading-relaxed">
                 <div>
-                    <h3 class="text-amber-400 font-black text-base mb-1.5">一、基本玩法與出牌規則</h3>
+                    <h3 class="text-amber-400 font-black text-base mb-1.5">出牌順序</h3>
                     <ul class="list-disc pl-5 space-y-1 text-slate-300">
-                        <li>使用一副標準 52 張撲克牌（無鬼牌），4 位玩家每人發 13 張牌。</li>
-                        <li><strong>首墩領出：</strong>每局第 1 墩由持有 <strong>梅花 2 (♣2)</strong> 的玩家先出牌並打出 ♣2；之後每一墩由上一墩的贏家先出牌。</li>
-                        <li><strong>跟牌與墊牌：</strong>跟牌玩家必須打出與「首張牌」相同花色的牌（有該花色必出）；若手中完全沒有該花色，則可打出任意其他花色的牌（墊牌，不會贏得該墩）。</li>
-                        <li><strong>勝負判定：</strong>同一墩中，符合「首張牌花色」且點數最大者贏得該墩（點數大小：<strong>A &gt; K &gt; Q &gt; J &gt; 10 &gt; 9 &gt; 8 &gt; 7 &gt; 6 &gt; 5 &gt; 4 &gt; 3 &gt; 2</strong>），並收下該墩中所有的計分牌。</li>
+                        <li>四人各拿 13 張牌。持有 <strong>♠7</strong> 的玩家先手，可選任一張手牌領出，接著順時針出牌。</li>
+                        <li>有首張牌的花色就必須跟同花色，缺門時可以墊任一張牌。</li>
+                        <li>首出花色中點數最大的人吃下這一墩，並領出下一墩。A 最大，2 最小。</li>
                     </ul>
                 </div>
 
                 <div>
-                    <h3 class="text-amber-400 font-black text-base mb-2">二、經典拱豬計分表</h3>
-                    <p class="text-slate-300 mb-2">每人每局先得 <strong class="text-emerald-400">50 分底分</strong>，再加上這局吃到的牌分。</p>
+                    <h3 class="text-amber-400 font-black text-base mb-2">計分牌</h3>
+                    <p class="text-slate-300 mb-2">每局從 0 分開始，依各家吃到的牌計分。</p>
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                        <div class="bg-rose-950/50 border border-rose-500/40 rounded-xl p-3 flex items-start gap-3">
-                            <div class="text-2xl">🐷</div>
-                            <div>
-                                <div class="font-black text-rose-300">豬（黑桃 Q · ♠Q）</div>
-                                <div class="text-xs text-slate-300 mt-0.5">平時吃到扣 <strong class="text-rose-400">-100 分</strong>；只要<strong>任一玩家收全紅（13張紅心）</strong>，豬就變為 <strong class="text-emerald-400">+100 分</strong>，不論由哪位玩家吃到！</div>
-                            </div>
+                        <div class="bg-rose-950/50 border border-rose-500/40 rounded-xl p-3">
+                            <div class="font-black text-rose-300">♠Q　豬</div>
+                            <p class="text-xs text-slate-300 mt-0.5">平時 −100 分。有人收全紅時改為 +100 分。</p>
                         </div>
-                        <div class="bg-emerald-950/50 border border-emerald-500/40 rounded-xl p-3 flex items-start gap-3">
-                            <div class="text-2xl">🐑</div>
-                            <div>
-                                <div class="font-black text-emerald-300">羊（方塊 J · ♦J）</div>
-                                <div class="text-xs text-slate-300 mt-0.5">平時吃到加 <strong class="text-emerald-400">+100 分</strong>；只要<strong>任一玩家收全紅（13張紅心）</strong>，羊就變為 <strong class="text-rose-400">-100 分</strong>，不論由哪位玩家吃到。16 張全吃另按大滿貫特殊獎勵計分。</div>
-                            </div>
+                        <div class="bg-emerald-950/50 border border-emerald-500/40 rounded-xl p-3">
+                            <div class="font-black text-emerald-300">♦J　羊</div>
+                            <p class="text-xs text-slate-300 mt-0.5">平時 +100 分。有人收全紅時改為 −100 分。</p>
                         </div>
-                        <div class="bg-amber-950/50 border border-amber-500/40 rounded-xl p-3 flex items-start gap-3">
-                            <div class="text-2xl">⚡</div>
-                            <div>
-                                <div class="font-black text-amber-300">變壓器（梅花 10 · ♣10）</div>
-                                <div class="text-xs text-slate-300 mt-0.5">和其他計分牌一起吃到時，將<strong>牌分加倍 (×2)</strong>。單吃 ♣10 的牌分為 <strong class="text-emerald-400">+50 分</strong>，加上底分共 +100 分。</div>
-                            </div>
+                        <div class="bg-pink-950/50 border border-pink-500/40 rounded-xl p-3">
+                            <div class="font-black text-pink-300">♥　紅心</div>
+                            <p class="text-xs text-slate-300 mt-0.5">2、3 和 5 到 10 各扣牌面點數，4 扣 10 分。J、Q、K、A 依序扣 20、30、40、50 分。</p>
                         </div>
-                        <div class="bg-pink-950/50 border border-pink-500/40 rounded-xl p-3 flex items-start gap-3">
-                            <div class="text-2xl">❤️</div>
-                            <div>
-                                <div class="font-black text-pink-300">紅心牌（♥A ~ ♥2 共 13 張）</div>
-                                <div class="text-xs text-slate-300 mt-0.5">
-                                    ♥A(-50)、♥K(-40)、♥Q(-30)、♥J(-20)、♥10~♥5(各-10)、♥4~♥2(0分)。<br>
-                                    🔥 <strong>收全紅：</strong>收齊全部 13 張紅心由 -200 轉為 <strong class="text-emerald-400">+200 分</strong>！
-                                </div>
-                            </div>
+                        <div class="bg-amber-950/50 border border-amber-500/40 rounded-xl p-3">
+                            <div class="font-black text-amber-300">♣10　變壓器</div>
+                            <p class="text-xs text-slate-300 mt-0.5">單吃這張計分牌得 +50 分。自己收全紅時依下方規則計分，其餘組合將牌分合計乘以 2。</p>
                         </div>
-                    </div>
-
-                    <!-- 新增：豬羊變色與 16 張全吃大滿貫說明 -->
-                    <div class="mt-3 bg-gradient-to-r from-amber-950/70 via-emerald-950/60 to-amber-950/70 border border-amber-400/50 rounded-xl p-3.5">
-                        <div class="font-black text-amber-300 text-sm flex items-center gap-1.5 mb-1">
-                            <span>🌟</span> 豬羊變色 ＆ 16 張全吃大滿貫
-                        </div>
-                        <ul class="list-disc pl-5 text-xs text-slate-200 space-y-1">
-                            <li><strong>收全紅，全桌豬羊變色：</strong>當任一玩家收齊全部 13 張紅心（+200）時，這一局的<strong>黑桃 Q（豬）由 -100 變為 +100 分</strong>，<strong>方塊 J（羊）由 +100 變為 -100 分</strong>，不論豬羊由哪位玩家吃到！例如一家全紅配羊與變壓器，本局得 50 + (200 - 100) × 2 = +250 分。另一家單吃變色豬，本局得 50 + 100 = +150 分。</li>
-                            <li><strong>16 張全吃大滿貫：</strong>單一玩家獨攬全部 16 張計分牌（13張紅心 + ♠Q + ♦J + ♣10）時：<br>
-                                <span class="text-amber-300 font-bold">特殊獎勵：</span>牌分為 <strong>+800 分</strong>，加上底分共 +850 分。超級大滿貫模式的牌分為 <strong>+1000 分</strong>，加上底分共 +1050 分。
-                            </li>
-                        </ul>
                     </div>
                 </div>
 
-                <!-- 計分流派設定 -->
                 <div class="bg-slate-800/90 border border-amber-400/30 rounded-xl p-3.5">
-                    <label for="ruleModeSelectRules" class="block text-xs font-black text-amber-300 mb-1.5">
-                        ⚙️ 選擇全紅／全吃計分流派（切換後立即套用並重算所有局數）：
-                    </label>
-                    <select id="ruleModeSelectRules" onchange="game.setScoringRuleMode(this.value)" class="w-full bg-slate-950 border border-white/20 rounded-lg px-3 py-2 text-xs sm:text-sm font-bold text-white focus:outline-none focus:border-amber-400">
-                        <option value="classic">經典豬羊變色（有人收全紅時全桌豬+100、羊-100，16張全吃特獎 +800 分）【預設】</option>
-                        <option value="strict_swap">嚴格豬羊對調（有人收全紅時全桌豬+100、羊-100，16張全吃特獎 +800 分）</option>
-                        <option value="super_slam">超級大滿貫模式（有人收全紅時全桌豬+100、羊-100，16張全吃特獎 +1000 分）</option>
-                    </select>
+                    <h3 class="text-amber-400 font-black text-base mb-1.5">收全紅計分</h3>
+                    <ul class="list-disc pl-5 space-y-1 text-slate-300">
+                        <li>一家收齊 13 張紅心，紅心合計 <strong>+200 分</strong>，全桌的豬和羊都變色。</li>
+                        <li>收全紅的人若也吃到豬和羊，或吃到加倍牌 ♣10，就適用<strong>特殊規則</strong>，本局固定得 <strong class="text-amber-300">+500 分</strong>。</li>
+                        <li>若這家收齊全部 16 張計分牌（13 張紅心、豬、羊、♣10），本局固定得 <strong class="text-amber-300">+1000 分</strong>，優先於 +500 分。</li>
+                    </ul>
+                    <a class="text-xs text-slate-300 underline" href="https://dylanwan.pixnet.net/blog/posts/3018074318" target="_blank" rel="noopener noreferrer">參考 Dylan 的〈撲克牌玩法－拱豬〉</a>
                 </div>
 
                 <!-- 電腦的打法（伺服器上有訓練好的模型時才能選模型，見 README「讓電腦照模型出牌」） -->
@@ -690,24 +659,12 @@
                     <h2 id="scoreModalTitle" class="text-lg sm:text-xl font-black text-amber-300 flex items-center gap-2">
                         🏆 本局結算計分板
                     </h2>
-                    <p id="scoreModalSubtitle" class="text-xs text-slate-300 mt-0.5">各家捕獲計分牌與得分明細</p>
+                    <p id="scoreModalSubtitle" class="text-xs text-slate-300 mt-0.5">特殊規則</p>
                 </div>
                 <button aria-label="關閉視窗" id="scoreModalCloseBtn" onclick="game.closeScoreModal()" class="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white font-bold">✕</button>
             </div>
 
             <div class="p-4 sm:p-6 overflow-y-auto space-y-4">
-                <!-- 計分流派快速切換列 -->
-                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 bg-slate-950/80 border border-amber-400/30 rounded-xl px-3.5 py-2.5">
-                    <span class="text-xs font-black text-amber-300 whitespace-nowrap flex items-center gap-1.5">
-                        <span>⚙️</span> 計分流派設定：
-                    </span>
-                    <select id="ruleModeSelectScoreboard" onchange="game.setScoringRuleMode(this.value)" class="flex-1 bg-slate-900 border border-white/20 rounded-lg px-2.5 py-1.5 text-xs font-bold text-white focus:outline-none focus:border-amber-400">
-                        <option value="classic">經典豬羊變色（有人收全紅時全桌豬+100、羊-100，16張全吃特獎 +800 分）</option>
-                        <option value="strict_swap">嚴格豬羊對調（有人收全紅時全桌豬+100、羊-100，16張全吃特獎 +800 分）</option>
-                        <option value="super_slam">超級大滿貫模式（有人收全紅時全桌豬+100、羊-100，16張全吃特獎 +1000 分）</option>
-                    </select>
-                </div>
-
                 <!-- 電腦的打法快速切換列（伺服器上有訓練好的模型時才能選模型） -->
                 <div data-bot-setting class="hidden">
                     <div class="bg-slate-950/80 border border-sky-400/30 rounded-xl px-3.5 py-2.5">
@@ -827,7 +784,7 @@
     </div>
 
     <script>
-        const ROUND_BASE_POINTS = 50;
+        const HEART_POINTS = [-2, -3, -10, -5, -6, -7, -8, -9, -10, -20, -30, -40, -50]; // ♥2 到 ♥A
 
         /**
          * Web Audio API 合成音效系統（無須外部音檔，確保單檔離線/線上皆可順暢發聲）
@@ -910,8 +867,7 @@
          */
         const GongZhuAI = {
             SUIT_INDEX: { S: 0, H: 1, C: 2, D: 3 },
-            PIG: 10, SHEEP: 48, TRANS: 34,           // ♠Q、♦J、♣10
-            HEART_POINTS: [0, 0, 0, -10, -10, -10, -10, -10, -10, -20, -30, -40, -50],   // ♥2 ~ ♥A
+            SPADE_SEVEN: 5, PIG: 10, SHEEP: 48, TRANS: 34,
             BUDGET_MS: 160, MIN_SAMPLES: 24, MAX_SAMPLES: 400,
             // 電腦估「自己收全紅」原本太樂觀，沒收成就抱著紅心連豬和變壓器一起賠。拿 538 局實際對局對過之後修了兩處：
             //  1. sweepForecast：已經吃到的紅心張數原本直接當成機率（吃到 8 張就當成六成），實際上電腦說六成多的時候
@@ -929,14 +885,14 @@
             toInt(card) { return this.SUIT_INDEX[card.suit] * 13 + card.rank - 2; },
 
             /**
-             * view：{ me, legal, hand, trick: [{ p, card }], history: [[{ p, card } x4]], captured: [[card] x4], totals, mode }
+             * view：{ me, legal, hand, trick: [{ p, card }], history: [[{ p, card } x4]], captured: [[card] x4], totals }
              * 座位以出牌順序 0~3 表示；回傳 legal 裡的一張牌
              */
             choose(view) {
                 const legal = view.legal;
                 if (legal.length <= 1) return legal[0];
                 const me = view.me;
-                const match = { totals: view.totals ?? [0, 0, 0, 0], mode: view.mode };
+                const match = { totals: view.totals ?? [0, 0, 0, 0] };
                 const hand = view.hand.map(c => this.toInt(c));
                 const trick = view.trick.map(t => ({ p: t.p, c: this.toInt(t.card) }));
                 // 每家已出的張數、缺門
@@ -978,9 +934,14 @@
                 };
                 for (const tr of view.history) noteTrick(tr.map(t => ({ p: t.p, c: this.toInt(t.card) })));
                 if (trick.length) noteTrick(trick);
+                // 首家公開持有 ♠7。它還沒出現時，只把其餘未知牌分給三家。
+                const opener = view.history[0]?.[0].p ?? trick[0]?.p ?? me;
+                const reserveSeven = !seen[this.SPADE_SEVEN];
+                if (reserveSeven) seen[this.SPADE_SEVEN] = 1;
                 const unseen = [];
                 for (let c = 0; c < 52; c++) if (!seen[c]) unseen.push(c);
                 const need = [0, 1, 2, 3].map(p => (p === me ? 0 : 13 - played[p]));
+                if (reserveSeven) need[opener]--;
                 const estimates = [];
                 const pref = this.policy(me, hand, trick, cap, live, voids, match, 0, estimates);
                 // 同花色、同分值，且桌面和對手都沒有夾在中間的牌，兩張的吃墩能力相同。
@@ -991,7 +952,7 @@
                 for (const card of legal) {
                     const c = this.toInt(card), suit = Math.floor(c / 13);
                     const lower = external[suit] & ((1 << (c % 13)) - 1);
-                    const points = suit === 1 ? this.HEART_POINTS[c - 13] : 0;
+                    const points = suit === 1 ? HEART_POINTS[c - 13] : 0;
                     const key = c === this.PIG || c === this.SHEEP || c === this.TRANS ? c : [suit, lower, points].join('/');
                     if (!groups.has(key) || c === pref) groups.set(key, card);
                 }
@@ -1017,6 +978,7 @@
                         if (!this.deal(unseen, need, voids, me, hands)) break;
                         hands[me] = hand;
                     }
+                    if (reserveSeven) hands[opener].push(this.SPADE_SEVEN);
                     const weight = this.dealWeight(hands, evidence, match);
                     totalWeight += weight;
                     squaredWeight += weight * weight;
@@ -1087,23 +1049,39 @@
                 if (x === this.PIG) c.pig = true;
                 else if (x === this.SHEEP) c.sheep = true;
                 else if (x === this.TRANS) c.trans = true;
-                else if (x >= 13 && x < 26) { c.hearts++; c.heartSum += this.HEART_POINTS[x - 13]; }
+                else if (x >= 13 && x < 26) { c.hearts++; c.heartSum += HEART_POINTS[x - 13]; }
             },
             // 正式結算以實收張數判斷全紅。估牌時也可以試算指定一家收齊剩餘紅心的分數。
-            score(c, roundAllHearts, mode, allHearts = c.hearts === 13) {
-                let cardPoints;
-                if (c.trans && !c.pig && !c.sheep && !allHearts && c.hearts === 0) {
-                    cardPoints = 50;
-                } else if (allHearts && c.pig && c.sheep && c.trans) {
-                    cardPoints = mode === 'super_slam' ? 1000 : 800;
-                } else {
-                    cardPoints = allHearts ? 200 : c.heartSum;
-                    const changed = allHearts || roundAllHearts;
-                    if (c.pig) cardPoints += changed ? 100 : -100;
-                    if (c.sheep) cardPoints += changed ? -100 : 100;
-                    if (c.trans) cardPoints *= 2;
+            score(pile, roundAllHearts, allHearts = pile.hearts === 13, details = null) {
+                if (allHearts) {
+                    const pigAndSheep = pile.pig && pile.sheep;
+                    if (pigAndSheep && pile.trans) {
+                        details?.push('16 張計分牌全吃 (+1000)');
+                        return 1000;
+                    }
+                    if (pigAndSheep || pile.trans) {
+                        details?.push(pile.trans ? '特殊規則 · 全紅加 ♣10 (+500)' : '特殊規則 · 全紅加豬羊 (+500)');
+                        return 500;
+                    }
                 }
-                return ROUND_BASE_POINTS + cardPoints;
+                if (pile.trans && !allHearts && !pile.hearts && !pile.pig && !pile.sheep) {
+                    details?.push('單吃 ♣10 (+50)');
+                    return 50;
+                }
+
+                const flipped = allHearts || roundAllHearts;
+                const hearts = allHearts ? 200 : pile.heartSum;
+                const pig = pile.pig ? (flipped ? 100 : -100) : 0;
+                const sheep = pile.sheep ? (flipped ? -100 : 100) : 0;
+                if (details) {
+                    if (allHearts) details.push('收全紅(+200)');
+                    else if (pile.hearts) details.push(`紅心×${pile.hearts}(${hearts})`);
+                    if (pig) details.push(flipped ? '豬變色(+100)' : '豬(-100)');
+                    if (sheep) details.push(flipped ? '羊變色(-100)' : '羊(+100)');
+                    if (!details.length) details.push('無計分牌 (0)');
+                    if (pile.trans) details.push('合計 × 2');
+                }
+                return (hearts + pig + sheep) * (pile.trans ? 2 : 1);
             },
 
             winner(trick) {
@@ -1128,7 +1106,7 @@
 
             finalTotals(cap, match) {
                 const allHearts = cap.some(c => c.hearts === 13);
-                return cap.map((c, q) => match.totals[q] + this.score(c, allHearts, match.mode));
+                return cap.map((c, q) => match.totals[q] + this.score(c, allHearts));
             },
 
             // 各剩兩張牌時，三家最多只有 90 種分配，可以把符合缺門的發牌全部列出。
@@ -1362,7 +1340,7 @@
                 const pigOut = Boolean(outside[0] & (1 << 10));
                 const pref = this.normalPlay(hand, trick, pigOut);
                 const sweep = this.sweepForecast(p, held, outside, cap, voids, values ? trick : null);
-                const { totals, mode } = match;
+                const { totals } = match;
                 const seat = sweep?.seat ?? -1;
                 const chance = sweep?.chance ?? 0;
                 if (caution > chance) return pref;
@@ -1370,27 +1348,28 @@
                 const pigLive = Boolean(live[0] & (1 << 10));
                 const sheepLive = Boolean(live[3] & (1 << 9));
                 let heartPoints = 0;
-                for (let r = 3; r < 13; r++) if (live[1] & (1 << r)) heartPoints += this.HEART_POINTS[r];
+                for (let r = 0; r < 13; r++) if (live[1] & (1 << r)) heartPoints += HEART_POINTS[r];
                 const transformerSeat = cap.findIndex(c => c.trans);
                 // 變壓器會再乘到後面的分數。按尚未分配的牌估計多出的一份得失，
                 // 單吃的 +50 也要看其餘計分墩全部由別家吃走的機會。
                 const outlook = (pile, flipped, collector, card) => {
-                    const now = this.score(pile, flipped, mode, collector);
-                    if (!pile.trans) return now;
+                    const now = this.score(pile, flipped, collector);
+                    // 收全紅又持有 ♣10 的分數已是固定獎勵。
+                    if (!pile.trans || collector) return now;
                     const heart = card >= 13 && card < 26;
                     const pig = Number(pigLive && card !== this.PIG);
                     const sheep = Number(sheepLive && card !== this.SHEEP);
                     const pointsLeft = flipped ? (pig - sheep) * 100
-                        : (sheep - pig) * 100 + heartPoints - (heart ? this.HEART_POINTS[card - 13] : 0);
+                        : (sheep - pig) * 100 + heartPoints - (heart ? HEART_POINTS[card - 13] : 0);
                     let value = now + pointsLeft / 4;
-                    if (!collector && !pile.hearts && !pile.pig && !pile.sheep) {
+                    if (!pile.hearts && !pile.pig && !pile.sheep) {
                         const heartTricks = flipped ? 0 : (count[live[1]] - Number(heart)) / 3;
                         value -= 50 * (1 - 0.75 ** (pig + sheep + heartTricks));
                     }
                     return value;
                 };
-                const ordinaryTotals = cap.map((c, q) => totals[q] + this.score(c, false, mode, false));
-                const sweepTotals = sweep && cap.map((c, q) => totals[q] + this.score(c, true, mode, q === seat));
+                const ordinaryTotals = cap.map((c, q) => totals[q] + this.score(c, false, false));
+                const sweepTotals = sweep && cap.map((c, q) => totals[q] + this.score(c, true, q === seat));
                 const followers = 3 - trick.length;
                 const suitSeats = live.map((_, s) => voids.filter((mask, q) => q !== p && !(mask & (1 << s))).length);
                 // 後手已經缺門時，估計他能墊出的最大負分牌。只用外面還沒出現的牌。
@@ -1405,8 +1384,8 @@
                         if (s !== 1 && !(voids[q] & (1 << 1))) {
                             const share = 1 / suitSeats[1];
                             let noneHigher = 1;
-                            for (let r = 12; r >= 3; r--) if (outside[1] & (1 << r)) {
-                                loss += noneHigher * share * this.HEART_POINTS[r];
+                            for (let r = 12; r >= 0; r--) if (outside[1] & (1 << r)) {
+                                loss += noneHigher * share * HEART_POINTS[r];
                                 noneHigher *= 1 - share;
                             }
                         }
@@ -1441,8 +1420,11 @@
                     }
                     // 保有領牌權可以繼續收紅心；是否有利仍由四家的分差決定。
                     if (taker === seat && after.hearts < 13) weight += 0.1 * weight * (1 - weight);
+                    const collector = taker === seat;
+                    // 收全紅者已有豬或 ♣10，再吃羊只會維持或提高固定分數。
+                    const sheepRisk = collector && (after.pig || after.trans) ? 0 : risk.flipped * multiplier;
                     const flipped = this.standingValue(observer, sweepTotals, taker,
-                        totals[taker] + outlook(after, true, taker === seat, card) + risk.flipped * multiplier);
+                        totals[taker] + outlook(after, true, collector, card) + sheepRisk);
                     return ordinary + weight * (flipped - ordinary);
                 };
 
@@ -1479,7 +1461,7 @@
                 const flippedPool = 100 * (Number(pigLive) - Number(sheepLive)) + (p === seat ? 200 * count[live[1]] / 13 : 0);
                 const nextTrick = ((1 - chance) * ordinaryPool + chance * flippedPool) / hand.length;
                 const sheepOut = Boolean(outside[3] & (1 << 9));
-                const hasPenalty = (held[1] & ~7) || (held[0] & (1 << 10));
+                const hasPenalty = held[1] || (held[0] & (1 << 10));
                 let best = pref, bestValue = -Infinity;
                 for (const card of legal) {
                     if (transformerSeat >= 0) {
@@ -1529,7 +1511,7 @@
                     if (Math.floor(t.c / 13) === lead && t.c > win) win = t.c;
                     if (t.c === this.PIG) hasPig = true;
                     else if (t.c === this.SHEEP) hasSheep = true;
-                    else if (t.c >= 13 && t.c < 26) pts += this.HEART_POINTS[t.c - 13];
+                    else if (t.c >= 13 && t.c < 26) pts += HEART_POINTS[t.c - 13];
                 }
                 const last = trick.length === 3;
                 // 手上有豬、桌上已有比豬大的黑桃：送豬
@@ -1570,7 +1552,7 @@
                 for (const c of hand) {
                     const s = Math.floor(c / 13), r = c % 13;
                     let v = r;
-                    if (s === 1) v += 8 + (r >= 3 ? 6 : 0);              // 有分的紅心先墊
+                    if (s === 1) v += 8 - HEART_POINTS[r] / 2;            // 優先墊高扣分的紅心
                     if (s === 0 && r >= 11 && pigOut) v += 12;            // ♠K、♠A 在豬還沒出時很危險
                     if (c === this.SHEEP) v -= 30;                        // 羊留給自己
                     if (v > bs) { bs = v; best = c; }
@@ -1585,9 +1567,6 @@
         class GongZhuGame {
             constructor() {
                 this.sound = new SoundManager();
-
-                // 各流派收全紅皆為豬+100/羊-100；全吃特獎：'classic' / 'strict_swap' +800，'super_slam' +1000
-                this.scoringRuleMode = 'classic';
 
                 // 花色定義与手牌排序權重（黑桃 > 紅心 > 梅花 > 方塊）
                 this.SUITS = {
@@ -1614,8 +1593,8 @@
                     { rank: 14, label: 'A' }
                 ];
 
-                // 四家座位設定（順時針或逆時針出牌：南 -> 東 -> 北 -> 西）
-                this.SEAT_ORDER = ['south', 'east', 'north', 'west'];
+                // 依牌桌方位順時針出牌
+                this.SEAT_ORDER = ['south', 'west', 'north', 'east'];
                 this.PLAYERS = {
                     south: { id: 'south', name: '您（南家）', isAI: false, hand: [], captured: [], totalScore: 0 },
                     east:  { id: 'east',  name: 'BOT001', isAI: true,  hand: [], captured: [], totalScore: 0 },
@@ -1755,58 +1734,6 @@
                 return false;
             }
 
-            /**
-             * 取得單張紅心的原始分數
-             */
-            getHeartPoint(rank) {
-                if (rank === 14) return -50; // ♥A
-                if (rank === 13) return -40; // ♥K
-                if (rank === 12) return -30; // ♥Q
-                if (rank === 11) return -20; // ♥J
-                if (rank >= 5 && rank <= 10) return -10; // ♥10 ~ ♥5
-                return 0; // ♥4 ~ ♥2 (0分，但算入收全紅張數)
-            }
-
-            /**
-             * 切換計分流派並即時重算所有歷史局數與目前面板分數
-             */
-            setScoringRuleMode(mode) {
-                this.scoringRuleMode = mode;
-
-                // 同步兩個下拉選單的值
-                const selRules = document.getElementById('ruleModeSelectRules');
-                const selScore = document.getElementById('ruleModeSelectScoreboard');
-                if (selRules) selRules.value = mode;
-                if (selScore) selScore.value = mode;
-
-                // 重新計算所有歷史局數與各家累計總分
-                for (const seat of this.SEAT_ORDER) {
-                    this.PLAYERS[seat].totalScore = 0;
-                }
-
-                for (const hist of this.roundHistory) {
-                    const roundScores = this.calculateRoundScores(hist.capturedBySeat || {});
-                    for (const seat of this.SEAT_ORDER) {
-                        const calc = roundScores[seat];
-                        hist.scores[seat] = calc.score;
-                        this.PLAYERS[seat].totalScore += calc.score;
-                    }
-                }
-
-                this.renderAllPlayers();
-
-                // 若計分板視窗開啟中，立即刷新表格與歷史明細
-                const scoreModal = document.getElementById('scoreModal');
-                if (scoreModal && !scoreModal.classList.contains('hidden')) {
-                    const isEndOfRound = (this.PLAYERS.south.hand.length === 0 && this.currentTrick.length === 0);
-                    this.openScoreModal(isEndOfRound);
-                }
-            }
-
-            /**
-             * 先檢查四家是否有人收全紅，再將同一局的豬羊變色套用到所有玩家。
-             * 歷史局數必須傳入該局快照，避免受到目前牌局影響。
-             */
             hasAllHeartsOnTable(capturedBySeat = null) {
                 return this.SEAT_ORDER.some(seat => {
                     const cards = capturedBySeat === null ? this.PLAYERS[seat].captured : (capturedBySeat[seat] || []);
@@ -1824,110 +1751,12 @@
                 ]));
             }
 
-            /**
-             * 每局底分獨立於牌分，變壓器只加倍牌分。
-             */
             calculatePlayerScore(capturedCards, roundHasAllHearts = false) {
-                const cardScore = this.calculateCardScore(capturedCards, roundHasAllHearts);
-                return {
-                    ...cardScore,
-                    score: ROUND_BASE_POINTS + cardScore.score,
-                    formula: `底分(+${ROUND_BASE_POINTS}) + ${cardScore.formula}`
-                };
-            }
-
-            calculateCardScore(capturedCards, roundHasAllHearts) {
-                if (!capturedCards || capturedCards.length === 0) {
-                    return {
-                        score: 0,
-                        formula: '無計分牌 (0)',
-                        shootMoon: false,
-                        isGrandSlam: false
-                    };
-                }
-
-                let hasPig = false;
-                let hasSheep = false;
-                let hasTransformer = false;
-                const hearts = [];
-
-                for (const c of capturedCards) {
-                    if (c.suit === 'S' && c.rank === 12) hasPig = true;
-                    else if (c.suit === 'D' && c.rank === 11) hasSheep = true;
-                    else if (c.suit === 'C' && c.rank === 10) hasTransformer = true;
-                    else if (c.suit === 'H') hearts.push(c);
-                }
-
-                const isAllHearts = (hearts.length === 13);
-                const isGrandSlam = (isAllHearts && hasPig && hasSheep && hasTransformer);
-                const pigSheepChanged = isAllHearts || roundHasAllHearts;
-
-                // 檢查是否單獨只吃到 ♣10 而無其他任何計分牌
-                if (hasTransformer && !hasPig && !hasSheep && hearts.length === 0) {
-                    return {
-                        score: 50,
-                        formula: '單吃變壓器 ♣10 (+50)',
-                        shootMoon: false,
-                        isGrandSlam: false
-                    };
-                }
-
-                // 16 張計分牌全吃採固定特殊獎勵，取代一般豬羊變色與變壓器計算
-                if (isGrandSlam) {
-                    const isSuperSlam = this.scoringRuleMode === 'super_slam';
-                    const bonus = isSuperSlam ? 1000 : 800;
-                    return {
-                        score: bonus,
-                        formula: `${isSuperSlam ? '👑16張全吃超級大滿貫' : '🌟16張全吃大滿貫'}！(特殊獎勵 +${bonus})`,
-                        shootMoon: true,
-                        isGrandSlam: true
-                    };
-                }
-
-                let baseScore = 0;
-                const parts = [];
-
-                // 紅心由持有人計分；收全紅 +200，否則依各張牌計分。
-                if (isAllHearts) {
-                    baseScore += 200;
-                    parts.push('收全紅(+200)');
-                } else if (hearts.length > 0) {
-                    const heartSum = hearts.reduce((acc, c) => acc + this.getHeartPoint(c.rank), 0);
-                    baseScore += heartSum;
-                    parts.push(`紅心×${hearts.length}(${heartSum})`);
-                }
-
-                // 全桌任一玩家收全紅，即使豬羊被其他玩家吃到也一併變色。
-                if (hasPig) {
-                    baseScore += pigSheepChanged ? 100 : -100;
-                    parts.push(pigSheepChanged ? '豬變色(+100)' : '豬(-100)');
-                }
-                if (hasSheep) {
-                    baseScore += pigSheepChanged ? -100 : 100;
-                    parts.push(pigSheepChanged ? '羊變色(-100)' : '羊(+100)');
-                }
-
-                // 變壓器 ♣10 加倍計算
-                let finalScore = baseScore;
-                if (hasTransformer) {
-                    finalScore = baseScore * 2;
-                    const baseFormula = parts.length > 0 ? parts.join(' ') : '0';
-                    const prefix = isAllHearts ? '🔥全紅變色！' : (pigSheepChanged && (hasPig || hasSheep) ? '🔥全桌豬羊變色！' : '');
-                    return {
-                        score: finalScore,
-                        formula: `${prefix}(${baseFormula}) × 2 [變壓器]`,
-                        shootMoon: isAllHearts,
-                        isGrandSlam
-                    };
-                }
-
-                const prefix = (pigSheepChanged && (hasPig || hasSheep)) ? '🔥全桌豬羊變色！' : '';
-                return {
-                    score: finalScore,
-                    formula: parts.length > 0 ? `${prefix}${parts.join(' ')}` : '無計分牌 (0)',
-                    shootMoon: isAllHearts,
-                    isGrandSlam: false
-                };
+                const pile = GongZhuAI.newCap((capturedCards ?? []).map(card => GongZhuAI.toInt(card)));
+                const shootMoon = pile.hearts === 13;
+                const details = [];
+                const score = GongZhuAI.score(pile, roundHasAllHearts, shootMoon, details);
+                return { score, formula: details.join(' '), shootMoon, isGrandSlam: shootMoon && pile.pig && pile.sheep && pile.trans };
             }
 
             /**
@@ -1969,24 +1798,19 @@
                     document.getElementById(`trick-slot-${seat}`).innerHTML = '';
                 }
 
-                // 發牌（每人 13 張）並找出持有梅花 2 (♣2) 的首出玩家
-                let club2Holder = 'south';
                 this.SEAT_ORDER.forEach((seat, idx) => {
                     const p = this.PLAYERS[seat];
                     p.hand = this.sortCards(deck.slice(idx * 13, (idx + 1) * 13));
                     p.captured = [];
-                    if (p.hand.some(c => c.id === 'C2')) {
-                        club2Holder = seat;
-                    }
                 });
 
-                this.currentTurn = club2Holder;
+                this.currentTurn = this.SEAT_ORDER.find(seat => this.PLAYERS[seat].hand.some(c => c.id === 'S7'));
                 this.recordBegin();
                 this.updateHeaderInfo();
                 this.renderAllPlayers();
 
-                const holderName = this.PLAYERS[club2Holder].name;
-                this.showCenterBanner(`🃏 第 ${this.roundNumber} 局開始！由持有 ♣2 的【${holderName}】先出牌`, 'bg-amber-400 text-slate-950');
+                const holderName = this.PLAYERS[this.currentTurn].name;
+                this.showCenterBanner(`🃏 第 ${this.roundNumber} 局開始！【${holderName}】持有 ♠7，可領出任一張牌`, 'bg-amber-400 text-slate-950');
 
                 if (this.PLAYERS[this.currentTurn].isAI) {
                     this.later(() => this.executeAITurn(), 950);
@@ -1999,12 +1823,6 @@
             getLegalCards(seat) {
                 const hand = this.PLAYERS[seat].hand;
                 if (hand.length === 0) return [];
-
-                // 第一墩且為首出玩家：若有梅花 2 (♣2) 則優先出 ♣2
-                if (this.trickNumber === 1 && this.currentTrick.length === 0) {
-                    const club2 = hand.find(c => c.id === 'C2');
-                    if (club2) return [club2];
-                }
 
                 // 若為該墩首出玩家，可出任意手牌
                 if (!this.leadSuit || this.currentTrick.length === 0) {
@@ -2097,8 +1915,7 @@
                     trick: this.currentTrick.map(t => ({ p: idx(t.seat), card: t.card })),
                     history: this.trickHistory.map(tr => tr.map(t => ({ p: idx(t.seat), card: t.card }))),
                     captured: this.SEAT_ORDER.map(s => this.PLAYERS[s].captured),
-                    totals: this.SEAT_ORDER.map(s => this.PLAYERS[s].totalScore),
-                    mode: this.scoringRuleMode
+                    totals: this.SEAT_ORDER.map(s => this.PLAYERS[s].totalScore)
                 });
             }
 
@@ -2213,13 +2030,16 @@
                 const hasSheep = scoringInTrick.some(c => c.id === 'D11');
                 const hasTrans = scoringInTrick.some(c => c.id === 'C10');
                 const pigSheepChanged = this.hasAllHeartsOnTable();
+                const winnerScore = this.calculatePlayerScore(winnerPlayer.captured, pigSheepChanged);
 
-                if (hasPig) {
+                if (winnerScore.shootMoon && scoringInTrick.length) {
+                    this.showCenterBanner(`【${winnerPlayer.name}】${winnerScore.formula}`, 'bg-amber-400 text-slate-950');
+                } else if (hasPig) {
                     this.showCenterBanner(`🐷 ${pigSheepChanged ? '豬變色！' : '哎呀！'}【${winnerPlayer.name}】吃到豬 (♠Q ${pigSheepChanged ? '+100' : '-100'})！`, pigSheepChanged ? 'bg-emerald-500 text-slate-950' : 'bg-rose-600 text-white');
                 } else if (hasSheep) {
                     this.showCenterBanner(`🐑 ${pigSheepChanged ? '羊變色！' : '恭喜！'}【${winnerPlayer.name}】吃到羊 (♦J ${pigSheepChanged ? '-100' : '+100'})！`, pigSheepChanged ? 'bg-rose-600 text-white' : 'bg-emerald-500 text-slate-950');
                 } else if (hasTrans) {
-                    this.showCenterBanner(`⚡ 【${winnerPlayer.name}】收下變壓器 (♣10 ×2)！`, 'bg-amber-400 text-slate-950');
+                    this.showCenterBanner(`⚡ 【${winnerPlayer.name}】收下加倍牌 ♣10`, 'bg-amber-400 text-slate-950');
                 }
 
                 // 播放收牌往贏家方向飛行的動畫
@@ -2265,24 +2085,18 @@
                 const roundScores = this.calculateRoundScores();
                 const roundSummary = {
                     round: this.roundNumber,
-                    scores: {},
-                    capturedBySeat: {}
+                    scores: {}
                 };
 
                 for (const seat of this.SEAT_ORDER) {
                     const p = this.PLAYERS[seat];
-                    // 保存本局已吃計分牌快照，供切換計分流派時動態重算
-                    roundSummary.capturedBySeat[seat] = p.captured.map(c => ({ ...c }));
                     const result = roundScores[seat];
                     p.totalScore += result.score;
                     roundSummary.scores[seat] = result.score;
 
-                    if (result.isGrandSlam) {
+                    if (result.shootMoon) {
                         anyGrandSlamOrMoon = true;
-                        this.showCenterBanner(`🌟 狂賀！【${p.name}】達成 16 張全吃豬羊變色大滿貫 (+${result.score})！`, 'bg-amber-400 text-slate-950');
-                    } else if (result.shootMoon) {
-                        anyGrandSlamOrMoon = true;
-                        this.showCenterBanner(`🔥 厲害！【${p.name}】達成收全紅豬羊變色 (+${result.score})！`, 'bg-emerald-400 text-slate-950');
+                        this.showCenterBanner(`【${p.name}】${result.formula}`, result.isGrandSlam ? 'bg-amber-400 text-slate-950' : 'bg-emerald-400 text-slate-950');
                     }
                 }
 
@@ -2321,7 +2135,7 @@
                 const record = {
                     finished: this.roundOver,
                     round: this.roundNumber,
-                    settings: { scoringRuleMode: this.scoringRuleMode },
+                    settings: { scoringRuleMode: 'player_special' },
                     seats: this.SEAT_ORDER,
                     players: {},
                     hands: {},
@@ -2493,13 +2307,8 @@
                 } else if (card.id === 'C10') {
                     specialBadge = `<span class="px-1 py-0.2 rounded bg-amber-500 text-slate-950 text-[9px] font-black shadow">⚡變×2</span>`;
                     cardBgTint = 'ring-2 ring-amber-500/50';
-                } else if (card.id === 'C2' && this.trickNumber === 1 && this.currentTrick.length === 0) {
-                    specialBadge = `<span class="px-1 py-0.2 rounded bg-sky-600 text-white text-[9px] font-black shadow">首出</span>`;
                 } else if (card.suit === 'H') {
-                    const hPt = this.getHeartPoint(card.rank);
-                    if (hPt < 0) {
-                        specialBadge = `<span class="text-[9px] font-extrabold text-rose-600">${hPt}</span>`;
-                    }
+                    specialBadge = `<span class="text-[9px] font-extrabold text-rose-600">${HEART_POINTS[card.rank - 2]}</span>`;
                 }
 
                 let stateClass = 'card-waiting';
@@ -2708,11 +2517,11 @@
 
                 if (isEndOfRound) {
                     titleEl.innerHTML = `🏆 第 ${this.roundNumber} 局結算計分板`;
-                    subEl.textContent = '本局 13 墩已全部結束，以下為各家亮牌計分明細：';
+                    subEl.textContent = '特殊規則 · 13 墩已結束';
                     nextBtn.classList.remove('hidden');
                 } else {
                     titleEl.innerHTML = `📊 第 ${this.roundNumber} 局即時戰況與計分板`;
-                    subEl.textContent = `目前進行至第 ${this.trickNumber} / 13 墩`;
+                    subEl.textContent = `特殊規則 · 第 ${this.trickNumber} / 13 墩`;
                     nextBtn.classList.toggle('hidden', this.PLAYERS.south.hand.length > 0 || this.currentTrick.length > 0);
                 }
 

@@ -177,8 +177,16 @@ class RecordServerTest(unittest.TestCase):
         status, lobby = self.request("GET", "/")
         self.assertEqual(status, 200)
         self.assertIn('data-category="其他" href="/new-game"', lobby)
-        self.assertIn('<h3>新遊戲 &amp; 測試</h3>', lobby)
+        self.assertIn('<h2>新遊戲 &amp; 測試</h2>', lobby)
         self.assertNotIn('src="/assets/new-game.webp"', lobby)
+
+    def test_lobby_shows_mahjong_once_in_the_collection(self):
+        (open_server.GAMES_DIR / "mahjong.html").write_text(PAGE, encoding="utf-8")
+        status, lobby = self.request("GET", "/")
+        self.assertEqual(status, 200)
+        self.assertIn('<h1 id="library-title">遊戲收藏</h1>', lobby)
+        self.assertEqual(lobby.count('href="/mahjong"'), 1)
+        self.assertNotIn('精選牌桌', lobby)
 
     def test_game_pages_carry_the_recorder_and_their_version(self):
         status, page = self.request("GET", "/banqi")

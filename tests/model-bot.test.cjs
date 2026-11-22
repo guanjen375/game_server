@@ -372,7 +372,7 @@ test('gongzhu: once the model is picked the computers play the card the model an
         assert.equal(question.mode, 'normal');
         assert.equal(question.record.finished, false);
         assert.equal(question.record.result, null);
-        assert.deepEqual(question.record.seats, ['south', 'east', 'north', 'west']);
+        assert.deepEqual(question.record.seats, ['south', 'west', 'north', 'east']);
         assert.deepEqual(question.record.tricks.flat().map(play => play.card), plays.slice(0, played).map(play => play.card),
             'the question carries the round up to that card');
         assert.deepEqual(question.record.hands, record.hands, 'and the deal');
@@ -397,7 +397,7 @@ test('gongzhu: the computers wait until the page knows whether there is a model,
         const game = env.game;
         while (env.step());    // every wait of the page runs out, and still:
         await settle();
-        if (mine(game)) continue;    // the player holds the two of clubs and leads: nothing for a computer to wait for
+        if (mine(game)) continue;    // The player holds the seven of spades and leads.
         assert.equal(game.tricksSoFar().flat().length, 0, 'no computer has played');
         assert.equal(bot.asked.length, 0);
         bot.info = MODEL;    // the server answers: there is a model
@@ -467,7 +467,7 @@ test('gongzhu: without an answer, or with one that cannot be played, the page pl
         question => ({ play: { seat: question.seat, card: 'S99' }, mode: 'normal', model: MODEL.id }),   // no such card
         (question, env) => {                                                                    // a card the seat does not hold
             const other = env.game.SEAT_ORDER.find(seat => seat !== question.seat && env.game.PLAYERS[seat].hand.length);
-            const card = other ? env.game.PLAYERS[other].hand[0].id : 'C2';     // (the others are out of cards: a card long gone)
+            const card = other ? env.game.PLAYERS[other].hand[0].id : question.record.tricks[0][0].card;
             return { play: { seat: question.seat, card }, mode: 'normal', model: MODEL.id };
         },
         (question, env) => ({ ...lastLegal(question, env), play: { seat: 'south', card: lastLegal(question, env).play.card } }),   // another seat's turn
@@ -498,7 +498,7 @@ test('gongzhu: a card that breaks the rules is not played even when the model as
     assert.ok(refused > 5, 'the stand-in did ask for cards that may not be played');
     const record = env.recorder.rounds[0];
     record.tricks.forEach((trick, t) => trick.forEach((play, i) => {
-        if (t === 0 && i === 0) assert.equal(play.card, 'C2');
+        if (t === 0 && i === 0) assert.ok(record.hands[play.seat].includes('S7'));
         if (i === 0) return;
         const led = trick[0].card[0];
         const held = record.hands[play.seat].filter(card => !record.tricks.slice(0, t).flat().some(p => p.card === card));

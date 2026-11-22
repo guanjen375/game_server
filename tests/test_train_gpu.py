@@ -185,12 +185,16 @@ def gongzhu_twin(record, cut, rng):
     others = [seat for seat in seats if seat != me]
     remaining = {seat: [c for c in record["hands"][seat] if c not in played[seat]] for seat in seats}
     pool = [card for seat in others for card in remaining[seat]]
+    opener = plays[0]["seat"]
+    seven_is_public = record["settings"]["scoringRuleMode"] == "player_special" and "S7" in pool
     for _ in range(300):
         rng.shuffle(pool)
         dealt, at = {}, 0
         for seat in others:
             dealt[seat] = pool[at:at + len(remaining[seat])]
             at += len(remaining[seat])
+        if seven_is_public and "S7" not in dealt[opener]:
+            continue
         if all(card[0] not in out_of[seat] for seat in others for card in dealt[seat]) \
                 and any(set(dealt[seat]) != set(remaining[seat]) for seat in others):
             twin = json.loads(json.dumps(record))
@@ -397,7 +401,8 @@ class ReadingRecords(unittest.TestCase):
         self.assertEqual(field(game, x, "totals"), [level(0, -1500, 1500), level(40, -1500, 1500), level(-40, -1500, 1500), level(0, -1500, 1500)])
         self.assertEqual(game.about(card("S12"))[17:], [True, False, False, 0])
         self.assertEqual(game.about(card("H14"))[17:], [False, False, False, 1.0])
-        self.assertEqual(game.about(card("H4"))[20], 0)
+        penalties = [2, 3, 10, 5, 6, 7, 8, 9, 10, 20, 30, 40, 50]
+        self.assertEqual([game.about(card(f"H{rank}"))[20] for rank in range(2, 15)], [p / 50 for p in penalties])
         self.assertEqual((field(game, x, "hearts"), field(game, x, "sweep"), field(game, x, "big")), ([0] * 4, [0] * 4, [0] * 12))
         self.assertEqual((each("keeps"), each("splits")), ({s3: 0, s9: 0, h2: 0}, {s3: 0, s9: 0, h2: 0}), "nobody is collecting hearts")
 
@@ -487,10 +492,11 @@ class ReadingRecords(unittest.TestCase):
     def test_gongzhu_and_bigtwo_allow_what_the_rules_allow(self):
         game = train_gpu.GongZhu()
         card = game.card
-        hand = {card("S5"), card("S12"), card("H3"), card("C2")}
-        self.assertEqual(game.legal(hand, [], 0), {card("C2")}, "the two of clubs opens the round")
+        hand = {card("S7"), card("S12"), card("H3"), card("C2")}
+        self.assertEqual(game.legal(hand, [], 0), hand, "the seven of spades holder can lead any card")
+        self.assertEqual(game.legal(hand, [], 0, "classic"), {card("C2")}, "older recordings open with the two of clubs")
         self.assertEqual(game.legal(hand, [], 3), hand)
-        self.assertEqual(game.legal(hand, [(1, card("S9"))], 3), {card("S5"), card("S12")}, "follow suit")
+        self.assertEqual(game.legal(hand, [(1, card("S9"))], 3), {card("S7"), card("S12")}, "follow suit")
         self.assertEqual(game.legal(hand, [(1, card("D9"))], 3), hand, "anything when out of the suit")
 
         game = train_gpu.BigTwo()

@@ -497,7 +497,7 @@ def game_card(game, modelled=False):
   <div class="cover">{cover}{model}</div>
   <div class="card-body">
     <div class="card-meta"><span>{category}</span>{players}</div>
-    <h3>{name}</h3><p>{html.escape(game["desc"])}</p>
+    <h2>{name}</h2><p>{html.escape(game["desc"])}</p>
     <span class="card-arrow" aria-hidden="true"><i class="ui-icon i-arrow-up-right"></i></span>
   </div>
 </a>"""
@@ -511,28 +511,14 @@ def lobby_page(address, bots=None):
         for category in categories
     )
     cards = "".join(game_card(game, bool(bots and bots.info(game["slug"])["model"])) for game in games)
-    feature = ""
-    if any(game["slug"] == "mahjong" for game in games):
-        feature = """<section class="feature" aria-labelledby="feature-title">
-  <img class="feature-photo" src="/assets/mahjong.webp" alt="" width="1680" height="647" fetchpriority="high">
-  <div class="feature-copy">
-    <p class="feature-kicker"><i class="ui-icon i-stars" aria-hidden="true"></i>精選牌桌</p>
-    <h1 id="feature-title">台灣十六張麻將</h1>
-    <p class="feature-description">與三家電腦同桌，從起手十六張，一路摸到胡牌。</p>
-    <div class="feature-actions"><a class="play" href="/mahjong"><i class="ui-icon i-play-fill" aria-hidden="true"></i>入座開局</a>
-      <span><i class="ui-icon i-people" aria-hidden="true"></i>四人對局</span></div>
-  </div>
-</section>"""
-    heading = "h2" if feature else "h1"
     filter_bar = f"""<div class="filters" role="group" aria-label="依遊戲類型篩選" hidden>
       <button type="button" data-filter="" aria-pressed="true"><i class="ui-icon i-grid" aria-hidden="true"></i>全部</button>{filters}
     </div>""" if len(categories) > 1 else ""
     content = f'<div class="library-grid">{cards}</div>' if cards else '<p class="empty">目前沒有遊戲。將遊戲 HTML 放入 games 資料夾後，就會出現在這裡。</p>'
     body = f"""<main class="shell lobby-main" id="main">
-{feature}
 <section class="library" id="library" aria-labelledby="library-title">
   <div class="library-head">
-    <div class="library-title"><{heading} id="library-title">遊戲收藏</{heading}><span id="game-count" aria-live="polite">{len(games)} 款遊戲</span></div>
+    <div class="library-title"><h1 id="library-title">遊戲收藏</h1><span id="game-count" aria-live="polite">{len(games)} 款遊戲</span></div>
     {filter_bar}
   </div>
   {content}

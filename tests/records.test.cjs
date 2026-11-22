@@ -239,20 +239,20 @@ const DRIVERS = {
         }),
         replay(record, final) {
             const seats = record.seats, suit = id => id[0], rank = id => Number(id.slice(1));
-            assert.deepEqual(seats, ['south', 'east', 'north', 'west']);
+            assert.deepEqual(seats, ['south', 'west', 'north', 'east']);
+            assert.equal(record.settings.scoringRuleMode, 'player_special');
             const hands = Object.fromEntries(seats.map(seat => [seat, record.hands[seat].slice()]));
             assert.equal(new Set(seats.flatMap(seat => hands[seat])).size, 52);
             seats.forEach(seat => assert.equal(hands[seat].length, 13));
             const scoring = id => suit(id) === 'H' || ['S12', 'D11', 'C10'].includes(id);
             const captured = Object.fromEntries(seats.map(seat => [seat, []]));
-            let leader = seats.find(seat => hands[seat].includes('C2'));
+            let leader = seats.find(seat => hands[seat].includes('S7'));
             record.tricks.forEach((trick, t) => {
                 assert.ok(trick.length === 4 || (!record.finished && t === record.tricks.length - 1));
                 trick.forEach((play, i) => {
                     assert.equal(play.seat, seats[(seats.indexOf(leader) + i) % 4], `trick ${t + 1} is out of turn`);
                     const hand = hands[play.seat];
                     assert.ok(hand.includes(play.card), `${play.seat} plays ${play.card} without holding it`);
-                    if (t === 0 && i === 0) assert.equal(play.card, 'C2');
                     if (i > 0 && suit(play.card) !== suit(trick[0].card)) {
                         assert.ok(!hand.some(id => suit(id) === suit(trick[0].card)), `${play.seat} fails to follow suit`);
                     }

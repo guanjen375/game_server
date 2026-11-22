@@ -169,8 +169,10 @@ class GongZhu(Game):
     """拱豬。動作：出哪一張牌（52 種）。牌的編號＝花色（黑桃、紅心、梅花、方塊）× 13 ＋ 點數 − 2。"""
     slug, title, version, actions = "gongzhu", "拱豬", 2, 52
     SUITS = "SHCD"
-    MODES = ("classic", "strict_swap", "super_slam")
-    C2, PIG, SHEEP, TRANSFORMER = 26, 10, 48, 34    # 梅花 2、黑桃 Q、方塊 J、梅花 10
+    PLAYER_RULES = "player_special"
+    LEGACY_MODES = ("classic", "strict_swap", "super_slam")
+    S7, C2, PIG, SHEEP, TRANSFORMER = 5, 26, 10, 48, 34
+    HEART_PENALTIES = (2, 3, 10, 5, 6, 7, 8, 9, 10, 20, 30, 40, 50)
     # 計分牌：紅心 13 張是 0～12，再來是豬、羊、變壓器
     SCORING = [card - 13 if 13 <= card < 26 else {10: 13, 48: 14, 34: 15}.get(card) for card in range(52)]
     # 手上的每一張牌：出了會是這一墩最大的／跟了但比較小／墊牌；是自己這個花色裡最小的／最大的；
@@ -196,7 +198,7 @@ class GongZhu(Game):
         self.SPECIAL = add("special", 8)            # 豬、羊、變壓器、紅心在不在這一墩桌上；豬、羊、變壓器是不是還在別人手上；自己是不是最後一個出
         self.COUNTS = add("counts", 6, 1 / 255)     # 四個花色外面各還有幾張；桌上有幾張紅心；外面還有幾張紅心
         self.TOTALS = add("totals", 4, 1 / 255)     # 累計分數：自己比平均多多少、另外三家比自己多多少
-        self.MODE = add("mode", 3)                  # 計分流派
+        self.MODE = add("mode", 3)                  # 舊紀錄沿用原來三格，特殊規則三格皆為 0
         # 玩家看到有人快收全紅會改打法。「誰吃了哪些計分牌」是細節欄位、訓練時多半被遮掉，所以另外明白講出來：
         self.HEARTS = add("hearts", 4, 1 / 255)     # 四家各吃了幾張紅心（自己、下家、對家、上家）
         self.SWEEP = add("sweep", 4)                # 被吃走的紅心全在同一家手上：是哪一家（還沒有人吃到、或已經分散了就都不是）
@@ -209,7 +211,7 @@ class GongZhu(Game):
         row[rank] = row[13 + suit] = 1
         row[17], row[18], row[19] = card == self.PIG, card == self.SHEEP, card == self.TRANSFORMER
         if suit == 1:
-            row[20] = {12: 50, 11: 40, 10: 30, 9: 20}.get(rank, 10 if rank >= 3 else 0) / 50
+            row[20] = self.HEART_PENALTIES[rank] / 50
         return row
 
     def card(self, name):
@@ -220,9 +222,11 @@ class GongZhu(Game):
     def card_name(self, card):
         return f"{self.SUITS[card // 13]}{card % 13 + 2}"
 
-    def legal(self, hand, table, trick):
+    def legal(self, hand, table, trick, mode=PLAYER_RULES):
         if not table:
-            return {self.C2} if trick == 0 and self.C2 in hand else set(hand)
+            if trick == 0 and mode != self.PLAYER_RULES and self.C2 in hand:
+                return {self.C2}
+            return set(hand)
         lead = table[0][1] // 13
         return {card for card in hand if card // 13 == lead} or set(hand)
 
@@ -277,8 +281,8 @@ class GongZhu(Game):
             x[self.COUNTS + suit] = level(sum(1 for card in unseen if card // 13 == suit), 0, 13)
         x[self.COUNTS + 4] = level(len(hearts), 0, 3)
         x[self.COUNTS + 5] = level(sum(1 for card in unseen if card // 13 == 1), 0, 13)
-        if mode in self.MODES:
-            x[self.MODE + self.MODES.index(mode)] = 1
+        if mode in self.LEGACY_MODES:
+            x[self.MODE + self.LEGACY_MODES.index(mode)] = 1
 
         for card in hand:
             suit = card // 13
@@ -324,7 +328,8 @@ class GongZhu(Game):
         played, taken = [set() for _ in seats], [set() for _ in seats]
         void = [[False] * 4 for _ in seats]
         led = [0] * 4       # 每個花色已經被帶頭出過幾墩
-        leader = next(seat for seat in range(4) if self.C2 in hands[seat])
+        opening_card = self.S7 if mode == self.PLAYER_RULES else self.C2
+        leader = next(seat for seat in range(4) if opening_card in hands[seat])
         tricks = record["tricks"]
         table = []
         for number, trick in enumerate(tricks):
@@ -334,7 +339,7 @@ class GongZhu(Game):
                 seat = seats.index(play["seat"])
                 need(seat == (leader + turn) % 4, "出牌的順序不對")
                 card = self.card(play["card"])
-                legal = self.legal(hands[seat], table, number)
+                legal = self.legal(hands[seat], table, number, mode)
                 need(card in legal, f"{play['seat']} 出了不能出的 {play['card']}")
                 if not upcoming:
                     x = self.view(seat, hands[seat], table, played, taken, void, led, number, totals, mode)
@@ -362,7 +367,7 @@ class GongZhu(Game):
             number = len(tricks) - bool(table)
             need(not finished and number < 13, "這一局已經打完了")
             seat = (leader + len(table)) % 4
-            legal = self.legal(hands[seat], table, number)
+            legal = self.legal(hands[seat], table, number, mode)
             x = self.view(seat, hands[seat], table, played, taken, void, led, number, totals, mode)
             yield seats[seat], x, self.choice(legal)
 
