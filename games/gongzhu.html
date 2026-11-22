@@ -441,7 +441,7 @@
     <!-- 牌桌主要遊戲區 -->
     <main class="relative flex-1 min-h-0 w-full max-w-7xl mx-auto flex flex-col justify-between p-2 sm:p-4 overflow-hidden">
 
-        <!-- 上方 AI：北家（小美） -->
+        <!-- 上方 AI：北家 -->
         <div class="w-full flex justify-center z-20">
             <div id="panel-north" class="bg-slate-900/75 backdrop-blur-md border border-white/15 rounded-2xl px-3.5 py-1.5 sm:py-2 w-full sm:w-96 flex flex-wrap items-center gap-x-3 sm:block transition-all duration-300">
                 <div class="flex items-center justify-between gap-3 sm:gap-2">
@@ -449,7 +449,7 @@
                         <div class="w-8 h-8 rounded-full bg-pink-500/30 border border-pink-400 flex items-center justify-center text-base">👩</div>
                         <div>
                             <div class="flex items-center gap-1.5">
-                                <span class="font-bold text-xs sm:text-sm text-white">北家 · 小美</span>
+                                <span class="font-bold text-xs sm:text-sm text-white">北家 · BOT002</span>
                                 <span id="turn-badge-north" class="hidden text-[10px] px-1.5 py-0.5 rounded bg-amber-400 text-slate-950 font-black">思考中</span>
                             </div>
                             <div class="text-[11px] text-emerald-300">
@@ -472,12 +472,12 @@
         <!-- 中間層：左方 AI + 中央出牌桌面 + 右方 AI -->
         <div class="flex-1 min-h-0 w-full flex items-center justify-between relative my-1">
 
-            <!-- 左方 AI：西家（阿財）；手機上面板變窄、不顯示頭像，讓中間放得下出牌區 -->
+            <!-- 左方 AI：西家；手機上面板變窄、不顯示頭像，讓中間放得下出牌區 -->
             <div id="panel-west" class="bg-slate-900/75 backdrop-blur-md border border-white/15 rounded-2xl p-2 sm:p-3 w-[84px] sm:w-52 max-h-full overflow-y-auto overscroll-contain shrink-0 z-20 transition-all duration-300">
                 <div class="flex items-center gap-2">
                     <div class="w-8 h-8 rounded-full bg-indigo-500/30 border border-indigo-400 hidden sm:flex items-center justify-center text-base shrink-0">🧔</div>
                     <div class="min-w-0">
-                        <div class="font-bold text-[11px] sm:text-sm text-white truncate">西家 · 阿財</div>
+                        <div class="font-bold text-[11px] sm:text-sm text-white truncate"><span class="sr-only sm:not-sr-only">西家 · </span>BOT003</div>
                         <div class="text-[11px] text-emerald-300">手牌 <span id="count-west" class="font-bold text-amber-300">13</span> 張</div>
                     </div>
                 </div>
@@ -526,12 +526,12 @@
                 </div>
             </div>
 
-            <!-- 右方 AI：東家（老王）；手機上面板變窄、不顯示頭像 -->
+            <!-- 右方 AI：東家；手機上面板變窄、不顯示頭像 -->
             <div id="panel-east" class="bg-slate-900/75 backdrop-blur-md border border-white/15 rounded-2xl p-2 sm:p-3 w-[84px] sm:w-52 max-h-full overflow-y-auto overscroll-contain shrink-0 z-20 transition-all duration-300">
                 <div class="flex items-center gap-2">
                     <div class="w-8 h-8 rounded-full bg-amber-500/30 border border-amber-400 hidden sm:flex items-center justify-center text-base shrink-0">👴</div>
                     <div class="min-w-0">
-                        <div class="font-bold text-[11px] sm:text-sm text-white truncate">東家 · 老王</div>
+                        <div class="font-bold text-[11px] sm:text-sm text-white truncate"><span class="sr-only sm:not-sr-only">東家 · </span>BOT001</div>
                         <div class="text-[11px] text-emerald-300">手牌 <span id="count-east" class="font-bold text-amber-300">13</span> 張</div>
                     </div>
                 </div>
@@ -1664,9 +1664,9 @@
                 this.SEAT_ORDER = ['south', 'east', 'north', 'west'];
                 this.PLAYERS = {
                     south: { id: 'south', name: '您（南家）', isAI: false, hand: [], captured: [], totalScore: 0 },
-                    east:  { id: 'east',  name: '東家·老王', isAI: true,  hand: [], captured: [], totalScore: 0 },
-                    north: { id: 'north', name: '北家·小美', isAI: true,  hand: [], captured: [], totalScore: 0 },
-                    west:  { id: 'west',  name: '西家·阿財', isAI: true,  hand: [], captured: [], totalScore: 0 }
+                    east:  { id: 'east',  name: 'BOT001', isAI: true,  hand: [], captured: [], totalScore: 0 },
+                    north: { id: 'north', name: 'BOT002', isAI: true,  hand: [], captured: [], totalScore: 0 },
+                    west:  { id: 'west',  name: 'BOT003', isAI: true,  hand: [], captured: [], totalScore: 0 }
                 };
 
                 this.roundNumber = 1;
@@ -2490,7 +2490,7 @@
                     : `第 ${this.roundNumber} 局 · 這一局還沒有人出牌`;
 
                 // 各墩出牌：照出牌順序排，吃下這一墩的那張加金框
-                const SHORT = { south: '您', east: '東', north: '北', west: '西' };
+                const shortName = seat => seat === 'south' ? '您' : this.PLAYERS[seat].name;
                 const logCard = card => {
                     const s = this.SUITS[card.suit];
                     return `<span class="log-card ${s.color}">${SPECIAL[card.id] || ''}${s.symbol}${card.label}</span>`;
@@ -2498,8 +2498,8 @@
                 const rows = tricks.map((trick, i) => {
                     const done = trick.length === 4;
                     const winner = done ? this.trickWinner(trick) : null;
-                    const plays = trick.map((entry, k) => `<span class="trick-play${entry === winner ? ' win' : ''}">${SHORT[entry.seat]}${k === 0 ? '領' : ''}${logCard(entry.card)}</span>`).join('');
-                    const note = done ? `${winner.seat === 'south' ? '您' : SHORT[winner.seat] + '家'}吃` : '進行中';
+                    const plays = trick.map((entry, k) => `<span class="trick-play${entry === winner ? ' win' : ''}">${shortName(entry.seat)}${k === 0 ? '領' : ''}${logCard(entry.card)}</span>`).join('');
+                    const note = done ? `${shortName(winner.seat)}吃` : '進行中';
                     return `<div class="trick-row${done ? '' : ' open'}"><span class="trick-no">第 ${i + 1} 墩</span><span class="trick-plays">${plays}</span><span class="trick-note">${note}</span></div>`;
                 });
                 document.getElementById('trickLog').innerHTML = rows.reverse().join('')

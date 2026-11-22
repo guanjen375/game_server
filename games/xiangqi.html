@@ -381,7 +381,7 @@
                     <div id="avatar-north" class="w-8 h-8 rounded-full bg-indigo-500/30 border border-indigo-400 flex items-center justify-center text-base shrink-0">🧔</div>
                     <div class="min-w-0">
                         <div class="flex items-center gap-1.5 flex-wrap">
-                            <span id="name-north" class="font-bold text-xs sm:text-sm text-white">電腦 · 阿財</span>
+                            <span id="name-north" class="font-bold text-xs sm:text-sm text-white">BOT001</span>
                             <span id="color-north" class="text-[10px] px-1.5 py-0.5 rounded-full font-black border bg-slate-200 text-slate-900 border-white/60">黑方</span>
                         </div>
                         <div class="text-[11px] text-emerald-300">
@@ -581,9 +581,9 @@
                         <label class="block">
                             <span class="block text-[11px] text-slate-400 mb-1">電腦難度</span>
                             <select data-setting="difficulty" onchange="game.setSetting('difficulty', this.value)" class="w-full bg-slate-950 border border-white/20 rounded-lg px-2.5 py-1.5 text-xs font-bold text-white focus:outline-none focus:border-amber-400">
-                                <option value="easy">簡單（小美）</option>
-                                <option value="normal">普通（阿財）</option>
-                                <option value="hard">困難（老王）</option>
+                                <option value="easy">簡單</option>
+                                <option value="normal">普通</option>
+                                <option value="hard">困難</option>
                             </select>
                         </label>
                         <label class="block">
@@ -634,9 +634,9 @@
                             <option value="pvp">👥 雙人同機對戰</option>
                         </select>
                         <select data-setting="difficulty" onchange="game.setSetting('difficulty', this.value)" class="bg-slate-900 border border-white/20 rounded-lg px-2.5 py-1.5 text-xs font-bold text-white focus:outline-none focus:border-amber-400">
-                            <option value="easy">電腦難度：簡單（小美）</option>
-                            <option value="normal">電腦難度：普通（阿財）</option>
-                            <option value="hard">電腦難度：困難（老王）</option>
+                            <option value="easy">電腦難度：簡單</option>
+                            <option value="normal">電腦難度：普通</option>
+                            <option value="hard">電腦難度：困難</option>
                         </select>
                         <select data-setting="side" onchange="game.setSetting('side', this.value)" class="bg-slate-900 border border-white/20 rounded-lg px-2.5 py-1.5 text-xs font-bold text-white focus:outline-none focus:border-amber-400">
                             <option value="alternate">執子：每局輪流</option>
@@ -1390,11 +1390,12 @@
             }
         };
 
+        const BOT_NAME = 'BOT001';
         // 電腦對手角色（依難度切換）
         const AI_PERSONAS = {
-            easy:   { name: '小美', avatar: '👩', ring: 'bg-pink-500/30 border-pink-400', label: '簡單' },
-            normal: { name: '阿財', avatar: '🧔', ring: 'bg-indigo-500/30 border-indigo-400', label: '普通' },
-            hard:   { name: '老王', avatar: '👴', ring: 'bg-amber-500/30 border-amber-400', label: '困難' }
+            easy:   { avatar: '👩', ring: 'bg-pink-500/30 border-pink-400', label: '簡單' },
+            normal: { avatar: '🧔', ring: 'bg-indigo-500/30 border-indigo-400', label: '普通' },
+            hard:   { avatar: '👴', ring: 'bg-amber-500/30 border-amber-400', label: '困難' }
         };
 
         /**
@@ -1406,7 +1407,7 @@
                 this.SEATS = ['south', 'north'];
                 this.PLAYERS = {
                     south: { id: 'south', name: '您（玩家）', short: '您', isAI: false, color: RED, record: { win: 0, lose: 0, draw: 0 } },
-                    north: { id: 'north', name: '電腦 · 阿財', short: '阿財', isAI: true, color: BLACK, record: { win: 0, lose: 0, draw: 0 } }
+                    north: { id: 'north', name: BOT_NAME, short: BOT_NAME, isAI: true, color: BLACK, record: { win: 0, lose: 0, draw: 0 } }
                 };
                 this.settings = { mode: 'ai', difficulty: 'normal', side: 'alternate' };
 
@@ -1507,8 +1508,8 @@
                     avatar.className = 'w-8 h-8 rounded-full border flex items-center justify-center text-base shrink-0 bg-sky-500/30 border-sky-400';
                 } else {
                     north.isAI = true;
-                    north.name = `電腦 · ${persona.name}`;
-                    north.short = persona.name;
+                    north.name = BOT_NAME;
+                    north.short = BOT_NAME;
                     south.name = '您（玩家）';
                     south.short = '您';
                     avatar.textContent = persona.avatar;
@@ -1535,7 +1536,7 @@
                     this.showCenterBanner(value === 'pvp' ? '👥 已切換為雙人同機對戰' : '🤖 已切換為人機對戰', 'bg-sky-500 text-slate-950');
                 } else {
                     const persona = AI_PERSONAS[value];
-                    this.showCenterBanner(`🤖 電腦難度：${persona.label}（${persona.name}）`, 'bg-sky-500 text-slate-950');
+                    this.showCenterBanner(`🤖 電腦難度：${persona.label}`, 'bg-sky-500 text-slate-950');
                 }
                 this.hint = null;
                 this.selectedSq = -1;

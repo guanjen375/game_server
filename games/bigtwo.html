@@ -78,7 +78,7 @@ dialog{max-height:calc(var(--app-h)*.88)}dialog[open]{display:flex;flex-directio
 /* 出牌紀錄視窗：這一局的出牌順序，一輪一格、最新的一輪在最上面 */
 .full-record{margin-top:16px;padding-top:13px;border-top:1px solid #e2cd7626}
 .log-trick{border:1px solid #ffffff1b;border-radius:11px;background:#03291c99;padding:8px 10px;margin-bottom:8px}.log-trick-title{display:flex;justify-content:space-between;gap:8px;font-size:11px;font-weight:800;color:#fde68a;margin-bottom:4px}.log-trick-title small{font-weight:500;color:#a9cbb5}
-.log-row{display:flex;align-items:center;gap:7px;min-height:30px;font-size:11px;line-height:1.3}.log-who{flex:none;width:36px;font-weight:800;color:#d7e9db}.log-row .round-action-type{flex:none;width:44px;margin:0;font-size:10px;line-height:1.3}.log-row .round-pass{padding:4px 9px}.log-row .round-play-card{height:24px}
+.log-row{display:flex;align-items:center;gap:7px;min-height:30px;font-size:11px;line-height:1.3}.log-who{flex:none;width:7ch;font-weight:800;color:#d7e9db}.log-row .round-action-type{flex:none;width:44px;margin:0;font-size:10px;line-height:1.3}.log-row .round-pass{padding:4px 9px}.log-row .round-play-card{height:24px}
 /* 「已出的牌」右邊的「整局紀錄」按鈕；頁首的「📋」在平板寬度只留圖示，按鈕列才排得進一行 */
 .record-more{flex:none;padding:5px 9px;border:1px solid #fbbf2455;border-radius:10px;background:#73531745;color:#fde68a;font-size:10px;font-weight:700;line-height:1.35;text-align:center;white-space:nowrap}.record-more:hover{background:#7353178c}
 @media(min-width:701px) and (max-width:1000px){.tools .record-tool span{display:none}}
@@ -86,6 +86,7 @@ dialog{max-height:calc(var(--app-h)*.88)}dialog[open]{display:flex;flex-directio
 .tool.unavailable{opacity:.45}
 /* 手機：頁首多了「悔牌」共六個圖示按鈕，按鈕和間距縮小才排得進一行（圖示在手機上比較寬，要留餘裕） */
 @media(max-width:440px){.header{padding-left:10px;padding-right:10px;gap:6px}.tools{gap:3px}.tool,.tools .tool.sound{min-width:27px;padding:7px 5px;text-align:center}}
+@media(max-width:700px){.seat-direction{display:none}}
 </style>
 </head>
 <body>
@@ -104,15 +105,15 @@ dialog{max-height:calc(var(--app-h)*.88)}dialog[open]{display:flex;flex-directio
   <main class="board-wrap" aria-label="大老二牌桌">
     <div class="board">
       <div class="table-note">CLASSIC<br>四人牌桌</div><div class="activity" id="moveCount">尚未出牌</div>
-      <section class="seat north" id="seat2" aria-label="北家小美"><div class="seat-top"><div class="avatar violet">👩</div><div><div class="seat-name">北家 · 小美</div><div class="seat-total">累計 <strong id="total2">0</strong></div></div><div class="count" id="count2"><strong>13</strong><small>張手牌</small></div></div><div class="seat-bottom"><div class="backs" aria-hidden="true"></div><div class="seat-action" id="action2">等待出牌</div></div></section>
-      <section class="seat west" id="seat3" aria-label="西家阿財"><div class="seat-top"><div class="avatar orange">🧔</div><div><div class="seat-name">西家 · 阿財</div><div class="seat-total">累計 <strong id="total3">0</strong></div></div><div class="count" id="count3"><strong>13</strong><small>張手牌</small></div></div><div class="seat-bottom"><div class="backs" aria-hidden="true"></div><div class="seat-action" id="action3">等待出牌</div></div></section>
+      <section class="seat north" id="seat2" aria-label="北家 BOT002"><div class="seat-top"><div class="avatar violet">👩</div><div><div class="seat-name"><span class="seat-direction">北家 · </span>BOT002</div><div class="seat-total">累計 <strong id="total2">0</strong></div></div><div class="count" id="count2"><strong>13</strong><small>張手牌</small></div></div><div class="seat-bottom"><div class="backs" aria-hidden="true"></div><div class="seat-action" id="action2">等待出牌</div></div></section>
+      <section class="seat west" id="seat3" aria-label="西家 BOT003"><div class="seat-top"><div class="avatar orange">🧔</div><div><div class="seat-name"><span class="seat-direction">西家 · </span>BOT003</div><div class="seat-total">累計 <strong id="total3">0</strong></div></div><div class="count" id="count3"><strong>13</strong><small>張手牌</small></div></div><div class="seat-bottom"><div class="backs" aria-hidden="true"></div><div class="seat-action" id="action3">等待出牌</div></div></section>
       <section class="arena" aria-label="目前要壓過的牌">
         <div class="arena-kicker">BIG TWO CLUB</div><div class="arena-title" id="arenaTitle">梅花 3 先出</div>
         <div class="pile" id="pile"><div class="empty-pile"><span>♠</span></div></div>
         <div class="combo-badge" id="comboBadge">準備開局</div>
         <div class="turn-status" id="turnStatus" role="status" aria-live="polite"></div>
       </section>
-      <section class="seat east" id="seat1" aria-label="東家老王"><div class="seat-top"><div class="avatar">🧑</div><div><div class="seat-name">東家 · 老王</div><div class="seat-total">累計 <strong id="total1">0</strong></div></div><div class="count" id="count1"><strong>13</strong><small>張手牌</small></div></div><div class="seat-bottom"><div class="backs" aria-hidden="true"></div><div class="seat-action" id="action1">等待出牌</div></div></section>
+      <section class="seat east" id="seat1" aria-label="東家 BOT001"><div class="seat-top"><div class="avatar">🧑</div><div><div class="seat-name"><span class="seat-direction">東家 · </span>BOT001</div><div class="seat-total">累計 <strong id="total1">0</strong></div></div><div class="count" id="count1"><strong>13</strong><small>張手牌</small></div></div><div class="seat-bottom"><div class="backs" aria-hidden="true"></div><div class="seat-action" id="action1">等待出牌</div></div></section>
       <section class="played-board" aria-label="這一局已經出過的牌"><div class="played-info"><strong>已出的牌</strong><span class="played-count">尚未出牌</span><p class="played-legend"><span><i class="out">A</i>已出</span><span><i class="mine">A</i>在您手上</span><span><i>A</i>還在別家</span></p></div><div class="played-grid" role="group" aria-label="已出的牌對照表"></div><button type="button" class="record-more" id="recordMoreBtn" title="打開出牌紀錄：這一局每一輪誰出了什麼">整局<br>紀錄 ▸</button></section>
       <section class="round-record" aria-label="當輪四家出牌與不出紀錄"><div class="round-record-heading"><strong>當輪出牌 · 四家紀錄</strong><span id="roundActionsStatus">尚未出牌</span></div><div class="round-actions" id="roundActions"></div></section>
       <div class="table-footer">♣ &lt; ♦ &lt; ♥ &lt; ♠ &nbsp; · &nbsp; 3 最小，2 最大 &nbsp; · &nbsp; 南 → 東 → 北 → 西</div>
@@ -858,8 +859,8 @@ dialog{max-height:calc(var(--app-h)*.88)}dialog[open]{display:flex;flex-directio
 'use strict';
 const $ = id => document.getElementById(id);
 const SUITS = {D:{symbol:'♦',name:'方塊',red:true},C:{symbol:'♣',name:'梅花',red:false},H:{symbol:'♥',name:'紅心',red:true},S:{symbol:'♠',name:'黑桃',red:false}};
-const NAMES = ['您（南家）','東家 · 老王','北家 · 小美','西家 · 阿財'];
-const SHORT = ['您','老王','小美','阿財'];
+const NAMES = ['您（南家）','BOT001','BOT002','BOT003'];
+const SHORT = ['您', ...NAMES.slice(1)];
 const signed = n => n > 0 ? '+' + n : String(n);
 class BigTwoApp {
   constructor(){
