@@ -68,328 +68,64 @@ RECORD_LOCK = threading.Lock()
 # 已知遊戲的顯示資料；games/ 裡其他的 .html 會用網頁標題列在「其他」
 CATALOG = {
     "banqi": {
-        "name": "暗棋", "category": "棋類", "icon": "暗", "style": "piece dark",
-        "desc": "翻開棋子、以大吃小，不允許連吃",
+        "name": "暗棋", "category": "棋類", "icon": "暗", "seats": 2,
+        "desc": "翻出暗藏的棋子，以大吃小、隔子跳吃。",
         "aliases": ["暗棋"],
     },
     "xiangqi": {
-        "name": "中國象棋", "category": "棋類", "icon": "帥", "style": "piece",
-        "desc": "標準規則，可悔棋、提示，也能兩人對下",
+        "name": "中國象棋", "category": "棋類", "icon": "帥", "seats": 2,
+        "desc": "隔河對弈，調兵遣將，步步逼近敵帥。",
         "aliases": ["象棋"],
     },
     "reversi": {
-        "name": "黑白棋", "category": "棋類", "icon": "黑", "style": "disc",
-        "desc": "夾住對方的棋子就翻面，子多的獲勝",
+        "name": "黑白棋", "category": "棋類", "icon": "黑", "seats": 2,
+        "desc": "夾住對手的棋子翻面，搶下四角與多數。",
         "aliases": ["黑白棋"],
     },
     "mahjong": {
-        "name": "台灣十六張麻將", "category": "牌類", "icon": "中", "style": "tile",
-        "desc": "花牌、吃碰槓、台數計算，和三家電腦對打",
+        "name": "台灣十六張麻將", "category": "麻將", "icon": "中", "seats": 4,
+        "desc": "十六張起手，吃碰槓胡，依台數計分。",
         "aliases": ["麻將", "majhong"],
     },
     "mahjong-me": {
-        "name": "台灣麻將（自我模式）", "category": "牌類", "icon": "發", "style": "tile",
-        "desc": "胡牌被胡限定個人",
+        "name": "台灣麻將（自我模式）", "category": "麻將", "icon": "發", "seats": 4,
+        "desc": "三家電腦只胡您打出的牌，也不會自摸。",
         "aliases": [],
     },
     "gongzhu": {
-        "name": "拱豬", "category": "牌類", "icon": "♠Q", "style": "cardface",
-        "desc": "四人撲克吃墩，避開豬（♠Q）、搶到羊（♦J）",
+        "name": "拱豬", "category": "撲克", "icon": "♠Q", "seats": 4,
+        "desc": "跟花吃墩，避開黑桃 Q，搶下方塊 J。",
         "aliases": ["拱豬", "gongzhu_argon"],
     },
     "bigtwo": {
-        "name": "大老二", "category": "牌類", "icon": "♠2", "style": "cardface",
-        "desc": "四人撲克，♣3 開局，最先出完手牌的人獲勝",
+        "name": "大老二", "category": "撲克", "icon": "♠2", "seats": 4,
+        "desc": "梅花 3 開局，比牌型、拚點數，搶先出完手牌。",
         "aliases": ["大老二"],
     },
 }
-CATEGORY_ORDER = ["棋類", "牌類", "其他"]
+CATEGORY_ORDER = ["棋類", "麻將", "撲克", "其他"]
 SLUG_RE = re.compile(r"[a-z0-9][a-z0-9_-]*")
 
-FONT_LINKS = (
-    '<link rel="preconnect" href="https://fonts.googleapis.com">'
-    '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>'
-    '<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900'
-    '&amp;family=Noto+Serif+TC:wght@700;900&amp;display=swap" rel="stylesheet">'
-)
-
-THEMES = {"felt": "經典牌桌", "paper": "紙上棋室", "night": "東京夜色"}
-
-THEME_COLORS = """
-:root {
-    color-scheme: dark;
-    --canvas: #072b18;
-    --backdrop: radial-gradient(circle at 50% 35%, #196c3e 0%, #0e4b28 60%, #072915 100%);
-    --vignette: inset 0 0 80px rgba(0, 0, 0, 0.75);
-    --ink: #fef3c7; --muted: #bde3cd; --accent: #fcd34d;
-    --line: rgba(251, 191, 36, 0.22); --hover-line: rgba(251, 191, 36, 0.6);
-    --surface: rgba(0, 0, 0, 0.28); --hover-surface: rgba(0, 0, 0, 0.4);
-    --tint: rgba(251, 191, 36, 0.12);
-    --mark: linear-gradient(135deg, #fbbf24, #d97706); --mark-ink: #881337;
-    --model-ink: #bae6fd; --model-bg: rgba(56, 189, 248, 0.16);
-}
-/* 紙上棋室的暖紙色與藍墨色取自 Solarized 的淺色系。 */
-:root[data-theme="paper"] {
-    color-scheme: light;
-    --canvas: #fdf6e3;
-    --backdrop: linear-gradient(rgba(88, 110, 117, 0.06) 1px, transparent 1px) center / 28px 28px,
-                linear-gradient(90deg, rgba(88, 110, 117, 0.06) 1px, transparent 1px) center / 28px 28px,
-                linear-gradient(145deg, #fdf6e3, #eee8d5);
-    --vignette: none;
-    --ink: #073642; --muted: #455e65; --accent: #155977;
-    --line: #c2b99d; --hover-line: #547887;
-    --surface: #fffcf2; --hover-surface: #fffef9; --tint: #e3ece9;
-    --mark: linear-gradient(135deg, #225f70, #073642); --mark-ink: #fdf6e3;
-    --model-ink: #63490e; --model-bg: #f7e9b9;
-}
-/* 東京夜色採用 Tokyo Night 的靛藍底色、淡紫與冰藍。 */
-:root[data-theme="night"] {
-    color-scheme: dark;
-    --canvas: #1a1b26;
-    --backdrop: radial-gradient(ellipse at 90% 0%, rgba(117, 78, 161, 0.38), transparent 52%),
-                radial-gradient(ellipse at 8% 85%, rgba(46, 102, 143, 0.32), transparent 55%), #1a1b26;
-    --vignette: none;
-    --ink: #e2e8ff; --muted: #adb8db; --accent: #bb9af7;
-    --line: #434c6e; --hover-line: #7dcfff;
-    --surface: #24283b; --hover-surface: #2d344d; --tint: #39324f;
-    --mark: linear-gradient(135deg, #7dcfff, #bb9af7); --mark-ink: #1a1b26;
-    --model-ink: #7dcfff; --model-bg: #233c52;
-}
-"""
-
-PAGE_CSS = THEME_COLORS + """
-* { box-sizing: border-box; }
-html { background: var(--canvas); -webkit-text-size-adjust: 100%; }
-body {
-    margin: 0; min-height: 100vh; min-height: 100dvh; color: var(--ink);
-    font-family: 'Noto Sans TC', 'PingFang TC', 'Microsoft JhengHei', sans-serif;
-    -webkit-tap-highlight-color: transparent;
-}
-body::before {
-    content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none;
-    background: var(--backdrop); box-shadow: var(--vignette);
-}
-.wrap {
-    max-width: 880px; margin: 0 auto;
-    padding: max(28px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right))
-             max(28px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
-}
-.top { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 18px; }
-.brand { display: flex; align-items: center; gap: 14px; max-width: 100%; }
-.logo {
-    flex: none; width: 52px; height: 52px; border-radius: 14px; display: grid; place-items: center;
-    background: var(--mark); color: var(--mark-ink);
-    font: 900 28px 'Noto Serif TC', serif; box-shadow: 0 6px 16px rgba(0, 0, 0, 0.35);
-}
-h1 { margin: 0; font-size: 26px; font-weight: 900; letter-spacing: 0.08em; color: var(--accent); }
-.sub { margin: 2px 0 0; font-size: 13px; color: var(--muted); overflow-wrap: anywhere; }
-.theme-picker { margin: 0; padding: 0; border: 0; min-width: 0; }
-:root:not([data-theme]) .theme-picker { display: none; }
-.theme-picker legend { margin-bottom: 5px; padding: 0; color: var(--muted); font-size: 12px; font-weight: 700; }
-.theme-options { display: flex; flex-wrap: wrap; gap: 5px; }
-.theme-options label { position: relative; flex: 1 0 auto; cursor: pointer; }
-.theme-options input { position: absolute; width: 1px; height: 1px; margin: 0; clip-path: inset(50%); }
-.theme-option {
-    display: flex; align-items: center; justify-content: center; gap: 6px; padding: 0 9px; min-height: 44px;
-    border: 1px solid var(--line); border-radius: 10px; background: var(--surface);
-    color: var(--muted); font-size: 13px; font-weight: 700;
-}
-.swatch {
-    width: 16px; height: 16px; border-radius: 50%; display: grid; place-items: center;
-    background: linear-gradient(135deg, #196c3e 55%, #fcd34d 55%);
-    box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.18);
-}
-input[value="paper"] + .theme-option .swatch { background: linear-gradient(135deg, #fdf6e3 55%, #155977 55%); }
-input[value="night"] + .theme-option .swatch { background: linear-gradient(135deg, #343b58 55%, #bb9af7 55%); }
-.theme-options label:hover .theme-option { border-color: var(--hover-line); }
-.theme-options input:checked + .theme-option { color: var(--accent); border-color: var(--accent); background: var(--hover-surface); }
-.theme-options input:checked + .theme-option .swatch { color: var(--canvas); background: var(--accent); }
-.theme-options input:checked + .theme-option .swatch::after { content: "✓"; font: bold 12px/1 sans-serif; }
-.theme-options input:focus-visible + .theme-option, .card:focus-visible, .back:focus-visible {
-    outline: 2px solid var(--accent); outline-offset: 3px;
-}
-h2 {
-    display: flex; align-items: center; gap: 10px; margin: 30px 0 12px;
-    font-size: 14px; font-weight: 700; letter-spacing: 0.2em; color: var(--muted);
-}
-h2::after { content: ""; flex: 1; height: 1px; background: var(--line); }
-.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr)); gap: 12px; }
-.card {
-    display: flex; align-items: center; gap: 16px; min-height: 92px; padding: 14px 16px;
-    border-radius: 18px; border: 1px solid var(--line); background: var(--surface);
-    color: inherit; text-decoration: none;
-    transition: transform 0.15s;
-}
-.card:hover { background: var(--hover-surface); border-color: var(--hover-line); transform: translateY(-2px); }
-.card:active { transform: scale(0.98); }
-[data-theme="paper"] .card, [data-theme="paper"] .logo { border-radius: 6px; box-shadow: 2px 3px 0 #d4cbb2; }
-[data-theme="paper"] h1, [data-theme="paper"] .name { font-family: 'Noto Serif TC', 'Songti TC', serif; }
-[data-theme="night"] .card { box-shadow: inset 0 1px 0 rgba(192, 202, 245, 0.1), 0 5px 14px rgba(10, 12, 26, 0.3); }
-.icon {
-    flex: none; position: relative; width: 56px; height: 56px; display: grid; place-items: center;
-    font: 900 27px 'Noto Serif TC', serif;
-}
-/* 棋子：象牙色圓盤＋內圈；暗棋用深色棋背 */
-.piece {
-    border-radius: 50%; color: #b91c1c;
-    background: radial-gradient(circle at 35% 30%, #fffaf0 0%, #f3dfb4 55%, #d6b075 100%);
-    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.45), inset 0 -3px 0 rgba(0, 0, 0, 0.15);
-}
-.piece::before { content: ""; position: absolute; inset: 5px; border-radius: 50%; border: 2px solid currentColor; opacity: 0.5; }
-.piece.dark { color: #fcd34d; background: radial-gradient(circle at 35% 30%, #8a5a2b 0%, #5c3417 60%, #3a1f0c 100%); }
-/* 麻將牌：象牙牌面＋綠色牌背厚度 */
-.tile {
-    width: 44px; height: 58px; margin: 0 6px 6px; border-radius: 8px; color: #b91c1c;
-    background: linear-gradient(180deg, #fffef8 0%, #f3ecd9 100%);
-    box-shadow: 0 5px 0 #22885a, 0 8px 12px rgba(0, 0, 0, 0.45);
-}
-/* 撲克牌：白色牌面 */
-.cardface {
-    width: 42px; height: 58px; margin: 0 7px; border-radius: 7px; color: #111827;
-    background: linear-gradient(180deg, #ffffff 0%, #eef2f7 100%);
-    box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.25), 0 6px 12px rgba(0, 0, 0, 0.45);
-    font: 900 19px 'Noto Serif TC', serif; letter-spacing: -1px;
-}
-/* 黑白棋：一半白、一半黑的棋子（不顯示文字） */
-.disc {
-    border-radius: 50%; font-size: 0;
-    background: radial-gradient(circle at 35% 30%, rgba(255, 255, 255, 0.35) 0%, rgba(255, 255, 255, 0) 45%),
-                linear-gradient(135deg, #f8fafc 50%, #111827 50%);
-    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.45), inset 0 -3px 0 rgba(0, 0, 0, 0.25);
-}
-.info { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
-.name { font-size: 18px; font-weight: 900; color: var(--ink); text-wrap: balance; }
-.desc { font-size: 13px; line-height: 1.5; color: var(--muted); }
-.path {
-    align-self: flex-start; margin-top: 3px; padding: 1px 8px; border-radius: 6px;
-    font: 600 12px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-    color: var(--accent); background: var(--tint);
-}
-/* 這個遊戲的電腦可以改成照訓練好的模型出牌 */
-.model {
-    align-self: flex-start; margin-top: 3px; padding: 1px 8px; border-radius: 6px;
-    font-size: 12px; font-weight: 700; color: var(--model-ink); background: var(--model-bg);
-}
-.empty { color: var(--muted); }
-/* 中文在標點處換行，不把「不允許」這類詞拆開 */
-.desc, footer { word-break: keep-all; overflow-wrap: anywhere; }
-footer {
-    margin-top: 36px; padding-top: 14px; border-top: 1px solid var(--line);
-    font-size: 12.5px; line-height: 1.8; color: var(--muted);
-}
-.missing { text-align: center; padding-top: 18vh; }
-.missing p { color: var(--muted); }
-.back {
-    display: inline-block; margin-top: 10px; padding: 10px 22px; border-radius: 12px;
-    background: var(--mark); color: var(--mark-ink); font-weight: 900; text-decoration: none;
-}
-@media (max-width: 600px) {
-    .theme-picker { width: 100%; }
-    .theme-option { padding-inline: 5px; }
-}
-@media (prefers-reduced-motion: reduce) { .card { transition: none; } }
-"""
-
-THEME_SCRIPT = """<script>
-(() => {
-    const themes = __THEMES__;
-    const storageKey = 'game-lobby-theme';
-    const root = document.documentElement;
-    const gameStyle = document.getElementById('game-theme-style');
-    let browserColor = document.querySelector('meta[name="theme-color"]');
-    if (!browserColor) {
-        browserColor = document.createElement('meta');
-        browserColor.name = 'theme-color';
-        browserColor.content = '#072b18';
-        document.head.append(browserColor);
-    }
-    const classicColor = browserColor.content;
-    let gamePicker;
-
-    function applyTheme(value) {
-        const theme = themes.includes(value) ? value : themes[0];
-        root.dataset.theme = theme;
-        if (gameStyle) gameStyle.media = theme === 'felt' ? 'not all' : 'all';
-        browserColor.content = theme === 'felt' ? classicColor : getComputedStyle(root).getPropertyValue('--canvas').trim();
-        if (gamePicker) gamePicker.value = theme;
-        for (const radio of document.querySelectorAll('input[name="lobby-theme"]')) {
-            radio.checked = radio.value === theme;
-        }
-    }
-
-    function savedTheme() {
-        try { return localStorage.getItem(storageKey); } catch { return root.dataset.theme; }
-    }
-    applyTheme(savedTheme());
-
-    document.addEventListener('DOMContentLoaded', () => {
-        const template = document.getElementById('game-theme-control');
-        if (template) {
-            const rules = document.querySelector('#rulesModal .overflow-y-auto, #rulesDialog .modal-body');
-            if (rules) {
-                gamePicker = template.content.querySelector('select');
-                rules.prepend(template.content);
-            }
-        }
-        applyTheme(root.dataset.theme);
-        const picker = gamePicker || document.getElementById('lobby-themes');
-        if (!picker) return;
-        picker.addEventListener('change', event => {
-            applyTheme(event.target.value);
-            try { localStorage.setItem(storageKey, root.dataset.theme); } catch { /* 本頁仍可切換 */ }
-        });
-    });
-    window.addEventListener('storage', event => {
-        if (event.key === storageKey || event.key === null) applyTheme(savedTheme());
-    });
-    window.addEventListener('pageshow', event => { if (event.persisted) applyTheme(savedTheme()); });
-})();
-</script>""".replace("__THEMES__", json.dumps(list(THEMES)))
-
-# 只有選了紙上棋室或東京夜色才啟用這張樣式表。各遊戲原本的經典外觀由自己的 HTML 提供。
-try:
-    GAME_THEME_CSS = (GAMES_DIR / "themes.css").read_text(encoding="utf-8")
-except OSError:
-    GAME_THEME_CSS = ""  # 只有伺服器腳本或遊戲資料夾缺少佈景時，仍可開啟大廳和原版遊戲
-
-GAME_THEME_HEAD = (
-    f'<style id="game-theme-style" media="not all">{THEME_COLORS}{GAME_THEME_CSS}</style>'
-    + """<style>
-.game-theme-setting { display: flex; align-items: center; justify-content: space-between; gap: 12px;
-    margin-bottom: 16px; font-size: 14px; font-weight: 700; }
-.game-theme-setting select { min-height: 40px; padding: 4px 10px; font: inherit;
-    border: 1px solid var(--line, #64748b); border-radius: 8px;
-    background: var(--surface, #1e293b); color: var(--ink, #f8fafc); }
-.game-theme-setting select:focus-visible { outline: 2px solid var(--accent, #fbbf24); outline-offset: 2px; }
-</style><template id="game-theme-control"><label class="game-theme-setting">遊戲主題<select>"""
-    + "".join(f'<option value="{key}">{name}</option>' for key, name in THEMES.items())
-    + '</select></label></template>' + THEME_SCRIPT
-) if GAME_THEME_CSS else ""
+ASSETS_DIR = GAMES_DIR / "assets"
+ASSET_TYPES = {".css": "text/css; charset=utf-8", ".js": "text/javascript; charset=utf-8",
+               ".webp": "image/webp", ".woff2": "font/woff2", ".txt": "text/plain; charset=utf-8"}
 
 # 插在每個遊戲頁面最後：點左上角的遊戲圖示回到大廳（手機「加入主畫面」後沒有上一頁按鈕）
 HOME_BUTTON = """<script>
-/* 遊戲伺服器加入：點左上角的圖示回到遊戲大廳 */
-(function () {
-    var logo = document.querySelector('header > div:first-child > div:first-child');
-    if (!logo || !(logo.classList.contains('rounded-xl') || logo.classList.contains('brand-mark'))) return;
-    logo.title = '回遊戲大廳';
-    logo.setAttribute('role', 'link');
-    logo.setAttribute('aria-label', '回遊戲大廳');
-    logo.tabIndex = 0;
-    logo.style.position = 'relative';
-    logo.style.cursor = 'pointer';
-    var badge = document.createElement('span');
-    badge.setAttribute('aria-hidden', 'true');
-    badge.style.cssText = 'position:absolute;left:-5px;bottom:-5px;width:17px;height:17px;border-radius:50%;'
-        + 'display:flex;align-items:center;justify-content:center;background:var(--canvas,#0e4b28);'
-        + 'border:1.5px solid var(--accent,#fbbf24);color:var(--accent,#fcd34d);';
-    badge.innerHTML = '<svg viewBox="0 0 16 16" width="9" height="9" fill="currentColor"><path d="M8 1.5 1 7.5h2.2V14h3.6v-4h2.4v4h3.6V7.5H15z"/></svg>';
-    logo.appendChild(badge);
-    function goHome() {
-        if (confirm('回到遊戲大廳？目前這一局不會保存。')) location.href = '/';
-    }
-    logo.addEventListener('click', goHome);
-    logo.addEventListener('keydown', function (e) { if (e.key === 'Enter') goHome(); });
+(() => {
+    const mark = document.querySelector('[data-game-mark], header > div:first-child > .rounded-xl, header .brand-mark');
+    if (!mark) return;
+    const link = document.createElement('a');
+    link.className = 'table-home';
+    link.href = '/';
+    link.title = '回遊戲大廳';
+    link.setAttribute('aria-label', link.title);
+    mark.replaceWith(link);
+    link.append(mark);
+    link.addEventListener('click', event => {
+        if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+        if (!confirm('離開牌桌，回到遊戲大廳？')) event.preventDefault();
+    });
 })();
 </script>
 """
@@ -686,7 +422,7 @@ def find_games():
         info = CATALOG.get(slug)
         if info is None:
             name = read_title(path) or path.stem
-            info = {"name": name, "category": "其他", "icon": name[:1], "style": "piece",
+            info = {"name": name, "category": "其他", "icon": name[:1],
                     "desc": path.name, "aliases": []}
         games.append({"slug": slug, "path": path, **info})
 
@@ -711,87 +447,110 @@ def find_game(name):
 
 
 def icon_uri(char):
-    """瀏覽器分頁用的小圖示（金色方塊上的一個字）。"""
+    """瀏覽器分頁用的小圖示（桌遊室印記）。"""
     svg = ("<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'>"
-           "<rect width='64' height='64' rx='16' fill='#f59e0b'/>"
+           "<rect width='64' height='64' rx='16' fill='#254c3d'/>"
            "<text x='32' y='45' font-size='38' font-weight='900' text-anchor='middle' "
-           f"font-family='serif' fill='#881337'>{html.escape(char)}</text></svg>")
+           f"font-family='serif' fill='#fff6dc'>{html.escape(char)}</text></svg>")
     return "data:image/svg+xml," + quote(svg)
 
 
-def page_shell(title, icon, body, head_script=""):
+def page_shell(title, body):
     return f"""<!DOCTYPE html>
-<html lang="zh-Hant">
+<html lang="zh-Hant" class="lobby">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="apple-mobile-web-app-title" content="遊戲大廳">
-<meta name="theme-color" content="#072b18">
-<title>{html.escape(title)}</title>
-<link rel="icon" href="{icon_uri(icon)}">
-<style>{PAGE_CSS}</style>
-{head_script}
-{FONT_LINKS}
+<meta name="apple-mobile-web-app-title" content="棋聚桌遊室">
+<meta name="theme-color" content="#f8f7f2">
+<title>{html.escape(title)} · 棋聚桌遊室</title>
+<link rel="icon" href="{icon_uri("棋")}">
+<link rel="stylesheet" href="/assets/palette.css">
+<link rel="stylesheet" href="/assets/lobby.css">
+<script src="/assets/interface.js"></script>
 </head>
 <body>
-<main class="wrap">
+<a class="skip-link" href="#main">跳至主要內容</a>
+<header class="masthead"><div class="shell mast-inner">
+  <a class="wordmark" href="/"><span class="club-mark" aria-hidden="true">⚄</span>棋聚桌遊室</a>
+  <nav aria-label="主選單"><a class="nav-link" href="/#library">遊戲大廳</a></nav>
+  <label class="appearance" data-theme-picker hidden>
+    <i class="ui-icon i-palette" aria-hidden="true"></i>
+    <select aria-label="大廳主題"></select><i class="ui-icon i-chevron-down" aria-hidden="true"></i>
+  </label>
+</div></header>
 {body}
-</main>
-</body>
-</html>"""
+</body></html>"""
 
 
 def game_card(game, modelled=False):
-    tag = '<span class="model">可以和模型對打</span>' if modelled else ""
-    return (f'<a class="card" href="/{game["slug"]}">'
-            f'<span class="icon {game["style"]}">{html.escape(game["icon"])}</span>'
-            f'<span class="info"><span class="name">{html.escape(game["name"])}</span>'
-            f'<span class="desc">{html.escape(game["desc"])}</span>'
-            f'<span class="path">/{game["slug"]}</span>{tag}</span></a>')
+    slug, category = game["slug"], html.escape(game["category"], quote=True)
+    name = html.escape(game["name"])
+    if (ASSETS_DIR / f"{slug}.webp").is_file():
+        cover = f'<img src="/assets/{slug}.webp" alt="" width="680" height="383" loading="lazy" decoding="async">'
+    else:
+        cover = f'<span class="cover-letter" aria-hidden="true">{html.escape(game["icon"])}</span>'
+    players = (f'<span class="players"><i class="ui-icon i-people" aria-hidden="true"></i>{game["seats"]} 人</span>'
+               if game.get("seats") else "")
+    model = '<span class="model">可以和模型對打</span>' if modelled else ""
+    return f"""<a class="game-card" data-category="{category}" href="/{slug}">
+  <div class="cover">{cover}{model}</div>
+  <div class="card-body">
+    <div class="card-meta"><span>{category}</span>{players}</div>
+    <h3>{name}</h3><p>{html.escape(game["desc"])}</p>
+    <span class="card-arrow" aria-hidden="true"><i class="ui-icon i-arrow-up-right"></i></span>
+  </div>
+</a>"""
 
 
 def lobby_page(address, bots=None):
-    """bots：伺服器的模型（model_bot.Bots）；有模型可以選的遊戲在卡片上標出來。"""
     games = find_games()
-    sections = []
-    for category in dict.fromkeys(game["category"] for game in games):
-        cards = "".join(game_card(game, bool(bots and bots.info(game["slug"])["model"]))
-                        for game in games if game["category"] == category)
-        sections.append(f'<section><h2>{html.escape(category)}</h2><div class="grid">{cards}</div></section>')
-    content = "".join(sections) or '<p class="empty">games/ 資料夾裡還沒有遊戲。</p>'
-    theme_options = "".join(
-        f'<label><input type="radio" name="lobby-theme" value="{key}">'
-        f'<span class="theme-option"><span class="swatch" aria-hidden="true"></span>{name}</span></label>'
-        for key, name in THEMES.items()
+    categories = list(dict.fromkeys(game["category"] for game in games))
+    filters = "".join(
+        f'<button type="button" data-filter="{html.escape(category)}" aria-pressed="false">{html.escape(category)}</button>'
+        for category in categories
     )
-    body = f"""<header class="top">
-  <div class="brand">
-    <div class="logo" aria-hidden="true">遊</div>
-    <div>
-      <h1>遊戲大廳</h1>
-      <p class="sub">Tailscale 內網 · {html.escape(address)}</p>
-    </div>
+    cards = "".join(game_card(game, bool(bots and bots.info(game["slug"])["model"])) for game in games)
+    feature = ""
+    if any(game["slug"] == "mahjong" for game in games):
+        feature = """<section class="feature" aria-labelledby="feature-title">
+  <img class="feature-photo" src="/assets/mahjong.webp" alt="" width="1680" height="647" fetchpriority="high">
+  <div class="feature-copy">
+    <p class="feature-kicker"><i class="ui-icon i-stars" aria-hidden="true"></i>精選牌桌</p>
+    <h1 id="feature-title">台灣十六張麻將</h1>
+    <p class="feature-description">與三家電腦同桌，從起手十六張，一路摸到胡牌。</p>
+    <div class="feature-actions"><a class="play" href="/mahjong"><i class="ui-icon i-play-fill" aria-hidden="true"></i>入座開局</a>
+      <span><i class="ui-icon i-people" aria-hidden="true"></i>四人對局</span></div>
   </div>
-  <fieldset class="theme-picker" id="lobby-themes">
-    <legend>大廳主題</legend>
-    <div class="theme-options">{theme_options}</div>
-  </fieldset>
-</header>
-{content}
-<footer>
-  iPhone／iPad：用 Safari 打開這頁，點「分享」→「加入主畫面」，就能像 App 一樣開啟。<br>
-  進入遊戲後，點左上角的圖示可以回到大廳。
+</section>"""
+    heading = "h2" if feature else "h1"
+    filter_bar = f"""<div class="filters" role="group" aria-label="依遊戲類型篩選" hidden>
+      <button type="button" data-filter="" aria-pressed="true"><i class="ui-icon i-grid" aria-hidden="true"></i>全部</button>{filters}
+    </div>""" if len(categories) > 1 else ""
+    content = f'<div class="library-grid">{cards}</div>' if cards else '<p class="empty">目前沒有遊戲。將遊戲 HTML 放入 games 資料夾後，就會出現在這裡。</p>'
+    body = f"""<main class="shell lobby-main" id="main">
+{feature}
+<section class="library" id="library" aria-labelledby="library-title">
+  <div class="library-head">
+    <div class="library-title"><{heading} id="library-title">遊戲收藏</{heading}><span id="game-count" aria-live="polite">{len(games)} 款遊戲</span></div>
+    {filter_bar}
+  </div>
+  {content}
+</section>
+</main>
+<footer class="shell lobby-footer">
+  <p><i class="ui-icon i-hdd-network" aria-hidden="true"></i>Tailscale 內網<span class="address">{html.escape(address)}</span></p>
+  <details><summary>加入主畫面<i class="ui-icon i-chevron-down" aria-hidden="true"></i></summary>
+    <p>在 iPhone 或 iPad 上用 Safari 打開大廳，從分享選單選擇「加入主畫面」。</p></details>
 </footer>"""
-    return page_shell("遊戲大廳", "遊", body, THEME_SCRIPT)
+    return page_shell("遊戲大廳", body)
 
 
 def not_found_page():
-    body = """<div class="missing">
-  <h1>找不到這個遊戲</h1>
-  <p>網址可能打錯了。</p>
-  <a class="back" href="/">回遊戲大廳</a>
-</div>"""
-    return page_shell("找不到遊戲", "遊", body)
+    return page_shell("找不到遊戲", """<main class="shell missing" id="main">
+  <p>404</p><h1>找不到這個遊戲</h1>
+  <a class="play" href="/">回遊戲大廳<i class="ui-icon i-arrow-right" aria-hidden="true"></i></a>
+</main>""")
 
 
 def insert_before(page, marker, extra, last):
@@ -814,7 +573,8 @@ def add_lobby_links(page, game):
     head = (f'<meta name="apple-mobile-web-app-title" content="{html.escape(game["name"])}">'
             f'<link rel="icon" href="{icon_uri(game["icon"])}">{recorder}{BOT.replace("__GAME__", game["slug"])}')
     if game["slug"] in CATALOG:
-        head += GAME_THEME_HEAD
+        # 原始檔與 assets 同層；伺服器上的別名與帶尾斜線的網址一律從 /assets 載入。
+        page = page.replace(b'href="assets/', b'href="/assets/').replace(b'src="assets/', b'src="/assets/')
     page = insert_before(page, b"</head>", head.encode(), last=False)
     return insert_before(page, b"</body>", HOME_BUTTON.encode(), last=True)
 
@@ -993,8 +753,35 @@ class GameHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    def send_asset(self, name, send_body):
+        # 僅公開 assets 裡的前端檔案。請求路徑不能包含子目錄。
+        media = ASSET_TYPES.get(Path(name).suffix)
+        if not media or not re.fullmatch(r"[a-z0-9-]+\.[a-z0-9]+", name):
+            return self.send_page(HTTPStatus.NOT_FOUND, not_found_page(), send_body)
+        try:
+            file = ASSETS_DIR / name
+            with file.open("rb") as stream:
+                stat = os.fstat(stream.fileno())
+                etag = f'"{stat.st_mtime_ns:x}-{stat.st_size:x}"'
+                cached = self.headers.get("If-None-Match") == etag
+                body = stream.read() if send_body and not cached else None
+        except OSError:
+            return self.send_page(HTTPStatus.NOT_FOUND, not_found_page(), send_body)
+        self.send_response(HTTPStatus.NOT_MODIFIED if cached else HTTPStatus.OK)
+        self.send_header("ETag", etag)
+        self.send_header("Cache-Control", "no-cache")
+        if not cached:
+            self.send_header("Content-Type", media)
+            self.send_header("Content-Length", str(stat.st_size))
+            self.send_header("X-Content-Type-Options", "nosniff")
+        self.end_headers()
+        if body is not None:
+            self.wfile.write(body)
+
     def respond(self, send_body):
         path = unquote(urlsplit(self.path).path)
+        if path.startswith("/assets/"):
+            return self.send_asset(path[len("/assets/"):], send_body)
         if path in ("/", "/index.html"):
             return self.send_page(HTTPStatus.OK, lobby_page(self.headers.get("Host", ""), self.server.bots), send_body)
         if path.startswith("/api/bot/"):

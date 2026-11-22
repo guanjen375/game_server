@@ -293,7 +293,7 @@ async function exercise(browser, name) {
     await midRound(3);
     let snapshot = await peek();
     await Promise.all([page.waitForNavigation({ waitUntil: 'load' }), page.evaluate(() => {
-        window.__sleep(20).then(() => document.querySelector('header > div:first-child > div:first-child').click());
+        window.__sleep(20).then(() => document.querySelector('header a[aria-label="回遊戲大廳"]').click());
     })]);
     assert.equal(new URL(page.url()).pathname, '/');
     checkFile(name, await newFile('the unfinished round after leaving for the lobby'), snapshot, 'unfinished');

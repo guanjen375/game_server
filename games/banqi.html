@@ -1,15 +1,10 @@
 <!DOCTYPE html>
-<html lang="zh-Hant">
+<html lang="zh-Hant" data-game="banqi">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <title>經典暗棋 Banqi - 網頁象棋遊戲</title>
-    <!-- 引入 Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- 引入 Google Fonts -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&family=Noto+Serif+TC:wght@700;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="assets/layout.css">
     <style>
         * {
             box-sizing: border-box;
@@ -53,11 +48,6 @@
         /* 彈窗最大高度同樣以可見高度為準 */
         .modal-h-88 { max-height: 88vh; max-height: 88dvh; }
         .modal-h-90 { max-height: 90vh; max-height: 90dvh; }
-        /* 手機橫放時畫面太矮，放不下整個遊戲：提示轉成直向 */
-        .rotate-hint { display: none; }
-        @media (orientation: landscape) and (max-height: 500px) and (pointer: coarse) {
-            .rotate-hint { display: flex; }
-        }
 
         /* 經典綠色絨布棋桌背景 */
         .felt-table {
@@ -365,59 +355,32 @@
             border-radius: 4px;
         }
     </style>
+    <link rel="stylesheet" href="assets/palette.css">
+    <link rel="stylesheet" href="assets/tables.css">
+    <script src="assets/interface.js"></script>
 </head>
 <body class="w-screen flex flex-col justify-between felt-table text-white select-none">
 
     <!-- 頂部導覽與資訊列（手機上縮成兩行：圖示與按鈕一行、狀態一行） -->
-    <header class="w-full px-3 sm:px-6 py-1.5 sm:py-2 bg-black/45 backdrop-blur-md border-b border-white/10 flex flex-wrap items-center justify-between gap-x-2 gap-y-1.5 sm:gap-2 z-30">
-        <div class="flex items-center gap-2 sm:gap-3">
-            <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center shadow-md text-xl font-black text-rose-900" style="font-family: 'Noto Serif TC', serif;">
-                暗
-            </div>
-            <div>
-                <h1 class="text-base sm:text-lg font-black tracking-wide text-amber-300 flex items-center gap-2">
-                    <span class="hidden sm:inline">經典暗棋</span>
-                    <span id="roundBadge" class="text-xs font-bold px-2 py-0.5 rounded-full bg-emerald-800/90 text-emerald-200 border border-emerald-500/40">
-                        第 1 局
-                    </span>
-                </h1>
-                <p class="text-[11px] text-emerald-200/80 hidden sm:block">帥將 › 仕士 › 相象 › 俥車 › 傌馬 › 炮包 › 兵卒 · 兵卒可吃帥將 · 炮隔一子跳吃 · 每回合一動、不可連吃</p>
-            </div>
+    <header class="table-header">
+        <div class="table-identity">
+            <span class="table-emblem" data-game-mark aria-hidden="true">暗</span>
+            <div><h1>暗棋</h1><p class="table-round"><span id="roundBadge">第 1 局</span></p></div>
         </div>
-
-        <!-- 中央狀態提示條 -->
-        <div class="order-3 sm:order-none mx-auto sm:mx-0 flex items-center gap-2 bg-emerald-950/80 border border-emerald-600/40 px-3 py-1 rounded-full shadow-inner">
-            <span class="text-xs text-emerald-300 font-medium">目前手數：</span>
-            <span id="moveCounter" class="text-xs sm:text-sm font-extrabold text-amber-300">第 1 手</span>
-            <span class="text-white/20">|</span>
-            <span class="text-xs text-emerald-300 font-medium">比分計數：</span>
-            <span id="drawCounter" class="text-xs sm:text-sm font-extrabold text-white">0 / 50</span>
-            <span class="text-white/20 hidden sm:inline">|</span>
-            <span class="text-xs text-emerald-300 font-medium hidden sm:inline">暗子：</span>
-            <span id="hiddenCounter" class="text-xs sm:text-sm font-extrabold text-white hidden sm:inline">32</span>
-        </div>
-
-        <!-- 右側功能按鈕列 -->
-        <div class="order-2 sm:order-none flex items-center gap-1 sm:gap-2">
-            <button id="btnHint" onclick="game.showHint()" class="px-2 sm:px-2.5 py-1.5 rounded-lg bg-sky-600/80 hover:bg-sky-500 active:scale-95 text-xs font-bold transition flex items-center gap-1 shadow">
-                <span>💡</span><span class="hidden md:inline">走棋提示</span>
-            </button>
-            <button onclick="game.undo()" class="px-2 sm:px-2.5 py-1.5 rounded-lg bg-emerald-800/80 hover:bg-emerald-700 active:scale-95 text-xs font-bold transition flex items-center gap-1 border border-emerald-600/40">
-                <span>↩️</span><span class="hidden md:inline">悔棋</span>
-            </button>
-            <button id="btnSound" onclick="game.toggleSound()" class="px-2 sm:px-2.5 py-1.5 rounded-lg bg-emerald-800/80 hover:bg-emerald-700 active:scale-95 text-xs font-bold transition flex items-center gap-1 border border-emerald-600/40">
-                <span id="soundIcon">🔊</span><span class="hidden md:inline">音效</span>
-            </button>
-            <button onclick="game.openScoreModal(false)" class="px-2 sm:px-2.5 py-1.5 rounded-lg bg-emerald-800/80 hover:bg-emerald-700 active:scale-95 text-xs font-bold transition flex items-center gap-1 border border-emerald-600/40">
-                <span>📊</span><span class="hidden sm:inline">戰績板</span>
-            </button>
-            <button onclick="game.openRulesModal()" class="px-2 sm:px-2.5 py-1.5 rounded-lg bg-amber-500/90 hover:bg-amber-400 text-slate-950 active:scale-95 text-xs font-black transition flex items-center gap-1 shadow">
-                <span>📖</span><span class="hidden sm:inline">規則說明</span>
-            </button>
-            <button onclick="game.confirmRestartMatch()" class="px-2 sm:px-2.5 py-1.5 rounded-lg bg-rose-600/85 hover:bg-rose-500 active:scale-95 text-xs font-bold transition flex items-center gap-1 shadow">
-                <span>🔄</span><span class="hidden sm:inline">重新開始</span>
-            </button>
-        </div>
+        <div class="table-state" aria-label="牌桌狀態"><span id="moveCounter">第 1 手</span><span>比分計數 <b id="drawCounter">0 / 50</b></span><span>暗子 <b id="hiddenCounter">32</b></span></div>
+        <nav class="table-tools" aria-label="遊戲操作">
+            <button type="button" class="table-tool hint-tool" id="btnHint" onclick="game.showHint()" title="走棋提示" aria-label="走棋提示"><i class="ui-icon i-lightbulb" aria-hidden="true"></i><span>提示</span></button>
+            <button type="button" class="table-tool" onclick="game.undo()"><i class="ui-icon i-arrow-counterclockwise" aria-hidden="true"></i><span>悔棋</span></button>
+            <details class="table-menu">
+                <summary class="table-tool" aria-label="牌桌選單"><i class="ui-icon i-three-dots" aria-hidden="true"></i><span>選單</span></summary>
+                <div class="menu-panel">
+                    <button type="button" class="table-tool" onclick="game.openScoreModal(false)"><i class="ui-icon i-trophy" aria-hidden="true"></i><span>戰績板</span></button>
+                    <button type="button" class="table-tool" onclick="game.openRulesModal()"><i class="ui-icon i-journal-text" aria-hidden="true"></i><span>規則與設定</span></button>
+                    <button type="button" class="table-tool sound-toggle" id="btnSound" onclick="game.toggleSound()" aria-pressed="true"><i class="ui-icon i-volume-up" aria-hidden="true"></i><span>音效</span><span class="sound-state" aria-hidden="true"></span></button>
+                    <button type="button" class="table-tool restart-tool" onclick="game.confirmRestartMatch()"><i class="ui-icon i-arrow-repeat" aria-hidden="true"></i><span>重新開始</span></button>
+                </div>
+            </details>
+        </nav>
     </header>
 
     <!-- 棋桌主要遊戲區 -->
@@ -428,7 +391,7 @@
             <div id="panel-north" class="bg-slate-900/75 backdrop-blur-md border border-white/15 rounded-2xl px-3.5 py-2 w-full max-w-md sm:max-w-xl transition-all duration-300">
                 <div class="flex items-center justify-between gap-2">
                     <div class="flex items-center gap-2 min-w-0">
-                        <div id="avatar-north" class="w-8 h-8 rounded-full bg-indigo-500/30 border border-indigo-400 flex items-center justify-center text-base shrink-0">🧔</div>
+                        <div id="avatar-north" class="w-8 h-8 rounded-full bg-indigo-500/30 border border-indigo-400 flex items-center justify-center text-base shrink-0">中</div>
                         <div class="min-w-0">
                             <div class="flex items-center gap-1.5 flex-wrap">
                                 <span id="name-north" class="font-bold text-xs sm:text-sm text-white">BOT001</span>
@@ -498,7 +461,7 @@
             <div id="panel-south" class="w-full max-w-3xl bg-slate-900/80 backdrop-blur-md border border-white/15 rounded-2xl px-3.5 py-2 transition-all duration-300">
                 <div class="flex flex-wrap items-center justify-between gap-2">
                     <div class="flex items-center gap-2.5">
-                        <div class="w-8 h-8 rounded-full bg-emerald-500/30 border border-emerald-400 flex items-center justify-center text-base shrink-0">😎</div>
+                        <div class="seat-initial w-8 h-8 rounded-full bg-emerald-500/30 border border-emerald-400 flex items-center justify-center text-base shrink-0">南</div>
                         <div>
                             <div class="flex items-center gap-1.5 flex-wrap">
                                 <span id="name-south" class="font-black text-sm text-white">您（玩家）</span>
@@ -541,21 +504,14 @@
 
     </main>
 
-    <!-- 手機橫放時的提示（只在高度很矮的觸控螢幕顯示） -->
-    <div class="rotate-hint fixed inset-0 z-[100] flex-col items-center justify-center gap-2 bg-[#072b18] text-center px-6">
-        <div class="text-5xl">📱</div>
-        <div class="text-lg font-black text-amber-300">請把手機轉成直向</div>
-        <div class="text-xs text-emerald-200/80">橫向畫面太矮，放不下整個遊戲畫面</div>
-    </div>
-
     <!-- 彈窗 1：規則說明 Modal -->
-    <div id="rulesModal" class="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
+    <div id="rulesModal" role="dialog" aria-modal="true" aria-labelledby="rulesModalHeading" class="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
         <div class="bg-slate-900 border border-emerald-500/40 rounded-3xl max-w-2xl w-full modal-h-88 flex flex-col shadow-2xl overflow-hidden">
             <div class="px-6 py-4 bg-gradient-to-r from-emerald-900 to-slate-900 border-b border-white/10 flex items-center justify-between">
-                <h2 class="text-lg sm:text-xl font-black text-amber-300 flex items-center gap-2">
+                <h2 class="text-lg sm:text-xl font-black text-amber-300 flex items-center gap-2" id="rulesModalHeading">
                     <span>📖</span> 經典暗棋（半盤暗棋）規則說明
                 </h2>
-                <button onclick="game.closeRulesModal()" class="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white font-bold">✕</button>
+                <button aria-label="關閉視窗" onclick="game.closeRulesModal()" class="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white font-bold">✕</button>
             </div>
             <div class="p-6 overflow-y-auto space-y-5 text-sm text-slate-200 leading-relaxed">
                 <div>
@@ -693,7 +649,7 @@
     </div>
 
     <!-- 彈窗 2：每局結算 / 戰績板 Modal -->
-    <div id="scoreModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
+    <div id="scoreModal" role="dialog" aria-modal="true" aria-labelledby="scoreModalTitle" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
         <div class="bg-slate-900 border border-amber-400/40 rounded-3xl max-w-3xl w-full modal-h-90 flex flex-col shadow-2xl overflow-hidden">
             <div class="px-6 py-4 bg-gradient-to-r from-amber-900/60 via-slate-900 to-emerald-900/60 border-b border-white/10 flex items-center justify-between">
                 <div>
@@ -702,7 +658,7 @@
                     </h2>
                     <p id="scoreModalSubtitle" class="text-xs text-slate-300 mt-0.5">雙方吃子明細與累計戰績</p>
                 </div>
-                <button onclick="game.closeScoreModal()" class="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white font-bold">✕</button>
+                <button aria-label="關閉視窗" onclick="game.closeScoreModal()" class="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white font-bold">✕</button>
             </div>
 
             <div class="p-4 sm:p-6 overflow-y-auto space-y-4">
@@ -772,12 +728,12 @@
     </div>
 
     <!-- 彈窗 3：確認重新開始 Modal（取代原生 confirm） -->
-    <div id="confirmModal" class="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
+    <div id="confirmModal" role="dialog" aria-modal="true" aria-labelledby="confirmModalHeading" class="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
         <div class="bg-slate-900 border border-rose-500/40 rounded-2xl max-w-sm w-full p-5 shadow-2xl text-center">
             <div class="w-12 h-12 rounded-full bg-rose-500/20 border border-rose-400/40 text-2xl flex items-center justify-center mx-auto mb-3">
                 🔄
             </div>
-            <h3 class="text-lg font-black text-white mb-1">確定要重新開始嗎？</h3>
+            <h3 class="text-lg font-black text-white mb-1" id="confirmModalHeading">確定要重新開始嗎？</h3>
             <p class="text-xs text-slate-300 mb-5">這將會清空雙方的累計戰績與歷史局數，並重新洗牌開始第 1 局。</p>
             <div class="flex items-center justify-center gap-3">
                 <button onclick="game.closeConfirmModal()" class="flex-1 py-2 rounded-xl bg-slate-700 hover:bg-slate-600 text-xs font-bold text-white transition">
@@ -1719,9 +1675,9 @@
         const BOT_NAME = 'BOT001';
         // 電腦對手角色（依難度切換）
         const AI_PERSONAS = {
-            easy:   { avatar: '👩', ring: 'bg-pink-500/30 border-pink-400', label: '簡單' },
-            normal: { avatar: '🧔', ring: 'bg-indigo-500/30 border-indigo-400', label: '普通' },
-            hard:   { avatar: '👴', ring: 'bg-amber-500/30 border-amber-400', label: '困難' }
+            easy:   { avatar: '初', ring: 'bg-pink-500/30 border-pink-400', label: '簡單' },
+            normal: { avatar: '中', ring: 'bg-indigo-500/30 border-indigo-400', label: '普通' },
+            hard:   { avatar: '高', ring: 'bg-amber-500/30 border-amber-400', label: '困難' }
         };
 
         /**
@@ -1818,7 +1774,7 @@
                     north.short = '玩家二';
                     south.name = '玩家一';
                     south.short = '玩家一';
-                    avatar.textContent = '🧑';
+                    avatar.textContent = '北';
                     avatar.className = 'w-8 h-8 rounded-full border flex items-center justify-center text-base shrink-0 bg-sky-500/30 border-sky-400';
                     document.getElementById('sub-north').textContent = '雙人同機對戰';
                 } else {
@@ -2829,7 +2785,7 @@
              */
             toggleSound() {
                 this.sound.enabled = !this.sound.enabled;
-                document.getElementById('soundIcon').textContent = this.sound.enabled ? '🔊' : '🔇';
+                document.getElementById('btnSound').setAttribute('aria-pressed', String(this.sound.enabled));
                 this.showCenterBanner(
                     this.sound.enabled ? '🔊 遊戲音效已開啟' : '🔇 遊戲音效已靜音',
                     'bg-slate-800 text-white'

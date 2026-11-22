@@ -148,6 +148,38 @@ class RecordServerTest(unittest.TestCase):
         self.assertEqual(self.post(b"x" * 10, **{"Content-Length": "999999999"})[0], 413)
         self.assertEqual(self.files(), [])
 
+    def test_alias_and_trailing_slash_load_the_same_local_styles(self):
+        page = PAGE.replace("</head>", '<link rel="stylesheet" href="assets/layout.css"></head>')
+        (open_server.GAMES_DIR / "banqi.html").write_text(page, encoding="utf-8")
+        for route in ("/banqi", "/banqi/", "/暗棋/"):
+            status, body = self.request("GET", route)
+            self.assertEqual(status, 200)
+            self.assertIn('href="/assets/layout.css"', body)
+
+        connection = http.client.HTTPConnection(*self.server.server_address, timeout=10)
+        self.addCleanup(connection.close)
+        connection.request("GET", "/assets/layout.css")
+        response = connection.getresponse()
+        self.assertEqual(response.status, 200)
+        self.assertEqual(response.getheader("Content-Type"), "text/css; charset=utf-8")
+        size, etag = len(response.read()), response.getheader("ETag")
+        self.assertGreater(size, 0)
+        connection.request("HEAD", "/assets/layout.css")
+        response = connection.getresponse()
+        self.assertEqual(int(response.getheader("Content-Length")), size)
+        self.assertEqual(response.read(), b"")
+        connection.request("GET", "/assets/layout.css", headers={"If-None-Match": etag})
+        self.assertEqual(connection.getresponse().status, 304)
+
+    def test_new_game_gets_a_lobby_card_without_cover_art(self):
+        (open_server.GAMES_DIR / "new-game.html").write_text(
+            "<title>新遊戲 &amp; 測試</title>", encoding="utf-8")
+        status, lobby = self.request("GET", "/")
+        self.assertEqual(status, 200)
+        self.assertIn('data-category="其他" href="/new-game"', lobby)
+        self.assertIn('<h3>新遊戲 &amp; 測試</h3>', lobby)
+        self.assertNotIn('src="/assets/new-game.webp"', lobby)
+
     def test_game_pages_carry_the_recorder_and_their_version(self):
         status, page = self.request("GET", "/banqi")
         self.assertEqual(status, 200)

@@ -1,0 +1,98 @@
+/* 字型授權見同目錄的 credits.txt。 */
+/* 桌遊室共用色票。大廳採用淺色紙面，桌內採用同一組主題的棋桌與面板色。 */
+:root {
+    color-scheme: dark;
+    --sans: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", system-ui, "Table symbols", sans-serif;
+    --serif: "Noto Serif TC", "Songti TC", "Noto Serif CJK TC", "PMingLiU", "Table symbols", serif;
+    --canvas: #11382d;
+    --backdrop: radial-gradient(ellipse at 50% 40%, #315e49, transparent 74%), #143c30;
+    --surface: #1b4034;
+    --inset: #133327;
+    --ink: #f7f4e8;
+    --muted: #b7cabd;
+    --accent: #f0cb85;
+    --line: #436150;
+    --hover-line: #d5ba85;
+    --hover-surface: #315542;
+    --tint: #344e37;
+    --mark: #f1d196;
+    --mark-ink: #293527;
+    --board: linear-gradient(150deg, #356c50, #234b3c);
+    --frame: #19382a;
+    --grid: #78947b;
+    --piece-back: linear-gradient(145deg, #936743, #68472c 65%, #47301e);
+    --back-detail: #e0bc86;
+    --shadow: 0 3px 0 #0c2b20, 0 8px 22px #071d2224;
+    --positive: #abe1b0;
+    --negative: #ffb2aa;
+    --info: #a8d9e7;
+    --warning: #f2cf7e;
+    --warning-bg: #504831;
+    --negative-bg: #51382f;
+    --positive-bg: #2d4e37;
+    --paper: #f8f7f2;
+    --card: #fffefa;
+    --letter: #202f27;
+    --pencil: #5d6c61;
+    --rule: #dcded2;
+    --brand: #264d3b;
+    --brand-text: #fffdf3;
+    --wash: #e9eee5;
+    --chrome: var(--canvas);
+}
+:root.lobby { color-scheme: light; --chrome: var(--paper); }
+:root[data-theme="paper"] {
+    color-scheme: light;
+    --canvas: #eee7d9;
+    --backdrop: linear-gradient(0deg, #c4b79c1a 1px, transparent 1px) 0 0 / 24px 24px,
+                linear-gradient(90deg, #c4b79c1a 1px, transparent 1px) 0 0 / 24px 24px, #f2ede1;
+    --surface: #fffaf0; --inset: #ede7d8; --ink: #253c3c; --muted: #526662;
+    --accent: #245e65; --line: #c6beaa; --hover-line: #548383;
+    --hover-surface: #dce7df; --tint: #e2eae0; --mark: #28585a; --mark-ink: #fff9eb;
+    --paper: #f3ede0; --card: #fffaf0; --letter: #293b39; --pencil: #536862;
+    --rule: #cdc4ae; --brand: #295e62; --wash: #e1e7da;
+}
+:root[data-theme="night"] {
+    color-scheme: dark;
+    --canvas: #191d2b;
+    --backdrop: radial-gradient(ellipse at 50% 35%, #323c53, #1b2131 78%);
+    --surface: #272d41; --inset: #202537; --ink: #edf0fc; --muted: #b9c0dc;
+    --accent: #c9b2f3; --line: #4b536d; --hover-line: #a59fd5;
+    --hover-surface: #3b425b; --tint: #3b3650; --mark: #c7b5ed; --mark-ink: #25253a;
+    --paper: #1c2030; --card: #272c40; --letter: #eff0fa; --pencil: #b4bdd2;
+    --rule: #434b62; --brand: #c6b5ed; --brand-text: #242438; --wash: #33394c;
+}
+[hidden] { display: none !important; }
+@font-face {
+    font-family: "Table icons"; src: url("icons.woff2") format("woff2");
+    font-style: normal; font-weight: normal; font-display: block;
+}
+.ui-icon {
+    display: inline-flex; align-items: center; justify-content: center; flex: none;
+    font: normal normal 1em/1 "Table icons"; speak: never; -webkit-font-smoothing: antialiased;
+}
+.i-palette::before { content: "\f4b1"; }
+.i-chevron-down::before { content: "\f282"; }
+.i-chevron-left::before { content: "\f284"; }
+.i-stars::before { content: "\f589"; }
+.i-play-fill::before { content: "\f4f4"; }
+.i-people::before { content: "\f4d0"; }
+.i-grid::before { content: "\f3fc"; }
+.i-hdd-network::before { content: "\f40d"; }
+.i-arrow-right::before { content: "\f138"; }
+.i-arrow-up-right::before { content: "\f144"; }
+.i-lightbulb::before { content: "\f46b"; }
+.i-arrow-counterclockwise::before { content: "\f117"; }
+.i-three-dots::before { content: "\f5d4"; }
+.i-journal-text::before { content: "\f444"; }
+.i-trophy::before { content: "\f5e7"; }
+.i-volume-up::before { content: "\f611"; }
+.i-volume-mute::before { content: "\f60d"; }
+.i-arrow-repeat::before { content: "\f130"; }
+.i-card-list::before { content: "\f227"; }
+
+/* 規則與局內提示使用的符號，在缺少 emoji 字型的裝置也能顯示。 */
+@font-face {
+    font-family: "Table symbols"; src: url("table-symbols.woff2") format("woff2");
+    font-weight: 100 900; font-display: swap;
+}

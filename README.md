@@ -16,7 +16,7 @@
 
 - Linux 與 Python 3（只用標準函式庫，不用另外安裝套件）
 - 已安裝並登入 Tailscale：`tailscale ip -4` 要能印出 100.x.x.x 的位址
-- 玩家的瀏覽器要能連上網際網路（遊戲頁面從 CDN 載入 Tailwind CSS 與 Google Fonts）
+- 瀏覽器能連到這台 Tailscale 伺服器即可。遊戲樣式、圖示與封面都由伺服器提供。
 
 ## 使用方式
 
@@ -39,7 +39,7 @@ python3 open_server.py run        # 在前景執行（Ctrl+C 結束），除錯�
 
 iPhone／iPad 用 Safari 打開遊戲大廳，點「分享」→「加入主畫面」，就能像 App 一樣開啟；進入遊戲後點左上角的圖示可以回到大廳。
 
-在大廳的「大廳主題」可選經典牌桌（預設）、紙上棋室或東京夜色。七款遊戲都會沿用這個外觀。對局中也可以打開規則說明，在「遊戲主題」直接切換並繼續這一局。同一個瀏覽器會記住選擇。後兩款的配色分別參考 [Solarized](https://ethanschoonover.com/solarized/) 與 [Tokyo Night](https://github.com/tokyo-night/tokyo-night-vscode-theme)。
+大廳可依棋類、麻將或撲克篩選遊戲。右上角的主題選單提供經典牌桌（預設）、紙上棋室與東京夜色。七款遊戲都會沿用選擇的外觀。對局中打開「選單」→「規則與設定」，也能在「遊戲主題」切換外觀並繼續這一局。同一個瀏覽器會記住選擇。後兩款的配色分別參考 [Solarized](https://ethanschoonover.com/solarized/) 與 [Tokyo Night](https://github.com/tokyo-night/tokyo-night-vscode-theme)。
 
 ## 對局紀錄
 
@@ -105,7 +105,7 @@ git pull
 python3 open_server.py status     # 會列出現在哪些遊戲有模型可以選、是哪個模型
 ```
 
-然後在遊戲裡選：**規則說明**和**計分板**（每一局結算時會自動打開）裡都有「電腦的打法」，底下一行寫著伺服器上的模型（用幾局練的、什麼時候存檔、猜中的比例）。選了之後這台裝置會記住，其他裝置不受影響。大廳裡，有模型可以選的遊戲會標「可以和模型對打」。
+然後在遊戲裡選：**選單 → 規則與設定**和**選單 → 計分板**（每一局結算時會自動打開）裡都有「電腦的打法」，底下一行寫著伺服器上的模型（用幾局練的、什麼時候存檔、猜中的比例）。選了之後這台裝置會記住，其他裝置不受影響。大廳裡，有模型可以選的遊戲會標「可以和模型對打」。
 
 - **原本的電腦**（預設）：頁面內建的算法，和沒有模型的時候一樣。
 - **模型・正常**：完全照模型，每一手都出模型分數最高的那一張。
@@ -131,7 +131,9 @@ python3 open_server.py status     # 會列出現在哪些遊戲有模型可以�
 
 ## 新增遊戲
 
-把單一檔案的網頁遊戲放進 `games/`，檔名就是網址：`games/foo.html` 對應 `http://<IP>:8686/foo`，不用重開伺服器。沒有登記在 `open_server.py` 的 `CATALOG` 裡的遊戲，會用網頁標題列在大廳的「其他」；想指定名稱、分類、圖示和說明，就在 `CATALOG` 加一筆。
+現有遊戲的共用介面與圖片放在 `games/assets/`。直接在瀏覽器開啟遊戲 HTML 時，把這個資料夾放在 HTML 旁邊即可。六款沿用 Tailwind 工具類別的遊戲使用已編譯的 `layout.css`。若新增工具類別，可在專案根目錄執行 `npx --yes tailwindcss@3.4.17 --content './games/*.html' --output games/assets/layout.css --minify` 更新。
+
+把單一檔案的網頁遊戲放進 `games/`，檔名就是網址：`games/foo.html` 對應 `http://<IP>:8686/foo`，不用重開伺服器。沒有登記在 `open_server.py` 的 `CATALOG` 裡的遊戲，會用網頁標題列在大廳的「其他」；想指定名稱、分類、圖示和說明，就在 `CATALOG` 加一筆。將同名的 WebP 圖片放進 `games/assets/`，即可在遊戲卡片顯示封面。
 
 新遊戲要自動記錄，得自己交出紀錄：伺服器會在每個遊戲頁面放一個 `window.GameRecorder`，每一局開始時呼叫 `GameRecorder.begin(fn)`（`fn()` 回傳這一局目前的紀錄，打完時帶 `finished: true`；還沒有值得記的內容時回傳 `null`），一局結束、或還沒打完就要換掉這一局之前呼叫 `GameRecorder.end()`。現有七個遊戲的 `getRecord()`、`recordBegin()`、`recordEnd()` 可以照著寫。要讓 `train_gpu.py` 也能拿新遊戲的紀錄訓練，還要在 `train_gpu.py` 裡替它寫一個 `Game`（怎麼把一局紀錄重排成一個一個的決定），現有七個遊戲的可以參考。
 

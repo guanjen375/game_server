@@ -1,15 +1,10 @@
 <!DOCTYPE html>
-<html lang="zh-Hant">
+<html lang="zh-Hant" data-game="gongzhu">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <title>經典拱豬 Gong Zhu - 網頁撲克牌遊戲</title>
-    <!-- 引入 Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- 引入 Google Fonts -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="assets/layout.css">
     <style>
         * {
             box-sizing: border-box;
@@ -33,11 +28,6 @@
         /* 彈窗最大高度同樣以可見高度為準 */
         .modal-h-88 { max-height: 88vh; max-height: 88dvh; }
         .modal-h-90 { max-height: 90vh; max-height: 90dvh; }
-        /* 手機橫放時畫面太矮，放不下整個遊戲：提示轉成直向 */
-        .rotate-hint { display: none; }
-        @media (orientation: landscape) and (max-height: 500px) and (pointer: coarse) {
-            .rotate-hint { display: flex; }
-        }
 
         /* 經典綠色絨布牌桌背景 */
         .felt-table {
@@ -273,7 +263,7 @@
         .played-key i.mine { border-color: #fbbf24; background: rgba(251, 191, 36, 0.15); }
 
         /* 牌桌上的小對照表：橫的大畫面（平板橫放、電腦）排在中央出牌區左邊，點一下打開完整的已出牌紀錄；
-           直拿的平板用下面的 .played-strip，手機和太矮的畫面按上方的「已出牌」看 */
+           直拿的平板用下面的 .played-strip，手機和太矮的畫面打開「選單」中的「已出牌紀錄」看 */
         .played-tracker { display: none; }
         @media (min-width: 1024px) and (min-height: 690px) {
             .played-tracker {
@@ -380,73 +370,44 @@
             border-radius: 4px;
         }
     </style>
+    <link rel="stylesheet" href="assets/palette.css">
+    <link rel="stylesheet" href="assets/tables.css">
+    <script src="assets/interface.js"></script>
 </head>
 <body class="w-screen flex flex-col justify-between felt-table text-white select-none">
 
     <!-- 頂部導覽與資訊列（手機上縮成兩行：圖示與按鈕一行、狀態一行） -->
-    <header class="w-full px-3 sm:px-6 py-1.5 sm:py-2 bg-black/45 backdrop-blur-md border-b border-white/10 flex flex-wrap items-center justify-between gap-x-2 gap-y-1.5 sm:gap-2 z-30">
-        <!-- 標題下方那行計分摘要可以縮短（放不下的部分變成「…」），多了「悔牌」「已出牌」兩個按鈕後標題列才不會多佔一行 -->
-        <div class="flex items-center gap-2 sm:gap-3 sm:grow sm:shrink sm:basis-[210px] sm:min-w-0 sm:max-w-max">
-            <div class="w-9 h-9 shrink-0 rounded-xl bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center shadow-md text-xl">
-                🐷
-            </div>
-            <div class="min-w-0">
-                <h1 class="text-base sm:text-lg font-black tracking-wide text-amber-300 flex items-center gap-2 whitespace-nowrap">
-                    <span class="hidden sm:inline">經典拱豬</span>
-                    <span id="roundBadge" class="text-xs font-bold px-2 py-0.5 rounded-full bg-emerald-800/90 text-emerald-200 border border-emerald-500/40">
-                        第 1 局
-                    </span>
-                </h1>
-                <p class="text-[11px] text-emerald-200/80 hidden sm:block truncate">每局底分 +50 · ♠Q 豬(-100) · ♦J 羊(+100) · ♣10 變壓器(×2/+50) · ♥ 全紅(+200/全桌豬羊變色) · 🌟16張全吃大滿貫(+800)</p>
-            </div>
+    <header class="table-header">
+        <div class="table-identity">
+            <span class="table-emblem" data-game-mark aria-hidden="true">♠</span>
+            <div><h1>拱豬</h1><p class="table-round"><span id="roundBadge">第 1 局</span></p></div>
         </div>
-
-        <!-- 中央狀態提示條，旁邊是「已出牌」紀錄的按鈕（手機上兩個排在第二行，字縮短才放得下） -->
-        <div class="order-3 sm:order-none mx-auto sm:mx-0 flex items-center gap-2">
-            <div class="flex items-center gap-1.5 sm:gap-2 bg-emerald-950/80 border border-emerald-600/40 px-2.5 sm:px-3 py-1 rounded-full shadow-inner">
-                <span class="text-xs text-emerald-300 font-medium"><span class="hidden sm:inline">目前</span>墩數：</span>
-                <span id="trickCounter" class="text-xs sm:text-sm font-extrabold text-amber-300">1 / 13</span>
-                <span class="text-white/20">|</span>
-                <span class="text-xs text-emerald-300 font-medium"><span class="hidden sm:inline">首出</span>花色：</span>
-                <span id="leadSuitIndicator" class="text-xs sm:text-sm font-extrabold text-white">等待出牌</span>
-            </div>
-            <button onclick="game.openPlayedModal()" title="這一局已經出過的牌" class="px-2 sm:px-2.5 py-1 rounded-full bg-emerald-800/80 hover:bg-emerald-700 active:scale-95 text-xs font-bold transition flex items-center gap-1 border border-emerald-600/40 whitespace-nowrap">
-                <span>🃏</span><span>已出牌</span>
-            </button>
-        </div>
-
-        <!-- 右側功能按鈕列 -->
-        <div class="order-2 sm:order-none flex items-center gap-0.5 sm:gap-2">
-            <button id="btnHint" onclick="game.showHint()" class="px-1.5 sm:px-2.5 py-1.5 rounded-lg bg-sky-600/80 hover:bg-sky-500 active:scale-95 text-xs font-bold transition flex items-center gap-1 shadow">
-                <span>💡</span><span class="hidden md:inline">出牌提示</span>
-            </button>
-            <button onclick="game.undo()" title="悔牌：回到您上一次出牌之前" class="px-1.5 sm:px-2.5 py-1.5 rounded-lg bg-emerald-800/80 hover:bg-emerald-700 active:scale-95 text-xs font-bold transition flex items-center gap-1 border border-emerald-600/40">
-                <span>↩️</span><span class="hidden md:inline">悔牌</span>
-            </button>
-            <button id="btnSound" onclick="game.toggleSound()" class="px-1.5 sm:px-2.5 py-1.5 rounded-lg bg-emerald-800/80 hover:bg-emerald-700 active:scale-95 text-xs font-bold transition flex items-center gap-1 border border-emerald-600/40">
-                <span id="soundIcon">🔊</span><span class="hidden md:inline">音效</span>
-            </button>
-            <button onclick="game.openScoreModal(false)" class="px-1.5 sm:px-2.5 py-1.5 rounded-lg bg-emerald-800/80 hover:bg-emerald-700 active:scale-95 text-xs font-bold transition flex items-center gap-1 border border-emerald-600/40">
-                <span>📊</span><span class="hidden sm:inline">計分板</span>
-            </button>
-            <button onclick="game.openRulesModal()" class="px-1.5 sm:px-2.5 py-1.5 rounded-lg bg-amber-500/90 hover:bg-amber-400 text-slate-950 active:scale-95 text-xs font-black transition flex items-center gap-1 shadow">
-                <span>📖</span><span class="hidden sm:inline">規則說明</span>
-            </button>
-            <button onclick="game.confirmRestartMatch()" class="px-1.5 sm:px-2.5 py-1.5 rounded-lg bg-rose-600/85 hover:bg-rose-500 active:scale-95 text-xs font-bold transition flex items-center gap-1 shadow">
-                <span>🔄</span><span class="hidden sm:inline">重新開始</span>
-            </button>
-        </div>
+        <div class="table-state" aria-label="牌桌狀態"><span>牌墩 <b id="trickCounter">1 / 13</b></span><span>首出花色 <b id="leadSuitIndicator">等待出牌</b></span></div>
+        <nav class="table-tools" aria-label="遊戲操作">
+            <button type="button" class="table-tool hint-tool" id="btnHint" onclick="game.showHint()" title="出牌提示" aria-label="出牌提示"><i class="ui-icon i-lightbulb" aria-hidden="true"></i><span>提示</span></button>
+            <button type="button" class="table-tool" onclick="game.undo()"><i class="ui-icon i-arrow-counterclockwise" aria-hidden="true"></i><span>悔牌</span></button>
+            <details class="table-menu">
+                <summary class="table-tool" aria-label="牌桌選單"><i class="ui-icon i-three-dots" aria-hidden="true"></i><span>選單</span></summary>
+                <div class="menu-panel">
+                    <button type="button" class="table-tool" onclick="game.openPlayedModal()"><i class="ui-icon i-card-list" aria-hidden="true"></i><span>已出牌紀錄</span></button>
+                    <button type="button" class="table-tool" onclick="game.openScoreModal(false)"><i class="ui-icon i-trophy" aria-hidden="true"></i><span>計分板</span></button>
+                    <button type="button" class="table-tool" onclick="game.openRulesModal()"><i class="ui-icon i-journal-text" aria-hidden="true"></i><span>規則與設定</span></button>
+                    <button type="button" class="table-tool sound-toggle" id="btnSound" onclick="game.toggleSound()" aria-pressed="true"><i class="ui-icon i-volume-up" aria-hidden="true"></i><span>音效</span><span class="sound-state" aria-hidden="true"></span></button>
+                    <button type="button" class="table-tool restart-tool" onclick="game.confirmRestartMatch()"><i class="ui-icon i-arrow-repeat" aria-hidden="true"></i><span>重新開始</span></button>
+                </div>
+            </details>
+        </nav>
     </header>
 
     <!-- 牌桌主要遊戲區 -->
-    <main class="relative flex-1 min-h-0 w-full max-w-7xl mx-auto flex flex-col justify-between p-2 sm:p-4 overflow-hidden">
+    <main class="gz-layout relative flex-1 min-h-0 w-full max-w-7xl mx-auto flex flex-col justify-between p-2 sm:p-4 overflow-hidden">
 
         <!-- 上方 AI：北家 -->
-        <div class="w-full flex justify-center z-20">
+        <div class="gz-north w-full flex justify-center z-20">
             <div id="panel-north" class="bg-slate-900/75 backdrop-blur-md border border-white/15 rounded-2xl px-3.5 py-1.5 sm:py-2 w-full sm:w-96 flex flex-wrap items-center gap-x-3 sm:block transition-all duration-300">
                 <div class="flex items-center justify-between gap-3 sm:gap-2">
                     <div class="flex items-center gap-2">
-                        <div class="w-8 h-8 rounded-full bg-pink-500/30 border border-pink-400 flex items-center justify-center text-base">👩</div>
+                        <div class="seat-initial w-8 h-8 rounded-full bg-pink-500/30 border border-pink-400 flex items-center justify-center text-base">北</div>
                         <div>
                             <div class="flex items-center gap-1.5">
                                 <span class="font-bold text-xs sm:text-sm text-white">北家 · BOT002</span>
@@ -458,8 +419,8 @@
                         </div>
                     </div>
                     <div class="text-right">
-                        <div class="text-[11px] text-slate-300">累計總分：<span id="total-north" class="font-black text-sm text-amber-300">0</span></div>
-                        <div class="text-[10px] text-slate-400">本局暫計：<span id="live-north" class="font-bold text-white">+50</span></div>
+                        <div class="text-[11px] text-slate-300">累計 <span id="total-north" class="font-black text-sm text-amber-300">0</span></div>
+                        <div class="text-[10px] text-slate-400">本局 <span id="live-north" class="font-bold text-white">+50</span></div>
                     </div>
                 </div>
                 <!-- 北家已吃到的計分牌（亮牌區） -->
@@ -470,12 +431,12 @@
         </div>
 
         <!-- 中間層：左方 AI + 中央出牌桌面 + 右方 AI -->
-        <div class="flex-1 min-h-0 w-full flex items-center justify-between relative my-1">
+        <div class="gz-middle flex-1 min-h-0 w-full flex items-center justify-between relative my-1">
 
             <!-- 左方 AI：西家；手機上面板變窄、不顯示頭像，讓中間放得下出牌區 -->
             <div id="panel-west" class="bg-slate-900/75 backdrop-blur-md border border-white/15 rounded-2xl p-2 sm:p-3 w-[84px] sm:w-52 max-h-full overflow-y-auto overscroll-contain shrink-0 z-20 transition-all duration-300">
                 <div class="flex items-center gap-2">
-                    <div class="w-8 h-8 rounded-full bg-indigo-500/30 border border-indigo-400 hidden sm:flex items-center justify-center text-base shrink-0">🧔</div>
+                    <div class="seat-initial w-8 h-8 rounded-full bg-indigo-500/30 border border-indigo-400 hidden sm:flex items-center justify-center text-base shrink-0">西</div>
                     <div class="min-w-0">
                         <div class="font-bold text-[11px] sm:text-sm text-white truncate"><span class="sr-only sm:not-sr-only">西家 · </span>BOT003</div>
                         <div class="text-[11px] text-emerald-300">手牌 <span id="count-west" class="font-bold text-amber-300">13</span> 張</div>
@@ -493,11 +454,11 @@
             </div>
 
             <!-- 中央出牌競技區 (Trick Area) -->
-            <div class="relative flex-1 min-w-0 h-full flex items-center justify-center">
+            <div class="gz-trick relative flex-1 min-w-0 h-full flex items-center justify-center">
                 <!-- 桌面中央裝飾環（手機上縮成剛好放得下四張出牌的大小） -->
-                <div class="w-full max-w-[188px] h-[180px] sm:max-w-none sm:w-72 sm:h-72 rounded-full border border-emerald-400/15 bg-emerald-950/25 flex items-center justify-center relative shadow-inner">
+                <div class="gz-mat w-full max-w-[188px] h-[180px] sm:max-w-none sm:w-72 sm:h-72 rounded-full border border-emerald-400/15 bg-emerald-950/25 flex items-center justify-center relative shadow-inner">
                     <div class="text-center pointer-events-none opacity-20">
-                        <div class="text-xl sm:text-4xl font-black tracking-widest text-emerald-200">GONG ZHU</div>
+                        <div class="trick-spade" aria-hidden="true">♠</div>
                         <div class="text-xs font-bold text-emerald-300 mt-1">有花跟花 · 無花墊牌</div>
                     </div>
 
@@ -529,7 +490,7 @@
             <!-- 右方 AI：東家；手機上面板變窄、不顯示頭像 -->
             <div id="panel-east" class="bg-slate-900/75 backdrop-blur-md border border-white/15 rounded-2xl p-2 sm:p-3 w-[84px] sm:w-52 max-h-full overflow-y-auto overscroll-contain shrink-0 z-20 transition-all duration-300">
                 <div class="flex items-center gap-2">
-                    <div class="w-8 h-8 rounded-full bg-amber-500/30 border border-amber-400 hidden sm:flex items-center justify-center text-base shrink-0">👴</div>
+                    <div class="seat-initial w-8 h-8 rounded-full bg-amber-500/30 border border-amber-400 hidden sm:flex items-center justify-center text-base shrink-0">東</div>
                     <div class="min-w-0">
                         <div class="font-bold text-[11px] sm:text-sm text-white truncate"><span class="sr-only sm:not-sr-only">東家 · </span>BOT001</div>
                         <div class="text-[11px] text-emerald-300">手牌 <span id="count-east" class="font-bold text-amber-300">13</span> 張</div>
@@ -561,12 +522,12 @@
         </div>
 
         <!-- 下方：真人玩家區（南家） -->
-        <div class="w-full flex flex-col items-center z-20">
+        <div class="gz-hand w-full flex flex-col items-center z-20">
             <!-- 玩家狀態與亮牌列 -->
             <div id="panel-south" class="relative w-full max-w-3xl bg-slate-900/80 backdrop-blur-md border border-white/15 rounded-2xl px-3.5 py-1.5 sm:py-2 mb-1 sm:mb-2 transition-all duration-300">
                 <div class="flex flex-wrap items-center justify-between gap-2">
                     <div class="flex items-center gap-2.5">
-                        <div class="w-8 h-8 rounded-full bg-emerald-500/30 border border-emerald-400 flex items-center justify-center text-base">😎</div>
+                        <div class="seat-initial w-8 h-8 rounded-full bg-emerald-500/30 border border-emerald-400 flex items-center justify-center text-base">南</div>
                         <div>
                             <div class="flex items-center gap-2">
                                 <span class="font-black text-sm text-white">南家 · 您（玩家）</span>
@@ -588,11 +549,11 @@
                     <!-- 玩家分數統計 -->
                     <div class="flex items-center gap-3 text-right">
                         <div class="bg-black/35 px-2.5 py-1 rounded-lg border border-white/10">
-                            <span class="text-[11px] text-slate-400">本局暫計：</span>
+                            <span class="text-[11px] text-slate-400">本局 </span>
                             <span id="live-south" class="text-xs sm:text-sm font-black text-white">+50</span>
                         </div>
                         <div class="bg-amber-500/20 px-2.5 py-1 rounded-lg border border-amber-400/30">
-                            <span class="text-[11px] text-amber-200">累計總分：</span>
+                            <span class="text-[11px] text-amber-200">累計 </span>
                             <span id="total-south" class="text-sm sm:text-base font-black text-amber-300">0</span>
                         </div>
                     </div>
@@ -609,21 +570,14 @@
 
     </main>
 
-    <!-- 手機橫放時的提示（只在高度很矮的觸控螢幕顯示） -->
-    <div class="rotate-hint fixed inset-0 z-[100] flex-col items-center justify-center gap-2 bg-[#072b18] text-center px-6">
-        <div class="text-5xl">📱</div>
-        <div class="text-lg font-black text-amber-300">請把手機轉成直向</div>
-        <div class="text-xs text-emerald-200/80">橫向畫面太矮，放不下整個遊戲畫面</div>
-    </div>
-
     <!-- 彈窗 1：規則說明 Modal -->
-    <div id="rulesModal" class="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
+    <div id="rulesModal" role="dialog" aria-modal="true" aria-labelledby="rulesModalHeading" class="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
         <div class="bg-slate-900 border border-emerald-500/40 rounded-3xl max-w-2xl w-full modal-h-88 flex flex-col shadow-2xl overflow-hidden">
             <div class="px-6 py-4 bg-gradient-to-r from-emerald-900 to-slate-900 border-b border-white/10 flex items-center justify-between">
-                <h2 class="text-lg sm:text-xl font-black text-amber-300 flex items-center gap-2">
+                <h2 class="text-lg sm:text-xl font-black text-amber-300 flex items-center gap-2" id="rulesModalHeading">
                     <span>📖</span> 經典拱豬（Gong Zhu）規則說明
                 </h2>
-                <button onclick="game.closeRulesModal()" class="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white font-bold">✕</button>
+                <button aria-label="關閉視窗" onclick="game.closeRulesModal()" class="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white font-bold">✕</button>
             </div>
             <div class="p-6 overflow-y-auto space-y-5 text-sm text-slate-200 leading-relaxed">
                 <div>
@@ -717,7 +671,7 @@
                 <div class="bg-slate-800/80 border border-white/10 rounded-xl p-3.5 text-xs text-slate-300">
                     💡 <strong>貼心防呆設計：</strong>輪到您出牌時，系統會自動將可出的合法手牌向上抬起並亮起金框；不合規則的手牌則會半透明鎖定，避免誤出。點擊上方「出牌提示」還可獲得策略建議！<br>
                     ↩️ <strong>悔牌：</strong>按錯牌或出錯牌時，按上方的「悔牌」就回到您那一張出牌之前，可以連續按；一局結算之後就不能悔牌了。悔牌只會把出過的牌收回，各家的手牌不會重洗。<br>
-                    🃏 <strong>已出牌：</strong>按上方的「已出牌」可以看這一局哪些牌已經出過（白底）、哪些在您手上（金框）、哪些還在別家手上，以及每一墩誰出了什麼、被誰吃走。
+                    🃏 <strong>已出牌：</strong>打開「選單」中的「已出牌紀錄」可以看這一局哪些牌已經出過（白底）、哪些在您手上（金框）、哪些還在別家手上，以及每一墩誰出了什麼、被誰吃走。
                 </div>
             </div>
             <div class="px-6 py-3.5 bg-slate-950 border-t border-white/10 flex justify-end">
@@ -729,7 +683,7 @@
     </div>
 
     <!-- 彈窗 2：每局結算 / 計分板 Modal -->
-    <div id="scoreModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
+    <div id="scoreModal" role="dialog" aria-modal="true" aria-labelledby="scoreModalTitle" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
         <div class="bg-slate-900 border border-amber-400/40 rounded-3xl max-w-3xl w-full modal-h-90 flex flex-col shadow-2xl overflow-hidden">
             <div class="px-6 py-4 bg-gradient-to-r from-amber-900/60 via-slate-900 to-emerald-900/60 border-b border-white/10 flex items-center justify-between">
                 <div>
@@ -738,7 +692,7 @@
                     </h2>
                     <p id="scoreModalSubtitle" class="text-xs text-slate-300 mt-0.5">各家捕獲計分牌與得分明細</p>
                 </div>
-                <button id="scoreModalCloseBtn" onclick="game.closeScoreModal()" class="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white font-bold">✕</button>
+                <button aria-label="關閉視窗" id="scoreModalCloseBtn" onclick="game.closeScoreModal()" class="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white font-bold">✕</button>
             </div>
 
             <div class="p-4 sm:p-6 overflow-y-auto space-y-4">
@@ -818,16 +772,16 @@
     </div>
 
     <!-- 彈窗：已出牌紀錄 Modal（這一局出過的牌對照表＋每一墩誰出了什麼） -->
-    <div id="playedModal" class="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
+    <div id="playedModal" role="dialog" aria-modal="true" aria-labelledby="playedModalHeading" class="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
         <div class="bg-slate-900 border border-emerald-500/40 rounded-3xl max-w-2xl w-full modal-h-88 flex flex-col shadow-2xl overflow-hidden">
             <div class="px-6 py-4 bg-gradient-to-r from-emerald-900 to-slate-900 border-b border-white/10 flex items-center justify-between gap-3">
                 <div>
-                    <h2 class="text-lg sm:text-xl font-black text-amber-300 flex items-center gap-2">
+                    <h2 class="text-lg sm:text-xl font-black text-amber-300 flex items-center gap-2" id="playedModalHeading">
                         <span>🃏</span> 已出牌紀錄
                     </h2>
                     <p id="playedModalSubtitle" class="text-xs text-slate-300 mt-0.5">這一局還沒有人出牌</p>
                 </div>
-                <button onclick="game.closePlayedModal()" class="w-8 h-8 shrink-0 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white font-bold">✕</button>
+                <button aria-label="關閉視窗" onclick="game.closePlayedModal()" class="w-8 h-8 shrink-0 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white font-bold">✕</button>
             </div>
             <div class="p-4 sm:p-6 overflow-y-auto flex flex-col sm:flex-row sm:items-start gap-4 text-xs text-slate-300">
                 <!-- 已出的牌對照表 -->
@@ -854,12 +808,12 @@
     </div>
 
     <!-- 彈窗 3：確認重新開始 Modal（取代原生 confirm） -->
-    <div id="confirmModal" class="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
+    <div id="confirmModal" role="dialog" aria-modal="true" aria-labelledby="confirmModalHeading" class="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
         <div class="bg-slate-900 border border-rose-500/40 rounded-2xl max-w-sm w-full p-5 shadow-2xl text-center">
             <div class="w-12 h-12 rounded-full bg-rose-500/20 border border-rose-400/40 text-2xl flex items-center justify-center mx-auto mb-3">
                 🔄
             </div>
-            <h3 class="text-lg font-black text-white mb-1">確定要重新開始嗎？</h3>
+            <h3 class="text-lg font-black text-white mb-1" id="confirmModalHeading">確定要重新開始嗎？</h3>
             <p class="text-xs text-slate-300 mb-5">這將會清空目前所有玩家的累計總分與歷史局數，並重新發牌開始第 1 局。</p>
             <div class="flex items-center justify-center gap-3">
                 <button onclick="game.closeConfirmModal()" class="flex-1 py-2 rounded-xl bg-slate-700 hover:bg-slate-600 text-xs font-bold text-white transition">
@@ -2876,7 +2830,7 @@
              */
             toggleSound() {
                 this.sound.enabled = !this.sound.enabled;
-                document.getElementById('soundIcon').textContent = this.sound.enabled ? '🔊' : '🔇';
+                document.getElementById('btnSound').setAttribute('aria-pressed', String(this.sound.enabled));
                 this.showCenterBanner(
                     this.sound.enabled ? '🔊 遊戲音效已開啟' : '🔇 遊戲音效已靜音',
                     'bg-slate-800 text-white'

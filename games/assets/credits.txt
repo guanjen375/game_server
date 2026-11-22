@@ -1,0 +1,171 @@
+棋聚桌遊室的封面由內建 ImageGen 生成。台灣十六張麻將的圖片同時作為大廳主圖。
+
+mahjong.webp
+Use case: product-mockup. Art asset for a premium Taiwanese tabletop club website. Make one cinematic wide horizontal editorial product photograph, 2.6:1 landscape. Dark pine-green billiard felt table fills the whole frame, subtle fine fibers and natural grain. On the RIGHT two thirds, a close still life of thick vintage Taiwanese ivory and jade-green backed mahjong tiles, beautiful authentic painted red 中, green 發, round dot-suit pattern, bamboo engravings, and two small cream dice with black and red pips. A few tiles lying face up in the foreground, a short row standing behind. The view is a low three-quarter overhead angle, tactile aged bone-colored surfaces, realistic edges, elegant modern Taiwanese visual identity, soft directional warm daylight from upper right, believable rich contact shadows. The LEFT 40% is uninterrupted deep evergreen felt in shade, deliberately reserved for live website typography. Natural close crop at top right; keep the key red dragon and dice inside central vertical half of image. A real tabletop editorial photograph, no added text or numbers outside the physical markings, no wall, no borders, no watermark, no hands, no second panel. Wide landscape.
+
+以下六張封面共用提示詞前段，後接各遊戲的場景描述。
+Use case: product-mockup. A premium tabletop game catalog cover photograph. One wide 16:9 image, editorial still-life photography with tactile realistic physical pieces; an inviting modern Taiwanese game club. Edge-to-edge clean composition, focal objects fill about 65% of the frame clustered in the central 65% and stay visible when cropped to 2:1, backdrop extends to every edge. No hands, no human, no caption or typography except markings intrinsic to game pieces, no logos, no border, no watermark.
+
+banqi.webp
+Taiwanese banqi, oblique overhead still life on a warm TERRACOTTA brick/salmon painted playing surface with a hairline dark red square grid. A tight group of three chunky round honey-brown wooden Chinese chess disks, two face down with elegant concentric carved rings on their blank backs, the nearest one flipped face up with just the carved traditional character 兵 painted a rich oxblood red. Three-dimensional wood grain, modern tabletop club art direction.
+
+xiangqi.webp
+Taiwanese xiangqi, tightly framed overhead at a gentle angle: three pale honey-blond wooden Chinese chess pieces with thin concentric circular red/black rim lines, one bold red 帥 close to camera and one dark 馬 across from it, resting on a warm OCHRE/GOLD tan bamboo board with delicate black rectilinear grid lines and diagonal palace markings. Authentic Chinese chess, no Western chess, excellent legibility, directional sunlight.
+
+reversi.webp
+Othello/Reversi, close-up overhead view at a slight angle of a DARK TEAL GREEN flat board with delicate straight square grid lines, a small dramatic cluster of a few glossy rounded ivory and black disks on successive cells, one ivory disk partially flipped showing its black underside. Grid extends to all edges, bold contrast, just a tight focal group, realistic light catching the edges.
+
+mahjong-me.webp
+A playful intimate still life of just three Taiwanese mahjong tiles with duck-egg JADE backs and thick ivory faces; one prominent painted green 發 tile and one red 中 tile standing together, one resting on its side. On a DISTINCT SOFT MUTED LILAC mauve studio tabletop, no other objects. Three-quarter overhead, side lighting and small cast shadows.
+
+gongzhu.webp
+For Taiwanese Gong Zhu, a close-up, gently overlapped QUEEN OF SPADES and JACK OF DIAMONDS, traditional illustrated vintage court figures, one small red heart card showing beneath them, on a warm dusty BURGUNDY / dark rose felt tabletop. Photos of real ivory paper playing cards with crisp black and red typography and authentic corners Q ♠ and J ♦, soft daylight, interesting diagonal arrangement.
+
+bigtwo.webp
+For Taiwanese Big Two, three oversized real paper playing cards fanned diagonally on a smoky SLATE BLUE studio surface. Closest cards are a prominent black two of SPADES and a three of CLUBS, another partly visible. Classic crisp ranks in the corners, ivory stock, black pips, light from upper left, gentle long shadows.
+
+第三方前端資源授權
+
+Bootstrap Icons (subset in icons.woff2)
+
+The MIT License (MIT)
+
+Copyright (c) 2019-2024 The Bootstrap Authors
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+
+Noto Emoji (subset in table-symbols.woff2)
+
+Copyright 2013 Google LLC
+
+This Font Software is licensed under the SIL Open Font License, Version 1.1.
+This license is copied below, and is also available with a FAQ at:
+https://scripts.sil.org/OFL
+
+
+-----------------------------------------------------------
+SIL OPEN FONT LICENSE Version 1.1 - 26 February 2007
+-----------------------------------------------------------
+
+PREAMBLE
+The goals of the Open Font License (OFL) are to stimulate worldwide
+development of collaborative font projects, to support the font creation
+efforts of academic and linguistic communities, and to provide a free and
+open framework in which fonts may be shared and improved in partnership
+with others.
+
+The OFL allows the licensed fonts to be used, studied, modified and
+redistributed freely as long as they are not sold by themselves. The
+fonts, including any derivative works, can be bundled, embedded,
+redistributed and/or sold with any software provided that any reserved
+names are not used by derivative works. The fonts and derivatives,
+however, cannot be released under any other type of license. The
+requirement for fonts to remain under this license does not apply
+to any document created using the fonts or their derivatives.
+
+DEFINITIONS
+"Font Software" refers to the set of files released by the Copyright
+Holder(s) under this license and clearly marked as such. This may
+include source files, build scripts and documentation.
+
+"Reserved Font Name" refers to any names specified as such after the
+copyright statement(s).
+
+"Original Version" refers to the collection of Font Software components as
+distributed by the Copyright Holder(s).
+
+"Modified Version" refers to any derivative made by adding to, deleting,
+or substituting -- in part or in whole -- any of the components of the
+Original Version, by changing formats or by porting the Font Software to a
+new environment.
+
+"Author" refers to any designer, engineer, programmer, technical
+writer or other person who contributed to the Font Software.
+
+PERMISSION & CONDITIONS
+Permission is hereby granted, free of charge, to any person obtaining
+a copy of the Font Software, to use, study, copy, merge, embed, modify,
+redistribute, and sell modified and unmodified copies of the Font
+Software, subject to the following conditions:
+
+1) Neither the Font Software nor any of its individual components,
+in Original or Modified Versions, may be sold by itself.
+
+2) Original or Modified Versions of the Font Software may be bundled,
+redistributed and/or sold with any software, provided that each copy
+contains the above copyright notice and this license. These can be
+included either as stand-alone text files, human-readable headers or
+in the appropriate machine-readable metadata fields within text or
+binary files as long as those fields can be easily viewed by the user.
+
+3) No Modified Version of the Font Software may use the Reserved Font
+Name(s) unless explicit written permission is granted by the corresponding
+Copyright Holder. This restriction only applies to the primary font name as
+presented to the users.
+
+4) The name(s) of the Copyright Holder(s) or the Author(s) of the Font
+Software shall not be used to promote, endorse or advertise any
+Modified Version, except to acknowledge the contribution(s) of the
+Copyright Holder(s) and the Author(s) or with their explicit written
+permission.
+
+5) The Font Software, modified or unmodified, in part or in whole,
+must be distributed entirely under this license, and must not be
+distributed under any other license. The requirement for fonts to
+remain under this license does not apply to any document created
+using the Font Software.
+
+TERMINATION
+This license becomes null and void if any of the above conditions are
+not met.
+
+DISCLAIMER
+THE FONT SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO ANY WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT
+OF COPYRIGHT, PATENT, TRADEMARK, OR OTHER RIGHT. IN NO EVENT SHALL THE
+COPYRIGHT HOLDER BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+INCLUDING ANY GENERAL, SPECIAL, INDIRECT, INCIDENTAL, OR CONSEQUENTIAL
+DAMAGES, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+FROM, OUT OF THE USE OR INABILITY TO USE THE FONT SOFTWARE OR FROM
+OTHER DEALINGS IN THE FONT SOFTWARE.
+
+Tailwind CSS (compiled layout.css)
+
+MIT License
+
+Copyright (c) Tailwind Labs, Inc.
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
