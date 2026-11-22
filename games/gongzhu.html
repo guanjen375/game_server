@@ -187,7 +187,7 @@
             100% { transform: translate(-50%, -38px) scale(0.95); opacity: 0; }
         }
 
-        /* 已出的牌對照表：點數依 A、2 到 K，花色依 ♠ ♥ ♣ ♦。
+        /* 已出的牌對照表：點數由 2 到 A，花色依 ♠ ♥ ♣ ♦。
            白底＝這一局已經出過，金框＝在您手上，暗的＝還在別家手上 */
         .played-table {
             display: grid;
@@ -725,9 +725,7 @@
         const HEART_POINTS = [-2, -3, -10, -5, -6, -7, -8, -9, -10, -20, -30, -40, -50]; // ♥2 到 ♥A
 
         function compareDisplayRanks(a, b) {
-            const first = a.rank === 14 ? 1 : a.rank;
-            const second = b.rank === 14 ? 1 : b.rank;
-            return first - second;
+            return a.rank - b.rank;
         }
 
         /**
@@ -2193,7 +2191,7 @@
                 const SPECIAL = { S12: '🐷', D11: '🐑', C10: '⚡' };
                 const suits = ['S', 'H', 'C', 'D'];
 
-                const table = this.RANKS.slice().sort(compareDisplayRanks).map(r => `<em>${r.label}</em>` + suits.map(suit => {
+                const table = this.RANKS.map(r => `<em>${r.label}</em>` + suits.map(suit => {
                     const s = this.SUITS[suit], id = `${suit}${r.rank}`;
                     const state = out.has(id) ? 'out' : mine.has(id) ? 'mine' : '';
                     const where = state === 'out' ? '已出' : state === 'mine' ? '在您手上' : '還在別家';
