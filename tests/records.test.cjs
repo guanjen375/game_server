@@ -580,6 +580,91 @@ for (const name of GAMES) {
     }));
 }
 
+// 本局重新發牌 (the menu's "deal this round again"): the round number and the totals stay, the cards are dealt afresh.
+test('gongzhu: dealing the round again before the player has played changes the cards and nothing else', () => onFirstSuitableDeal(seed => {
+    const env = open('gongzhu', seed), game = env.game;
+    playRound(env, 0);
+    env.driver.next(game);
+    suits(wait(env));
+    const before = stateOf(env), begun = env.recorder.begun;
+    assert.equal(env.recorder.peek(), null, 'the player has not played in this round');
+
+    game.redealRound();    // nothing of the player's is lost, so it does not ask first
+    assert.equal(game.roundNumber, 2);
+    assert.equal(game.roundOver, false);
+    assert.deepEqual(stateOf(env).totals, before.totals, 'the totals stay');
+    assert.equal(env.recorder.rounds.length, 1, 'a round the player never played in is not kept');
+    assert.equal(env.recorder.begun, begun + 1, 'the new deal is a new record');
+    const hands = stateOf(env).hands, seats = Object.keys(hands);
+    seats.forEach(seat => assert.equal(hands[seat].length, 13));
+    assert.equal(new Set(seats.flatMap(seat => hands[seat])).size, 52);
+    assert.notDeepEqual(hands, before.hands, 'the cards were shuffled again');
+    assert.ok(game.PLAYERS[game.currentTurn].hand.some(card => card.id === 'S7'), 'the seven of spades leads again');
+    assert.equal(game.tricksSoFar().length, 0);
+    assert.equal(game.undoStack.length, 0);
+
+    playRound(env, 0);
+    assert.equal(env.recorder.rounds.length, 2);
+    const record = env.recorder.rounds[1];
+    assert.equal(record.finished, true);
+    assert.equal(record.round, 2);
+    env.driver.replay(record, stateOf(env), env);
+}));
+
+test('gongzhu: dealing again in the middle of a round asks first, and keeps the abandoned round as unfinished', () => onFirstSuitableDeal(seed => {
+    const env = open('gongzhu', seed), game = env.game;
+    playRound(env, 0);
+    env.driver.next(game);
+    for (let i = 0; i < 3; i++) {
+        suits(wait(env));
+        env.driver.act(env);
+    }
+    suits(wait(env));
+    const left = env.recorder.peek(), before = stateOf(env), begun = env.recorder.begun;
+    assert.ok(left, 'the player has played in this round');
+
+    game.redealRound();    // only asks: the cards on the table are the player's own work
+    assert.equal(game.confirmAction, 'redeal');
+    assert.deepEqual(stateOf(env), before);
+    game.closeConfirmModal();    // 取消
+    assert.deepEqual(stateOf(env), before);
+    assert.deepEqual(env.recorder.peek(), left);
+    assert.equal(env.recorder.begun, begun);
+
+    game.redealRound();
+    game.confirmYes();    // 重新發牌
+    assert.equal(env.recorder.rounds.length, 2, 'the abandoned round is kept');
+    assert.deepEqual(env.recorder.rounds[1], left, 'as it stood');
+    assert.equal(left.finished, false);
+    assert.equal(left.result, null);
+    assert.equal(game.roundNumber, 2);
+    assert.deepEqual(stateOf(env).totals, before.totals);
+    assert.equal(new Set(Object.values(stateOf(env).hands).flat()).size, 52);
+    assert.equal(game.tricksSoFar().length, 0);
+    assert.equal(game.undoStack.length, 0, 'nothing of the old deal can be taken back');
+    assert.equal(env.recorder.peek(), null);
+
+    playRound(env, 0);
+    assert.equal(env.recorder.rounds.length, 3);
+    assert.equal(env.recorder.rounds[2].round, 2);
+    env.driver.replay(env.recorder.rounds[2], stateOf(env), env);
+
+    // Once the round is settled there is nothing to deal again: the scores have been counted.
+    const settled = stateOf(env), rounds = env.recorder.begun;
+    game.redealRound();
+    game.confirmYes();    // (the confirmation still on 'redeal' from before must not get past a settled round either)
+    assert.equal(game.roundOver, true);
+    assert.deepEqual(stateOf(env), settled);
+    assert.equal(env.recorder.begun, rounds);
+
+    // The same confirmation serves 整場重新開始: there it still wipes the match.
+    game.confirmRestartMatch();
+    assert.equal(game.confirmAction, 'restart');
+    game.confirmYes();
+    assert.equal(game.roundNumber, 1);
+    assert.deepEqual(Object.values(stateOf(env).totals), [0, 0, 0, 0]);
+}));
+
 test('bigtwo: a pass that hands the lead back keeps its hint mark', () => {
     // The third pass in a row also resets the trick; the mark belongs on the pass, not on that reset.
     for (let seed = 1; seed <= 30; seed++) {

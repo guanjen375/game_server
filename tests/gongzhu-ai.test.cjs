@@ -168,13 +168,17 @@ test('the score projections match game settlement for ordinary hands, flipped sp
     for (const [mask, expected] of sweepScores.entries()) {
         const kept = specials.filter((_, i) => mask & (1 << i));
         const full = game.calculatePlayerScore(kept.concat(hearts));
-        assert.equal(full.score, expected);
+        assert.equal(full.cardPoints, expected);
+        assert.equal(full.score, 50 + expected, 'the base comes on top of a fixed award, it is not part of it');
         assert.equal(full.isGrandSlam, mask === 7);
         if (expected === 500) assert.match(full.formula, /特殊規則.*\+500/);
         for (const count of [0, 1, 12, 13]) {
             const cards = kept.concat(hearts.slice(0, count));
             const cap = ai.newCap(cards.map(c => ai.toInt(c)));
-            assert.equal(ai.score(cap, count === 13), game.calculatePlayerScore(cards, count === 13).score);
+            // The computers weigh card points only: the base is the same for all four seats.
+            const settled = game.calculatePlayerScore(cards, count === 13);
+            assert.equal(ai.score(cap, count === 13), settled.cardPoints);
+            assert.equal(settled.score, 50 + settled.cardPoints);
             assert.equal(ai.score(cap, true, true), expected);
         }
     }
@@ -185,7 +189,7 @@ test('card values, doubling and table-wide color changes are applied to their ho
     const deck = game.createShuffledDeck();
     const hearts = deck.filter(c => c.suit === 'H').sort((a, b) => a.rank - b.rank);
     const [pig, sheep, transformer] = ['SQ', 'DJ', 'C10'].map(key => deck.find(c => name(c) === key));
-    assert.deepEqual(hearts.map(card => game.calculatePlayerScore([card]).score),
+    assert.deepEqual(hearts.map(card => game.calculatePlayerScore([card]).cardPoints),
         [-2, -3, -10, -5, -6, -7, -8, -9, -10, -20, -30, -40, -50]);
     for (const [piles, expected] of [
         [{}, [0, 0, 0, 0]],
@@ -197,8 +201,29 @@ test('card values, doubling and table-wide color changes are applied to their ho
         [{ south: [...hearts.slice(1), pig, sheep, transformer], east: [hearts[0]] }, [-396, 0, 0, -2]]
     ]) {
         const round = game.calculateRoundScores(piles);
-        assert.deepEqual(game.SEAT_ORDER.map(seat => round[seat].score), expected);
+        assert.deepEqual(game.SEAT_ORDER.map(seat => round[seat].cardPoints), expected);
+        assert.deepEqual(game.SEAT_ORDER.map(seat => round[seat].score), expected.map(points => 50 + points));
     }
+});
+
+test('all four seats start every round with 50, and neither doubling nor a fixed award touches that base', () => {
+    const { game } = load({}, Math);
+    const deck = game.createShuffledDeck();
+    const hearts = deck.filter(c => c.suit === 'H');
+    const [pig, sheep, transformer] = ['SQ', 'DJ', 'C10'].map(key => deck.find(c => name(c) === key));
+    const scores = round => game.SEAT_ORDER.map(seat => round[seat].score);
+    assert.deepEqual(scores(game.calculateRoundScores()), [50, 50, 50, 50], 'before anyone has taken a card');
+    for (const [piles, expected] of [
+        [{ south: [pig, transformer], west: [sheep] }, [50 - 200, 50 + 100, 50, 50]],      // (-100) x 2, not (50 - 100) x 2
+        [{ south: [transformer], east: [pig] }, [50 + 50, 50, 50, 50 - 100]],              // the lone transformer is worth 50 of its own
+        [{ south: [...hearts, transformer], west: [pig] }, [50 + 500, 50 + 100, 50, 50]],  // the special sweep is 500 plus the base
+        [{ north: [...hearts, pig, sheep, transformer] }, [50, 50, 50 + 1000, 50]]
+    ]) {
+        const round = game.calculateRoundScores(piles);
+        assert.deepEqual(scores(round), expected);
+        for (const seat of game.SEAT_ORDER) assert.match(round[seat].formula, /^底分\(\+50\) /);
+    }
+    assert.match(game.calculatePlayerScore([hearts[0], transformer]).formula, /牌分 × 2$/, 'the formula says what is doubled');
 });
 
 test('settlement credits a grand slam and a special sweep only once and records each round', () => {
@@ -211,11 +236,11 @@ test('settlement credits a grand slam and a special sweep only once and records 
     game.finishRound();
     game.finishRound();
     assert.equal(game.roundHistory.length, 1);
-    assert.deepEqual(totals(), [0, 0, 0, 1000]);
+    assert.deepEqual(totals(), [50, 50, 50, 1050], 'the base is credited once per seat, however often the round is settled');
 
     game.closeScoreModal = game.updateHeaderInfo = game.later = () => {};
     game.startNextRound();
-    assert.deepEqual(totals(), [0, 0, 0, 1000]);
+    assert.deepEqual(totals(), [50, 50, 50, 1050]);
     const opener = game.currentTurn;
     assert.ok(game.PLAYERS[opener].hand.some(c => c.id === 'S7'));
     assert.deepEqual(game.getLegalCards(opener), game.PLAYERS[opener].hand);
@@ -225,12 +250,13 @@ test('settlement credits a grand slam and a special sweep only once and records 
     game.PLAYERS.north.captured = [deck.find(c => c.id === 'D11')];
     game.finishRound();
     game.finishRound();
-    assert.deepEqual(totals(), [500, 100, -100, 1000]);
-    assert.deepEqual(game.roundHistory.map(round => round.scores.south), [500, 0]);
+    assert.deepEqual(totals(), [600, 200, 0, 1100]);
+    assert.deepEqual(game.roundHistory.map(round => round.scores.south), [550, 50]);
     const record = game.getRecord();
-    assert.equal(record.result.south.score, 500);
-    assert.match(record.result.south.formula, /特殊規則/);
-    assert.equal(record.totals.east, 1000);
+    assert.equal(record.result.south.score, 550);
+    assert.match(record.result.south.formula, /^底分\(\+50\) 特殊規則/);
+    assert.equal(record.totals.east, 1050);
+    assert.deepEqual(record.settings, { scoringRuleMode: 'player_special', roundBase: 50 }, 'the record says which base its scores carry');
 });
 
 test('avoid doubling a pig, use another winner if forced, and double a sheep when it pays', () => {
