@@ -16,6 +16,9 @@ const settle = async () => { for (let i = 0; i < 6; i++) await Promise.resolve()
 const MODEL = { id: 'a'.repeat(40), saved: '2026-11-21T03:12:00+08:00', rounds: 236, decisions: 2400, accuracy: 0.59, chance: 0.29, finished: true, name: '' };
 // Several models of one game, the way the server lists them: the newest name first, the first one is the default.
 const MODELS = [['20261123_b', 'b'], ['20261123_a', 'c'], ['20261122', 'd']].map(([name, id]) => ({ ...MODEL, name, id: id.repeat(40) }));
+// The menu train_out/gongzhu/choices.json sets up for them.
+const MENU = [{ label: '遊戲設定(65)', play: 'builtin' }, { label: '模型A(100)', play: 'normal:20261123_b' },
+    { label: '模型B(100)', play: 'normal:20261123_a' }, { label: '舊模型(90)', play: 'normal:20261122' }];
 
 // ---------------------------------------------------------------- the script the server adds
 
@@ -169,6 +172,20 @@ test('the script: strength() hands over how strong the server measured each choi
     assert.deepEqual(clone(p.bot.strength()), {}, 'no model, nothing to rate');
 });
 
+test('the script: choices() hands over the menu the server was set up with', async () => {
+    const p = page('gongzhu');
+    assert.deepEqual(clone(p.bot.choices()), []);
+    let asking = p.bot.refresh();
+    p.requests.shift().answer(200, { model: MODELS[0], why: null, models: MODELS, choices: MENU });
+    await asking;
+    assert.deepEqual(clone(p.bot.choices()), MENU);
+    asking = p.bot.refresh();
+    p.requests.shift().answer(200, { model: MODELS[0], why: null, models: MODELS });
+    await asking;
+    assert.deepEqual(clone(p.bot.choices()), [], 'a server without a menu');
+    assert.equal(p.changes.length, 2);
+});
+
 test('the script: a model that has been taken away is forgotten', async () => {
     const p = page();
     await p.known();
@@ -290,6 +307,8 @@ function fakeBot(model = MODEL, list = null) {
         models() { return this.info ? this.list || [this.info] : []; },
         rated: {},
         strength() { return this.info ? this.rated : {}; },
+        listed: [],
+        choices() { return this.info ? this.listed : []; },
         why() { return null; },
         resting() { return this.off; },
         watch(fn) { this.watchers.push(fn); },
@@ -578,6 +597,18 @@ test('gongzhu: each choice carries the strength the server measured, when it mea
     assert.equal(labels()[5], 'normal:20261122=模型 20261122・正常（強度 61）');
     assert.deepEqual(clone(open(16, fakeBot(MODEL)).game.botChoices()).map(([value]) => value), ['builtin', 'normal:', 'weak:'],
         'a single model.pt has no name');
+});
+
+test('gongzhu: a menu set up on the server is listed as it is, and each choice asks its own model', async () => {
+    const menuBot = list => Object.assign(fakeBot(MODELS[0], MODELS), { listed: list });
+    const env = open(17, menuBot(MENU), 'normal:20261123_a');
+    assert.deepEqual(clone(env.game.botChoices()), [['builtin', '遊戲設定(65)'], ['normal:20261123_b', '模型A(100)'],
+        ['normal:20261123_a', '模型B(100)'], ['normal:20261122', '舊模型(90)']]);
+    const answered = [];
+    await untilAsked(env, answered);
+    assert.deepEqual([answered[0].question.mode, answered[0].question.name], ['normal', '20261123_a'], '模型B is 20261123_a');
+    assert.deepEqual(clone(open(18, menuBot(MENU.slice(1))).game.botChoices())[0], ['builtin', '原本的電腦（遊戲內建的算法）'],
+        'the page\'s own computer is always there');
 });
 
 test('gongzhu: a device that picked the model when there was only one asks the first of several by name', async () => {

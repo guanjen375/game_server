@@ -448,7 +448,7 @@
                         <select id="botModeSelectRules" data-bot-mode data-bot-default onchange="game.setBotMode(this.value)" class="w-full bg-slate-950 border border-white/20 rounded-lg px-3 py-2 text-xs sm:text-sm font-bold text-white focus:outline-none focus:border-sky-400">
                             <option value="builtin">原本的電腦（遊戲內建的算法）【預設】</option>
                         </select>
-                        <p class="mt-1.5 text-[11px] text-slate-400 leading-relaxed">模型「正常」完全照模型出牌；「較弱」一樣照模型，但有時改出它的第二、第三選擇。強度是讓這幾種打法實際對打量的：最強的是 100，每少 1，和同樣的對手打平均每局少拿 1 分。</p>
+                        <p class="mt-1.5 text-[11px] text-slate-400 leading-relaxed">括號裡的數字是強度，讓這幾種打法實際對打量的：最強的是 100，每少 1，和同樣的對手打平均每局少拿 1 分。</p>
                         <p data-bot-note class="mt-1.5 text-[11px] text-slate-400 leading-relaxed"></p>
                     </div>
                 </div>
@@ -1525,10 +1525,17 @@
             }
 
             /**
-             * 「電腦的打法」的選項 [[值, 文字]]：原本的電腦，再來是伺服器上每個模型的「正常」和「較弱」。
-             * 伺服器上有量過的強度（最強的是 100，見 tests/gongzhu/strength.cjs）就寫在文字後面
+             * 「電腦的打法」的選項 [[值, 文字]]，第一個一定是原本的電腦（值 'builtin'）。伺服器上設定好選單
+             * （train_out/<遊戲>/choices.json）就照它列；沒設定就列原本的電腦，加上每個模型的「正常」和「較弱」，
+             * 量過強度的（最強的是 100，見 tests/gongzhu/strength.cjs）寫在文字後面
              */
             botChoices(bot = window.GameBot) {
+                const listed = (bot && bot.choices && bot.choices()) || [];
+                if (listed.length) {
+                    const own = listed.find(choice => choice.play === 'builtin');
+                    return [['builtin', own ? own.label : '原本的電腦（遊戲內建的算法）']]
+                        .concat(listed.filter(choice => choice.play !== 'builtin').map(choice => [choice.play, choice.label]));
+                }
                 const models = bot ? bot.models() : [];
                 const strength = (bot && bot.strength && bot.strength()) || {};
                 const rated = value => (typeof strength[value] === 'number' ? `強度 ${strength[value]}` : '');
@@ -1544,10 +1551,14 @@
              */
             renderBotSetting() {
                 const bot = window.GameBot;
+                const configured = Boolean(bot && bot.choices && bot.choices().length);
+                const choices = this.botChoices(bot);
                 const models = bot ? bot.models() : [];
                 const chosen = this.chosenModel(bot);
                 const wanted = this.botMode !== 'builtin';
-                const named = model => (model.name ? `模型 ${model.name}` : '模型');
+                const value = wanted && chosen ? `${this.botMode}:${chosen.name}` : 'builtin';
+                const label = (choices.find(([choice]) => choice === value) || [])[1];
+                const named = model => (configured && label ? label : model.name ? `模型 ${model.name}` : '模型');
                 let note = '';
                 if (chosen) {
                     const saved = String(chosen.saved || '').slice(0, 16).replace('T', ' ');
@@ -1559,14 +1570,12 @@
                     note = (bot.why() ? `伺服器上的模型不能用（${bot.why()}）` : '伺服器上還沒有訓練好的模型')
                         + (wanted ? '，現在是原本的電腦在出牌。' : '，只能選原本的電腦。');
                 }
-                const choices = this.botChoices(bot);
-                const value = wanted && chosen ? `${this.botMode}:${chosen.name}` : 'builtin';
                 document.querySelectorAll('[data-bot-setting]').forEach(el => el.classList.toggle('hidden', !bot));
                 document.querySelectorAll('[data-bot-mode]').forEach(el => {
-                    // 第一個選項（原本的電腦）寫在頁面上，規則說明裡的那一個標【預設】；模型的選項照伺服器上的模型重排
+                    // 第一個選項（原本的電腦）寫在頁面上，自己列的選單裡，規則說明的那一個標【預設】；模型的選項照伺服器的重排
                     const list = choices.map(([choice, text]) => `${choice}=${text}`).join('|');
                     if (el.dataset.choices !== list) {
-                        el.options[0].textContent = choices[0][1] + ('botDefault' in el.dataset ? '【預設】' : '');
+                        el.options[0].textContent = choices[0][1] + (!configured && 'botDefault' in el.dataset ? '【預設】' : '');
                         while (el.options.length > 1) el.remove(1);
                         choices.slice(1).forEach(([choice, text]) => el.add(new Option(text, choice)));
                         el.dataset.choices = list;

@@ -251,10 +251,10 @@ class Server(unittest.TestCase):
         return self.request("POST", f"/api/bot/{game}", {"record": record, "seat": seat, "mode": mode, **changes})
 
     def test_without_a_model_the_page_is_told_to_play_by_itself(self):
-        self.assertEqual(self.request("GET", "/api/bot/gongzhu"), (200, {"model": None, "why": None, "models": [], "strength": {}}))
+        self.assertEqual(self.request("GET", "/api/bot/gongzhu"), (200, {"model": None, "why": None, "models": [], "strength": {}, "choices": []}))
         self.assertEqual(self.ask(5), (404, {"error": "no model"}))
         self.server.bots = None      # the server could not load model_bot at all
-        self.assertEqual(self.request("GET", "/api/bot/gongzhu"), (200, {"model": None, "why": None, "models": [], "strength": {}}))
+        self.assertEqual(self.request("GET", "/api/bot/gongzhu"), (200, {"model": None, "why": None, "models": [], "strength": {}, "choices": []}))
         self.assertEqual(self.ask(5), (404, {"error": "no model"}))
 
     def test_a_model_is_used_as_soon_as_its_file_is_there_and_says_what_it_is(self):
@@ -307,7 +307,7 @@ class Server(unittest.TestCase):
         self.assertEqual(self.request("GET", "/api/bot/gongzhu")[1]["model"]["id"], first)
         self.assertEqual(self.ask(5)[0], 200)
         target.unlink()
-        self.assertEqual(self.request("GET", "/api/bot/gongzhu"), (200, {"model": None, "why": None, "models": [], "strength": {}}))
+        self.assertEqual(self.request("GET", "/api/bot/gongzhu"), (200, {"model": None, "why": None, "models": [], "strength": {}, "choices": []}))
 
     def test_a_model_that_does_not_fit_is_left_alone_with_the_reason(self):
         self.install("banqi")
@@ -378,7 +378,7 @@ class Server(unittest.TestCase):
             return printed.getvalue()
 
         infos = open_server.ask_models(host, port)
-        self.assertEqual(infos, {"暗棋": {"model": None, "why": None, "models": [], "strength": {}}, "拱豬": {"model": None, "why": None, "models": [], "strength": {}}})
+        self.assertEqual(infos, {"暗棋": {"model": None, "why": None, "models": [], "strength": {}, "choices": []}, "拱豬": {"model": None, "why": None, "models": [], "strength": {}, "choices": []}})
         self.assertIn("還沒有訓練好的模型", shown(infos))
         self.install()
         self.install("banqi")
@@ -438,6 +438,32 @@ class Server(unittest.TestCase):
             self.assertEqual(self.request("GET", "/api/bot/gongzhu")[1]["strength"], {})
         target.write_text(json.dumps({"models": ids, "strength": dict(measured, odd="x", flag=True)}), encoding="utf-8")
         self.assertEqual(self.request("GET", "/api/bot/gongzhu")[1]["strength"], measured, "only numbers")
+
+    def test_the_menu_set_in_choices_json_is_handed_to_the_page_minus_what_cannot_be_played(self):
+        self.install_as("20261123_b", b"new")
+        self.install_as("20261122", b"old")
+        target = self.models / "gongzhu" / "choices.json"
+        menu = [{"label": "遊戲設定(65)", "play": "builtin"}, {"label": "模型A(100)", "play": "normal:20261123_b"},
+                {"label": "舊模型(90)", "play": "normal:20261122"}]
+        noise = [{"label": "模型B(100)", "play": "normal:20261123_a"},       # no such model here
+                 {"label": "怪", "play": "strong:20261122"}, {"label": "", "play": "builtin"}, {"play": "builtin"},
+                 {"label": "又一次", "play": "normal:20261122"}, "builtin", {"label": "數字", "play": 3}]    # the second 舊模型
+        target.write_text(json.dumps({"choices": menu + noise}), encoding="utf-8")
+        self.assertEqual(self.request("GET", "/api/bot/gongzhu")[1]["choices"], menu)
+
+        target.write_text(json.dumps({"choices": [{"label": "遊戲設定", "play": "builtin"}]}), encoding="utf-8")
+        self.assertEqual(self.request("GET", "/api/bot/gongzhu")[1]["choices"], [], "no model in it: the page lists its own")
+        for broken in ("{not json", json.dumps({"menu": menu}), json.dumps({"choices": 3})):
+            target.write_text(broken, encoding="utf-8")
+            self.assertEqual(self.request("GET", "/api/bot/gongzhu")[1]["choices"], [])
+        target.unlink()
+        self.assertEqual(self.request("GET", "/api/bot/gongzhu")[1]["choices"], [])
+
+    def test_the_shipped_gongzhu_menu_has_the_four_choices_asked_for(self):
+        shipped = json.loads((ROOT / "train_out" / "gongzhu" / "choices.json").read_text(encoding="utf-8"))["choices"]
+        self.assertEqual([(choice["label"], choice["play"]) for choice in shipped], [
+            ("遊戲設定(65)", "builtin"), ("模型A(100)", "normal:20261123_b"),
+            ("模型B(100)", "normal:20261123_a"), ("舊模型(90)", "normal:20261122")])
 
     def test_a_model_that_cannot_be_used_is_named_and_the_others_still_play(self):
         self.install_as("20261123_b")

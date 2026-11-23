@@ -66,7 +66,7 @@ RECORD_ID_RE = re.compile(r"\d{8}-\d{6}-[a-z0-9]{6}")    # 開局時間＋亂碼
 RECORD_LOCK = threading.Lock()
 
 # 沒有模型可以選時 GET /api/bot/<遊戲> 的回答（格式見 model_bot.Bots.info）
-NO_MODEL = {"model": None, "why": None, "models": [], "strength": {}}
+NO_MODEL = {"model": None, "why": None, "models": [], "strength": {}, "choices": []}
 
 # 已知遊戲的顯示資料；games/ 裡其他的 .html 會用網頁標題列在「其他」
 CATALOG = {
@@ -303,20 +303,21 @@ window.GameBot = (function () {
     var API = '/api/bot/__GAME__';
     var WAIT_MS = 2500;     // 等伺服器回答最久多久，超過就當作連不上
     var REST_MS = 30000;    // 連不上之後隔多久才再問；這段時間電腦用遊戲自己的打法，不會每一手都卡住
-    var model = null, models = [], strength = {}, why = null, restUntil = 0, watchers = [];
+    var model = null, models = [], strength = {}, choices = [], why = null, restUntil = 0, watchers = [];
 
     function changed() {
         watchers.forEach(function (fn) {
             try { fn(); } catch (e) { if (window.console) console.error('GameBot', e); }
         });
     }
-    function learn(next, reason, all, rated) {
-        var before = JSON.stringify([model, why, models, strength]);
+    function learn(next, reason, all, rated, listed) {
+        var before = JSON.stringify([model, why, models, strength, choices]);
         model = next || null;
         why = reason || null;
         models = model ? (Array.isArray(all) && all.length ? all : [model]) : [];
         strength = model && rated && typeof rated === 'object' ? rated : {};
-        if (JSON.stringify([model, why, models, strength]) !== before) changed();
+        choices = model && Array.isArray(listed) ? listed : [];
+        if (JSON.stringify([model, why, models, strength, choices]) !== before) changed();
     }
     function rest() {
         restUntil = Date.now() + REST_MS;
@@ -357,6 +358,8 @@ window.GameBot = (function () {
         models: function () { return models; },
         // 「電腦的打法」每個選項量出來的強度 { 'builtin': 56, 'normal:20261123_b': 100, ... }，最強的是 100；沒量過是 {}
         strength: function () { return strength; },
+        // 伺服器設定好的「電腦的打法」選單 [{ label: 選單上的字, play: 'builtin' 或 '<打法>:<模型名稱>' }]；沒設定是 []
+        choices: function () { return choices; },
         // 有模型檔卻不能用的原因；沒有這種情況是 null
         why: function () { return why; },
         // 剛剛連不上伺服器，暫時不問
@@ -368,7 +371,8 @@ window.GameBot = (function () {
             return ask({ method: 'GET' }).then(function (answer) {
                 if (answer && answer.body) {
                     var ok = answer.status === 200;
-                    learn(ok && answer.body.model, answer.body.why, ok && answer.body.models, ok && answer.body.strength);
+                    learn(ok && answer.body.model, answer.body.why, ok && answer.body.models, ok && answer.body.strength,
+                        ok && answer.body.choices);
                 }
             });
         },

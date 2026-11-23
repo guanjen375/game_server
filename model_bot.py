@@ -241,6 +241,7 @@ def blob_id(data):
 # 和檔名帶名稱的 model_<名稱>.pt（例如拱豬的 model_20261123_b.pt，名稱是 20261123_b）。遊戲裡每個都能選。
 MODEL_FILE = re.compile(r"model(?:_([0-9A-Za-z][0-9A-Za-z_-]{0,39}))?\.pt")
 STRENGTH_FILE = "strength.json"     # 同一個資料夾裡，各個選項實際對打量出來的強度（見 Bots.strength()）
+CHOICES_FILE = "choices.json"       # 同一個資料夾裡，遊戲頁面「電腦的打法」要列哪幾個選項、叫什麼（見 Bots.choices()）
 
 
 class Bots:
@@ -331,7 +332,7 @@ class Bots:
     def info(self, slug):
         """給遊戲頁面和 status 看的：{"models": 能用的模型的說明（多一項 name，model.pt 是 ""），順序同 files(),
         "model": 第一個（沒指定模型時用的）或 None, "why": 有模型檔卻不能用的原因（好幾個檔不能用就一個一個列）,
-        "strength": 「電腦的打法」每個選項的強度（見 strength()）}。"""
+        "strength": 「電腦的打法」每個選項的強度（見 strength()）, "choices": 選單上要列的選項（見 choices()）}。"""
         models, problems = [], []
         for name, loaded, why in self.load(slug):
             if loaded:
@@ -339,7 +340,27 @@ class Bots:
             elif why:
                 problems.append(f"{name}：{why}" if name else why)
         return {"model": models[0] if models else None, "why": "；".join(problems) or None, "models": models,
-                "strength": self.strength(slug, models)}
+                "strength": self.strength(slug, models), "choices": self.choices(slug, models)}
+
+    def choices(self, slug, models):
+        """遊戲頁面「電腦的打法」要列的選項 [{"label": 選單上的字, "play": 誰出牌}]，照 <遊戲>/choices.json 的順序。
+        play 是 "builtin"（遊戲內建的算法），或 "<打法>:<模型名稱>"（打法是 normal 或 weak，模型要是現在能用的）。
+        寫錯的、模型不在了的那幾個不列；沒有這個檔，或一個模型都列不出來，就是 []：遊戲頁面自己列
+        （原本的電腦，加上每個模型的「正常」「較弱」）。"""
+        try:
+            listed = list(json.loads((self.folder / slug / CHOICES_FILE).read_text(encoding="utf-8"))["choices"])
+        except (OSError, ValueError, KeyError, TypeError):
+            return []
+        names, shown = {model["name"] for model in models}, []
+        for choice in listed:
+            label, play = (choice.get("label"), choice.get("play")) if isinstance(choice, dict) else (None, None)
+            if not isinstance(label, str) or not label.strip() or not isinstance(play, str):
+                continue
+            mode, colon, name = play.partition(":")
+            usable = play == "builtin" or (mode in MODES and colon and name in names)
+            if usable and play not in {seen["play"] for seen in shown}:
+                shown.append({"label": label.strip(), "play": play})
+        return shown if any(choice["play"] != "builtin" for choice in shown) else []
 
     def strength(self, slug, models):
         """「電腦的打法」每個選項的強度 {選項: 數字}，選項是 "builtin"（原本的電腦）或 "<打法>:<模型名稱>"，最強的是 100。

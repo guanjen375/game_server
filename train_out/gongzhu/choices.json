@@ -1,0 +1,9 @@
+{
+ "about": "拱豬「電腦的打法」選單，照這裡的順序列。label 是選單上的字；play 是誰出牌：builtin 是遊戲內建的算法，normal:<名稱> 是 model_<名稱>.pt 這個模型照「正常」出牌（weak:<名稱> 是「較弱」）。括號裡的強度量法見 README「電腦的打法的強度」",
+ "choices": [
+  {"label": "遊戲設定(65)", "play": "builtin"},
+  {"label": "模型A(100)", "play": "normal:20261123_b"},
+  {"label": "模型B(100)", "play": "normal:20261123_a"},
+  {"label": "舊模型(90)", "play": "normal:20261122"}
+ ]
+}
