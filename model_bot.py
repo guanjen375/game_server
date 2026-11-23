@@ -2,6 +2,7 @@
 
 train_gpu.py 練出來的 train_out/<遊戲>/model.pt 放著就能用：玩家在遊戲裡把「電腦的打法」選成模型之後，
 遊戲頁面輪到電腦時問伺服器「這一手該出什麼」（POST /api/bot/<遊戲>，見 open_server.py），伺服器交給這裡算。
+一個遊戲可以放好幾個模型（model_<名稱>.pt，見 MODEL_FILE），玩家選哪一個就問哪一個。
 
 模型有兩種打法，在遊戲頁面上選：
     normal  正常：完全照模型，每次都出模型分數最高的那個動作。
@@ -20,6 +21,7 @@ import math
 import os
 import pickle
 import random
+import re
 import subprocess
 import sys
 import threading
@@ -234,30 +236,52 @@ def blob_id(data):
     return hashlib.sha1(b"blob %d\0" % len(data) + data).hexdigest()
 
 
+# 一個遊戲可以有好幾個模型：train_out/<遊戲>/model.pt（train_gpu.py 練的，沒有名稱），
+# 和檔名帶名稱的 model_<名稱>.pt（例如拱豬的 model_20261123_b.pt，名稱是 20261123_b）。遊戲裡每個都能選。
+MODEL_FILE = re.compile(r"model(?:_([0-9A-Za-z][0-9A-Za-z_-]{0,39}))?\.pt")
+
+
 class Bots:
     """train_out/ 裡各個遊戲的模型。檔案換了會自動重讀；讀進來的模型留在記憶體，每一手不用重讀。"""
 
     def __init__(self, folder=None):
         self.folder = Path(folder or MODEL_DIR)
         self.lock = threading.Lock()
-        self.loaded = {}        # 遊戲 → (檔案的時間和大小, (game, policy, 說明) 或 None, 不能用的原因)
+        self.loaded = {}        # (遊戲, 檔名) → (檔案的時間和大小, (game, policy, 說明) 或 None, 不能用的原因)
 
-    def load(self, slug):
-        """(game, policy, 說明)；這個遊戲沒有可以用的模型時是 None。第二個值是不能用的原因（沒有模型檔時是 None）。"""
-        path = self.folder / slug / "model.pt"
+    def files(self, slug):
+        """這個遊戲的模型檔：[(名稱, 路徑)]。名稱大的（日期新的）在前，model.pt 的名稱是 ""，排最後。"""
+        try:
+            found = [(MODEL_FILE.fullmatch(path.name), path) for path in (self.folder / slug).iterdir()]
+        except OSError:
+            return []
+        return sorted(((match.group(1) or "", path) for match, path in found if match and path.is_file()), reverse=True)
+
+    def load_file(self, slug, path):
+        """(game, policy, 說明)；這個檔不能用時是 None。第二個值是不能用的原因（檔案不見了是 None）。"""
+        key = (slug, path.name)
         with self.lock:
             try:
                 size = path.stat()
                 stamp = (size.st_mtime_ns, size.st_size)
             except OSError:
-                self.loaded.pop(slug, None)
+                self.loaded.pop(key, None)
                 return None, None
-            if slug not in self.loaded or self.loaded[slug][0] != stamp:
+            if key not in self.loaded or self.loaded[key][0] != stamp:
                 try:
-                    self.loaded[slug] = (stamp, self.read(slug, path), None)
+                    self.loaded[key] = (stamp, self.read(slug, path), None)
                 except Unusable as why:
-                    self.loaded[slug] = (stamp, None, str(why))
-            return self.loaded[slug][1:]
+                    self.loaded[key] = (stamp, None, str(why))
+            return self.loaded[key][1:]
+
+    def load(self, slug):
+        """這個遊戲的每個模型：[(名稱, (game, policy, 說明) 或 None, 不能用的原因)]，順序和 files() 一樣。"""
+        files = self.files(slug)
+        with self.lock:     # 拿掉的檔不用再記著
+            names = {path.name for _, path in files}
+            for key in [key for key in self.loaded if key[0] == slug and key[1] not in names]:
+                del self.loaded[key]
+        return [(name, *self.load_file(slug, path)) for name, path in files]
 
     def read(self, slug, path):
         if slug not in train_gpu.GAMES:
@@ -303,17 +327,28 @@ class Bots:
         return game, policy, info
 
     def info(self, slug):
-        """給遊戲頁面和 status 看的：{"model": 說明或 None, "why": 有模型檔卻不能用的原因}。"""
-        loaded, why = self.load(slug)
-        return {"model": loaded[2] if loaded else None, "why": why}
+        """給遊戲頁面和 status 看的：{"models": 能用的模型的說明（多一項 name，model.pt 是 ""），順序同 files(),
+        "model": 第一個（沒指定模型時用的）或 None, "why": 有模型檔卻不能用的原因（好幾個檔不能用就一個一個列）}。"""
+        models, problems = [], []
+        for name, loaded, why in self.load(slug):
+            if loaded:
+                models.append(dict(loaded[2], name=name))
+            elif why:
+                problems.append(f"{name}：{why}" if name else why)
+        return {"model": models[0] if models else None, "why": "；".join(problems) or None, "models": models}
 
-    def play(self, slug, record, seat=None, mode="normal"):
-        """這一局打到 record 這裡，輪到的那一家該出什麼。
+    def play(self, slug, record, seat=None, mode="normal", model=None):
+        """這一局打到 record 這裡，輪到的那一家該出什麼。model 是模型的名稱（model.pt 是 ""），None 是第一個模型。
         回傳 {"play": 寫進紀錄的那一筆, "mode": 打法, "model": 模型的編號}；這個遊戲沒有可以用的模型時回傳 None。"""
-        loaded, _ = self.load(slug)
-        if loaded is None:
+        usable = [(name, loaded) for name, loaded, _ in self.load(slug) if loaded]
+        if not usable:
             return None
-        game, policy, info = loaded
+        if model is not None and not isinstance(model, str):
+            raise Refused("模型的名稱不對")
+        chosen = [loaded for name, loaded in usable if model is None or name == model]
+        if not chosen:
+            raise Refused(f"沒有 {model} 這個模型")
+        game, policy, info = chosen[0]
         if mode not in MODES:
             raise Refused(f"沒有 {mode} 這種打法")
         if not isinstance(record, dict):

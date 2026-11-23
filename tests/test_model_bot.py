@@ -251,10 +251,10 @@ class Server(unittest.TestCase):
         return self.request("POST", f"/api/bot/{game}", {"record": record, "seat": seat, "mode": mode, **changes})
 
     def test_without_a_model_the_page_is_told_to_play_by_itself(self):
-        self.assertEqual(self.request("GET", "/api/bot/gongzhu"), (200, {"model": None, "why": None}))
+        self.assertEqual(self.request("GET", "/api/bot/gongzhu"), (200, {"model": None, "why": None, "models": []}))
         self.assertEqual(self.ask(5), (404, {"error": "no model"}))
         self.server.bots = None      # the server could not load model_bot at all
-        self.assertEqual(self.request("GET", "/api/bot/gongzhu"), (200, {"model": None, "why": None}))
+        self.assertEqual(self.request("GET", "/api/bot/gongzhu"), (200, {"model": None, "why": None, "models": []}))
         self.assertEqual(self.ask(5), (404, {"error": "no model"}))
 
     def test_a_model_is_used_as_soon_as_its_file_is_there_and_says_what_it_is(self):
@@ -307,7 +307,7 @@ class Server(unittest.TestCase):
         self.assertEqual(self.request("GET", "/api/bot/gongzhu")[1]["model"]["id"], first)
         self.assertEqual(self.ask(5)[0], 200)
         target.unlink()
-        self.assertEqual(self.request("GET", "/api/bot/gongzhu"), (200, {"model": None, "why": None}))
+        self.assertEqual(self.request("GET", "/api/bot/gongzhu"), (200, {"model": None, "why": None, "models": []}))
 
     def test_a_model_that_does_not_fit_is_left_alone_with_the_reason(self):
         self.install("banqi")
@@ -378,7 +378,7 @@ class Server(unittest.TestCase):
             return printed.getvalue()
 
         infos = open_server.ask_models(host, port)
-        self.assertEqual(infos, {"暗棋": {"model": None, "why": None}, "拱豬": {"model": None, "why": None}})
+        self.assertEqual(infos, {"暗棋": {"model": None, "why": None, "models": []}, "拱豬": {"model": None, "why": None, "models": []}})
         self.assertIn("還沒有訓練好的模型", shown(infos))
         self.install()
         self.install("banqi")
@@ -389,8 +389,51 @@ class Server(unittest.TestCase):
         self.assertIn("暗棋：有模型檔但不能用", text)
         self.assertIsNone(open_server.ask_models("127.0.0.1", 1), "a server that cannot be asked")
 
+    def install_as(self, name, comment=b""):
+        """The little model as model_<name>.pt ("" is model.pt); a zip comment makes it a file of its own."""
+        target = self.models / "gongzhu" / (f"model_{name}.pt" if name else "model.pt")
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(MODEL, target)
+        if comment:
+            with zipfile.ZipFile(target, "a") as archive:
+                archive.comment = comment
+        return model_bot.blob_id(target.read_bytes())
 
-SHIPPED = ROOT / "train_out" / "gongzhu" / "model.pt"
+    def test_several_models_are_listed_newest_first_and_each_is_asked_by_name(self):
+        ids = {name: self.install_as(name, comment) for name, comment in (("", b""), ("20261122", b"old"), ("20261123_b", b"new"))}
+        self.assertEqual(len(set(ids.values())), 3)
+        for other in ("model.previous.pt", "model.pt.tmp", "checkpoint.pt", "model_bad name.pt", "model_.pt"):
+            shutil.copyfile(MODEL, self.models / "gongzhu" / other)
+        status, info = self.request("GET", "/api/bot/gongzhu")
+        self.assertEqual(status, 200)
+        self.assertEqual([model["name"] for model in info["models"]], ["20261123_b", "20261122", ""], "nothing else is a model")
+        self.assertEqual([model["id"] for model in info["models"]], [ids["20261123_b"], ids["20261122"], ids[""]])
+        self.assertEqual(info["model"], info["models"][0])
+        for name, made_id in ids.items():
+            status, answer = self.ask(5, model=name)
+            self.assertEqual((status, answer["model"]), (200, made_id), name)
+        self.assertEqual(self.ask(5)[1]["model"], ids["20261123_b"], "no name: the first one")
+        self.assertEqual(self.ask(5, model="20261123_a")[0], 400, "a name the server does not have")
+        self.assertEqual(self.ask(5, model=3)[0], 400)
+        lines = open_server.model_lines("拱豬", info)
+        self.assertEqual([line.split("：")[0] for line in lines], ["拱豬 20261123_b", "拱豬 20261122", "拱豬"])
+
+    def test_a_model_that_cannot_be_used_is_named_and_the_others_still_play(self):
+        self.install_as("20261123_b")
+        (self.models / "gongzhu" / "model_20261123_a.pt").write_bytes(b"not a model")
+        status, info = self.request("GET", "/api/bot/gongzhu")
+        self.assertEqual([model["name"] for model in info["models"]], ["20261123_b"])
+        self.assertTrue(info["why"].startswith("20261123_a："), info["why"])
+        self.assertEqual(self.ask(5)[0], 200)
+        self.assertIn("拱豬：有模型檔但不能用：20261123_a：", open_server.model_lines("拱豬", info)[-1])
+
+        (self.models / "gongzhu" / "model_20261123_b.pt").unlink()    # taken away while the server runs
+        status, info = self.request("GET", "/api/bot/gongzhu")
+        self.assertEqual((info["model"], info["models"]), (None, []))
+        self.assertEqual(self.ask(5), (404, {"error": "no model"}))
+
+
+SHIPPED = ROOT / "train_out" / "gongzhu" / "model_20261123_b.pt"     # the default of the three Gong Zhu models
 SEARCH_CASE = FIXTURE / "gongzhu" / "search-case.json"
 PAGE_SEATS = ["south", "west", "north", "east"]     # the Gong Zhu page's playing order
 
@@ -436,6 +479,7 @@ class Searching(unittest.TestCase):
         cls.folder = Path(folder.name)
         (cls.folder / "gongzhu").mkdir()
         shutil.copyfile(SHIPPED, cls.folder / "gongzhu" / "model.pt")
+        cls.shipped = sorted((ROOT / "train_out" / "gongzhu").glob("model*.pt"))
         cls.bots = model_bot.Bots(cls.folder)
         cls.info = cls.bots.info("gongzhu")
         cls.wait = int(re.search(r"WAIT_MS = (\d+)", open_server.BOT).group(1)) / 1000
@@ -445,8 +489,8 @@ class Searching(unittest.TestCase):
         search = self.info["model"]["search"]
         self.assertEqual(search["rules"], "player_special")
         self.assertGreater(search["settings"]["worlds"], 1)
-        self.assertIn("出牌前會先推算", open_server.describe_model(self.info), "status shows the server really searches")
-        plain = dict(self.info, model={k: v for k, v in self.info["model"].items() if k != "search"})
+        self.assertIn("出牌前會先推算", open_server.describe_model(self.info["model"]), "status shows the server really searches")
+        plain = {k: v for k, v in self.info["model"].items() if k != "search"}
         self.assertNotIn("推算", open_server.describe_model(plain), "a server still on the old code does not")
 
     def test_the_position_checked_when_it_was_handed_over_gets_the_same_card(self):
@@ -502,6 +546,22 @@ class Searching(unittest.TestCase):
         self.assertFalse(result["numpy_before"])
         self.assertEqual(result["threads"], ["1"] * len(model_bot.SEARCH_THREADS))
         self.assertLess(result["slowest"], self.wait / 2, "the page stops waiting after WAIT_MS")
+
+    def test_the_three_shipped_gongzhu_models_all_answer(self):
+        names = [path.name for path in self.shipped]
+        self.assertEqual(names, ["model_20261122.pt", "model_20261123_a.pt", "model_20261123_b.pt"])
+        bots = model_bot.Bots(ROOT / "train_out")
+        info = bots.info("gongzhu")
+        self.assertIsNone(info["why"])
+        self.assertEqual([model["name"] for model in info["models"]], ["20261123_b", "20261123_a", "20261122"])
+        self.assertEqual(info["model"]["name"], "20261123_b", "the newest is the one a plain 'model' means")
+        self.assertEqual([("search" in model) for model in info["models"]], [True, True, False])
+        question, seat = next(self.questions())
+        for model in info["models"]:
+            answer = bots.play("gongzhu", question, seat, "normal", model["name"])
+            self.assertEqual(answer["model"], model["id"])
+            _, _, mask, _ = GAME.upcoming(dict(question, status="unfinished"))
+            self.assertTrue(mask[GAME.card(answer["play"]["card"])])
 
     def test_rounds_under_other_rules_are_left_to_the_page(self):
         classic = made.rounds(1, seed=3)[0]

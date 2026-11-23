@@ -447,9 +447,8 @@
                         </label>
                         <select id="botModeSelectRules" data-bot-mode onchange="game.setBotMode(this.value)" class="w-full bg-slate-950 border border-white/20 rounded-lg px-3 py-2 text-xs sm:text-sm font-bold text-white focus:outline-none focus:border-sky-400">
                             <option value="builtin">原本的電腦（遊戲內建的算法）【預設】</option>
-                            <option value="normal">模型・正常：完全照訓練好的模型出牌</option>
-                            <option value="weak">模型・較弱：一樣照模型，但有時改出它的第二、第三選擇</option>
                         </select>
+                        <p class="mt-1.5 text-[11px] text-slate-400 leading-relaxed">模型「正常」完全照模型出牌；「較弱」一樣照模型，但有時改出它的第二、第三選擇。</p>
                         <p data-bot-note class="mt-1.5 text-[11px] text-slate-400 leading-relaxed"></p>
                     </div>
                 </div>
@@ -492,8 +491,6 @@
                             </label>
                             <select id="botModeSelectScoreboard" data-bot-mode onchange="game.setBotMode(this.value)" class="flex-1 bg-slate-900 border border-white/20 rounded-lg px-2.5 py-1.5 text-xs font-bold text-white focus:outline-none focus:border-sky-400">
                                 <option value="builtin">原本的電腦（遊戲內建的算法）</option>
-                                <option value="normal">模型・正常：完全照訓練好的模型出牌</option>
-                                <option value="weak">模型・較弱：一樣照模型，但有時改出它的第二、第三選擇</option>
                             </select>
                         </div>
                         <p data-bot-note class="mt-1.5 text-[11px] text-slate-400 leading-relaxed"></p>
@@ -1441,8 +1438,10 @@
                 this.confirmAction = 'restart'; // 確認視窗按「確定」時要做的事：'restart' 整場重新開始、'redeal' 本局重新發牌
 
                 // 電腦的打法：'builtin' 原本的電腦（GongZhuAI）；伺服器上有訓練好的模型時還可以選
-                // 'normal'（完全照模型出牌）或 'weak'（照模型，較弱）。選了之後這台裝置會記住
+                // 'normal'（完全照模型出牌）或 'weak'（照模型，較弱）。伺服器上有好幾個模型時，botModel 是選的那個模型的名稱
+                // （null：伺服器排第一個的）。選了之後這台裝置會記住
                 this.botMode = this.rememberedBotMode();
+                this.botModel = this.rememberedBotModel();
                 this.botTicket = 0;     // 問模型的編號：牌局被悔牌或重新發牌換掉之後，先前問的答案就不用了
                 this.botLookup = null;  // 正在問伺服器有沒有模型（每一局開始時問一次）；問到之前電腦先不出牌
                 this.roundModel = null; // 這一局出牌的是哪一個模型（模型檔的編號，記進對局紀錄）
@@ -1489,36 +1488,78 @@
             }
 
             /**
-             * 切換電腦的打法：'builtin' 原本的電腦、'normal' 完全照模型出牌、'weak' 照模型但較弱
-             * （有時改出模型的第二、第三選擇）。選了模型而伺服器上沒有模型、或連不上時，還是原本的電腦在出牌
+             * 這台裝置上次選的模型名稱（伺服器上有好幾個模型時）；沒選過是 null，也就是伺服器排第一個的模型
              */
-            setBotMode(mode) {
+            rememberedBotModel() {
+                try {
+                    return localStorage.getItem('game_setting:gongzhu:bot_model');
+                } catch (e) {
+                    return null;
+                }
+            }
+
+            /**
+             * 切換電腦的打法：'builtin' 原本的電腦、'normal' 完全照模型出牌、'weak' 照模型但較弱
+             * （有時改出模型的第二、第三選擇）。伺服器上有好幾個模型時，後面接「:模型名稱」選哪一個
+             * （例如 'normal:20261123_a'），沒接就是伺服器排第一個的。選了模型而伺服器上沒有模型、或連不上時，
+             * 還是原本的電腦在出牌
+             */
+            setBotMode(value) {
+                const text = String(value), cut = text.indexOf(':');
+                const mode = cut < 0 ? text : text.slice(0, cut);
                 this.botMode = mode === 'normal' || mode === 'weak' ? mode : 'builtin';
-                try { localStorage.setItem('game_setting:gongzhu:bot', this.botMode); } catch (e) {}
+                this.botModel = this.botMode !== 'builtin' && cut >= 0 ? text.slice(cut + 1) : null;
+                try {
+                    localStorage.setItem('game_setting:gongzhu:bot', this.botMode);
+                    if (this.botModel === null) localStorage.removeItem('game_setting:gongzhu:bot_model');
+                    else localStorage.setItem('game_setting:gongzhu:bot_model', this.botModel);
+                } catch (e) {}
                 this.renderBotSetting();
             }
 
             /**
-             * 「電腦的打法」那一欄（規則說明和計分板各有一個）：單獨開啟這個檔案時沒有 GameBot，整欄不顯示
+             * 要問的模型（GameBot.models() 裡的一個）：選的那一個；沒選過、或伺服器上已經沒有它了，
+             * 就是伺服器排第一個的。沒有模型時是 null
+             */
+            chosenModel(bot = window.GameBot) {
+                const models = bot ? bot.models() : [];
+                return models.find(model => model.name === this.botModel) || models[0] || null;
+            }
+
+            /**
+             * 「電腦的打法」那一欄（規則說明和計分板各有一個）：單獨開啟這個檔案時沒有 GameBot，整欄不顯示。
+             * 選項是原本的電腦，加上伺服器上每個模型的「正常」和「較弱」
              */
             renderBotSetting() {
                 const bot = window.GameBot;
-                const model = bot ? bot.model() : null;
+                const models = bot ? bot.models() : [];
+                const chosen = this.chosenModel(bot);
                 const wanted = this.botMode !== 'builtin';
+                const named = model => (model.name ? `模型 ${model.name}` : '模型');
                 let note = '';
-                if (model) {
-                    const saved = String(model.saved || '').slice(0, 16).replace('T', ' ');
-                    const hit = typeof model.accuracy === 'number' ? `，沒練過的對局裡猜中玩家出牌的比例 ${Math.round(model.accuracy * 100)}%` : '';
+                if (chosen) {
+                    const saved = String(chosen.saved || '').slice(0, 16).replace('T', ' ');
+                    const hit = typeof chosen.accuracy === 'number' ? `，沒練過的對局裡猜中玩家出牌的比例 ${Math.round(chosen.accuracy * 100)}%` : '';
                     note = wanted && bot.resting() ? '⚠️ 暫時連不上模型，先由原本的電腦出牌，稍後會自動再試。'
-                        : `伺服器上的模型：用 ${model.rounds} 局對局練的${saved ? `（${saved} 存檔）` : ''}${hit}。`;
+                        : !wanted && models.length > 1 ? `伺服器上有 ${models.length} 個模型可以選。`
+                        : `${wanted ? named(chosen) : '伺服器上的模型'}：用 ${chosen.rounds} 局對局練的${saved ? `（${saved} 存檔）` : ''}${hit}。`;
                 } else if (bot) {
                     note = (bot.why() ? `伺服器上的模型不能用（${bot.why()}）` : '伺服器上還沒有訓練好的模型')
                         + (wanted ? '，現在是原本的電腦在出牌。' : '，只能選原本的電腦。');
                 }
+                const choices = models.flatMap(model => [[`normal:${model.name}`, `${named(model)}・正常`],
+                    [`weak:${model.name}`, `${named(model)}・較弱`]]);
+                const value = wanted && chosen ? `${this.botMode}:${chosen.name}` : 'builtin';
                 document.querySelectorAll('[data-bot-setting]').forEach(el => el.classList.toggle('hidden', !bot));
                 document.querySelectorAll('[data-bot-mode]').forEach(el => {
-                    el.querySelectorAll('option').forEach(option => { option.disabled = option.value !== 'builtin' && !model; });
-                    el.value = this.botMode;
+                    // 第一個選項（原本的電腦）寫在頁面上；模型的選項照伺服器上的模型重排
+                    const list = choices.map(([choice]) => choice).join('|');
+                    if (el.dataset.choices !== list) {
+                        while (el.options.length > 1) el.remove(1);
+                        choices.forEach(([choice, text]) => el.add(new Option(text, choice)));
+                        el.dataset.choices = list;
+                    }
+                    el.value = value;
                 });
                 document.querySelectorAll('[data-bot-note]').forEach(el => { el.textContent = note; });
             }
@@ -1778,7 +1819,8 @@
                 }
                 if (!bot.model() || bot.resting()) return this.playComputerCard(seat, null);
                 const ticket = ++this.botTicket;
-                bot.choose(this.roundSoFar(), seat, this.botMode).then(answer => {
+                const chosen = this.chosenModel(bot);
+                bot.choose(this.roundSoFar(), seat, this.botMode, chosen ? chosen.name : undefined).then(answer => {
                     // 等答案的時候悔牌或重新發牌了：這個答案是舊牌局的，不用
                     if (ticket === this.botTicket) this.playComputerCard(seat, answer);
                 });

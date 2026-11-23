@@ -13,7 +13,9 @@ const ROOT = path.resolve(__dirname, '..');
 const rng = seed => () => ((seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0) / 2 ** 32);
 const clone = value => (value == null ? null : JSON.parse(JSON.stringify(value)));
 const settle = async () => { for (let i = 0; i < 6; i++) await Promise.resolve(); };
-const MODEL = { id: 'a'.repeat(40), saved: '2026-11-21T03:12:00+08:00', rounds: 236, decisions: 2400, accuracy: 0.59, chance: 0.29, finished: true };
+const MODEL = { id: 'a'.repeat(40), saved: '2026-11-21T03:12:00+08:00', rounds: 236, decisions: 2400, accuracy: 0.59, chance: 0.29, finished: true, name: '' };
+// Several models of one game, the way the server lists them: the newest name first, the first one is the default.
+const MODELS = [['20261123_b', 'b'], ['20261123_a', 'c'], ['20261122', 'd']].map(([name, id]) => ({ ...MODEL, name, id: id.repeat(40) }));
 
 // ---------------------------------------------------------------- the script the server adds
 
@@ -113,6 +115,36 @@ test('the script: choose() sends the round so far, the seat and the mode, and ha
     assert.deepEqual(clone(await asking), answer);
     assert.equal(p.requests.length, 0);
     assert.equal(p.bot.resting(), false);
+});
+
+test('the script: with several models, models() lists them and choose() asks the one it names', async () => {
+    const p = page('gongzhu');
+    assert.deepEqual(clone(p.bot.models()), []);
+    let asking = p.bot.refresh();
+    p.requests.shift().answer(200, { model: MODELS[0], why: null, models: MODELS });
+    await asking;
+    assert.deepEqual(clone(p.bot.model()), MODELS[0]);
+    assert.deepEqual(clone(p.bot.models()), MODELS);
+
+    const record = { tricks: [] };
+    let choosing = p.bot.choose(record, 'east', 'weak', '20261122');
+    let request = p.requests.shift();
+    assert.deepEqual(request.body, { record, seat: 'east', mode: 'weak', model: '20261122' });
+    request.answer(200, { play: { seat: 'east', card: 'C14' }, mode: 'weak', model: MODELS[2].id });
+    assert.equal((await choosing).model, MODELS[2].id);
+    assert.equal(p.requests.length, 0, 'the answer came from the model that was named: nothing to look up');
+
+    choosing = p.bot.choose(record, 'east', 'normal', '20261123_a');
+    p.requests.shift().answer(200, { play: { seat: 'east', card: 'C14' }, mode: 'normal', model: 'e'.repeat(40) });
+    await choosing;
+    assert.equal(p.requests.length, 1, 'another file under that name: the models are looked up again');
+    assert.equal(p.requests[0].options.method, 'GET');
+
+    asking = p.bot.refresh();
+    p.requests.shift();    // (the lookup started above)
+    p.requests.shift().answer(200, { model: MODEL, why: null });    // a server that only knows of one model
+    await asking;
+    assert.deepEqual(clone(p.bot.models()), [MODEL]);
 });
 
 test('the script: a model that has been taken away is forgotten', async () => {
@@ -229,15 +261,16 @@ function nothing() {
 }
 
 // What the server's script is to the page, with the answers in the test's hands.
-function fakeBot(model = MODEL) {
+function fakeBot(model = MODEL, list = null) {
     return {
-        info: model, off: false, asked: [], watchers: [], refreshed: 0, looking: null,
+        info: model, list, off: false, asked: [], watchers: [], refreshed: 0, looking: null,
         model() { return this.info; },
+        models() { return this.info ? this.list || [this.info] : []; },
         why() { return null; },
         resting() { return this.off; },
         watch(fn) { this.watchers.push(fn); },
         refresh() { this.refreshed++; return this.looking || Promise.resolve(); },   // `looking`: a lookup the test ends itself
-        choose(record, seat, mode) { return new Promise(resolve => this.asked.push({ record: clone(record), seat, mode, resolve })); }
+        choose(record, seat, mode, name) { return new Promise(resolve => this.asked.push({ record: clone(record), seat, mode, name, resolve })); }
     };
 }
 
@@ -459,6 +492,60 @@ test('gongzhu: the way picked for the computers is remembered on the device', as
     assert.equal(locked.game.botMode, 'builtin');
     locked.game.setBotMode('normal');
     assert.equal(locked.game.botMode, 'normal', 'the choice still holds while the page is open');
+});
+
+// The model's stand-in when there are several: the last card the seat may play, from the model that was named.
+function lastLegalFromNamed(question, env) {
+    return { ...lastLegal(question, env), model: MODELS.find(model => model.name === question.name).id };
+}
+
+// Plays on until the computers have been asked at least once (the player may hold the seven of spades and lead).
+async function untilAsked(env, answered) {
+    while (!answered.length && await wait(env, lastLegalFromNamed, answered)) act(env);
+}
+
+test('gongzhu: with several models each one can be picked, is asked for by name, and the record says which', async () => {
+    const env = open(5, fakeBot(MODELS[0], MODELS), 'weak:20261123_a');
+    assert.equal(env.game.botMode, 'weak');
+    assert.equal(env.game.botModel, '20261123_a');
+    const answered = await playRound(env, lastLegalFromNamed);
+    assert.equal(answered.length, 39);
+    assert.ok(answered.every(({ question }) => question.mode === 'weak' && question.name === '20261123_a'));
+    const record = env.recorder.rounds[0];
+    assert.equal(record.model, MODELS[1].id, 'the record names the model by its file');
+    assert.ok(record.tricks.flat().filter(play => play.seat !== 'south').every(play => play.bot === 'weak'));
+
+    env.game.startNextRound();
+    env.game.setBotMode('normal:20261122');
+    const next = [];
+    await untilAsked(env, next);
+    assert.deepEqual([next[0].question.mode, next[0].question.name], ['normal', '20261122']);
+});
+
+test('gongzhu: the model picked is remembered, and the first one stands in for a model that is no longer there', async () => {
+    const disk = new Map();
+    open(11, fakeBot(MODELS[0], MODELS), 'normal:20261123_a', disk);
+    const again = open(12, fakeBot(MODELS[0], MODELS), null, disk);
+    assert.deepEqual([again.game.botMode, again.game.botModel], ['normal', '20261123_a']);
+
+    const gone = open(13, fakeBot(MODELS[0], [MODELS[0], MODELS[2]]), null, disk);
+    const answered = [];
+    await untilAsked(gone, answered);
+    assert.equal(answered[0].question.name, '20261123_b');
+    assert.equal(gone.game.botModel, '20261123_a', 'the pick is kept for when that model comes back');
+
+    gone.game.setBotMode('builtin');
+    assert.equal(gone.game.botModel, null);
+    assert.equal(disk.has('game_setting:gongzhu:bot_model'), false);
+});
+
+test('gongzhu: a device that picked the model when there was only one asks the first of several by name', async () => {
+    const disk = new Map([['game_setting:gongzhu:bot', 'normal']]);
+    const env = open(14, fakeBot(MODELS[0], MODELS), null, disk);
+    assert.deepEqual([env.game.botMode, env.game.botModel], ['normal', null]);
+    const answered = [];
+    await untilAsked(env, answered);
+    assert.deepEqual([answered[0].question.mode, answered[0].question.name], ['normal', '20261123_b']);
 });
 
 test('gongzhu: without an answer, or with one that cannot be played, the page plays its own card and marks nothing', async () => {

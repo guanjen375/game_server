@@ -65,6 +65,9 @@ RECORD_MAX_BYTES = 2_000_000    # 一局紀錄的大小上限（實際上一局�
 RECORD_ID_RE = re.compile(r"\d{8}-\d{6}-[a-z0-9]{6}")    # 開局時間＋亂碼，例如 20261120-164512-k3f9x2
 RECORD_LOCK = threading.Lock()
 
+# 沒有模型可以選時 GET /api/bot/<遊戲> 的回答（格式見 model_bot.Bots.info）
+NO_MODEL = {"model": None, "why": None, "models": []}
+
 # 已知遊戲的顯示資料；games/ 裡其他的 .html 會用網頁標題列在「其他」
 CATALOG = {
     "banqi": {
@@ -300,18 +303,19 @@ window.GameBot = (function () {
     var API = '/api/bot/__GAME__';
     var WAIT_MS = 2500;     // 等伺服器回答最久多久，超過就當作連不上
     var REST_MS = 30000;    // 連不上之後隔多久才再問；這段時間電腦用遊戲自己的打法，不會每一手都卡住
-    var model = null, why = null, restUntil = 0, watchers = [];
+    var model = null, models = [], why = null, restUntil = 0, watchers = [];
 
     function changed() {
         watchers.forEach(function (fn) {
             try { fn(); } catch (e) { if (window.console) console.error('GameBot', e); }
         });
     }
-    function learn(next, reason) {
-        var before = JSON.stringify([model, why]);
+    function learn(next, reason, all) {
+        var before = JSON.stringify([model, why, models]);
         model = next || null;
         why = reason || null;
-        if (JSON.stringify([model, why]) !== before) changed();
+        models = model ? (Array.isArray(all) && all.length ? all : [model]) : [];
+        if (JSON.stringify([model, why, models]) !== before) changed();
     }
     function rest() {
         restUntil = Date.now() + REST_MS;
@@ -345,8 +349,11 @@ window.GameBot = (function () {
     }
 
     var api = {
-        // 伺服器上這個遊戲的模型：{ id, saved, rounds, decisions, accuracy, chance, finished }；沒有可以用的是 null
+        // 伺服器上這個遊戲的模型（沒指定模型時用的那一個）：{ name, id, saved, rounds, decisions, accuracy, chance,
+        // finished }；沒有可以用的是 null
         model: function () { return model; },
+        // 伺服器上這個遊戲的每個模型，格式同 model()，name 是模型的名稱（例如 '20261123_b'，沒有名稱的是 ''）
+        models: function () { return models; },
         // 有模型檔卻不能用的原因；沒有這種情況是 null
         why: function () { return why; },
         // 剛剛連不上伺服器，暫時不問
@@ -356,16 +363,22 @@ window.GameBot = (function () {
         // 問伺服器現在有沒有模型。遊戲每一局開始時要問一次（沒問過就當作沒有模型）；模型換了不用重新整理頁面
         refresh: function () {
             return ask({ method: 'GET' }).then(function (answer) {
-                if (answer && answer.body) learn(answer.status === 200 && answer.body.model, answer.body.why);
+                if (answer && answer.body) {
+                    var ok = answer.status === 200;
+                    learn(ok && answer.body.model, answer.body.why, ok && answer.body.models);
+                }
             });
         },
-        // 這一手模型出什麼。record：這一局到目前為止的紀錄；seat：輪到的那一家；mode：'normal'（正常）或 'weak'（較弱）。
+        // 這一手模型出什麼。record：這一局到目前為止的紀錄；seat：輪到的那一家；mode：'normal'（正常）或 'weak'（較弱）；
+        // name：問哪一個模型（models() 裡的 name，不給就是 model() 那一個）。
         // 回傳 Promise：{ play: 寫進紀錄的那一筆, mode, model: 模型的編號 }；沒有模型、連不上、伺服器不收時是 null
-        choose: function (record, seat, mode) {
+        choose: function (record, seat, mode, name) {
             if (!model || api.resting()) return Promise.resolve(null);
+            var asked = typeof name === 'string' ? models.filter(function (m) { return m.name === name; })[0] : model;
             var body;
             try {
-                body = JSON.stringify({ record: record, seat: seat, mode: mode });
+                body = JSON.stringify(typeof name === 'string'
+                    ? { record: record, seat: seat, mode: mode, model: name } : { record: record, seat: seat, mode: mode });
             } catch (e) {
                 return Promise.resolve(null);
             }
@@ -374,7 +387,7 @@ window.GameBot = (function () {
                 if (!answer || answer.status >= 500) { rest(); return null; }
                 if (answer.status === 404) { learn(null, null); return null; }      // 模型被拿掉了
                 if (answer.status !== 200 || !answer.body || !answer.body.play) return null;
-                if (model && answer.body.model !== model.id) api.refresh();        // 模型換了一個：更新說明
+                if (!asked || answer.body.model !== asked.id) api.refresh();         // 模型換了一個：更新說明
                 return answer.body;
             });
         }
@@ -684,16 +697,18 @@ class GameHandler(BaseHTTPRequestHandler):
         self.send_text(HTTPStatus.OK, "saved" if written else "already saved")
 
     def bot_info(self, name, send_body=True):
-        """這個遊戲現在有沒有模型可以用（GET /api/bot/<遊戲>）：{"model": 模型的說明或 null, "why": 不能用的原因}。"""
+        """這個遊戲現在有沒有模型可以用（GET /api/bot/<遊戲>）：{"model": 沒指定時用的模型的說明或 null,
+        "why": 不能用的原因, "models": 每個能用的模型的說明}（見 model_bot.Bots.info）。"""
         game = find_game(name)
         if game is None:
             return self.send_json(HTTPStatus.NOT_FOUND, {"error": "unknown game"}, send_body)
         bots = self.server.bots
-        self.send_json(HTTPStatus.OK, bots.info(game["slug"]) if bots else {"model": None, "why": None}, send_body)
+        self.send_json(HTTPStatus.OK, bots.info(game["slug"]) if bots else NO_MODEL, send_body)
 
     def bot_play(self, name):
         """輪到電腦，問模型這一手出什麼（POST /api/bot/<遊戲>，內容是 {"record": 這一局到目前為止的紀錄,
-        "seat": 輪到的座位, "mode": "normal" 或 "weak"}）。這個遊戲沒有模型時回 404，遊戲頁面就用自己的電腦。"""
+        "seat": 輪到的座位, "mode": "normal" 或 "weak", "model": 模型的名稱（可以不給）}）。
+        這個遊戲沒有模型時回 404，遊戲頁面就用自己的電腦。"""
         body = self.read_body()
         if body is None:
             return
@@ -706,7 +721,8 @@ class GameHandler(BaseHTTPRequestHandler):
             asked = json.loads(body, parse_constant=reject_constant)
             if not isinstance(asked, dict):
                 raise ValueError("not an object")
-            answer = bots.play(game["slug"], asked.get("record"), asked.get("seat"), asked.get("mode", "normal"))
+            answer = bots.play(game["slug"], asked.get("record"), asked.get("seat"), asked.get("mode", "normal"),
+                               asked.get("model"))
         except (ValueError, RecursionError) as e:
             return self.send_json(HTTPStatus.BAD_REQUEST, {"error": f"bad request: {e}"})
         except model_bot.Refused as e:
@@ -849,11 +865,8 @@ def print_urls(host, port):
         print(f"  {base}/{game['slug']:<12}{game['name']}", flush=True)
 
 
-def describe_model(info):
-    """一個遊戲的模型寫成一行人看的話（info 是 GET /api/bot/<遊戲> 的內容）；沒有模型檔時回傳 None。"""
-    model = info.get("model")
-    if not model:
-        return f"有模型檔但不能用：{info['why']}" if info.get("why") else None
+def describe_model(model):
+    """一個模型寫成一行人看的話（model 是 GET /api/bot/<遊戲> 的 models 裡的一個）。"""
     text = f"用 {model.get('rounds')} 局練的模型"
     if model.get("saved"):
         text += f"（{str(model['saved'])[:16].replace('T', ' ')} 存檔）"
@@ -864,9 +877,18 @@ def describe_model(info):
     return text + ("" if model.get("finished") else "，還沒練完")
 
 
+def model_lines(game_name, info):
+    """一個遊戲的模型，一個一行（info 是 GET /api/bot/<遊戲> 的內容）；沒有模型檔時是空的。"""
+    models = info.get("models") or ([info["model"]] if info.get("model") else [])    # 舊版的伺服器只回一個
+    lines = [f"{game_name}{' ' + model['name'] if model.get('name') else ''}：{describe_model(model)}" for model in models]
+    if info.get("why"):
+        lines.append(f"{game_name}：有模型檔但不能用：{info['why']}")
+    return lines
+
+
 def print_models(infos, folder=None):
     """哪些遊戲有模型可以選。infos：{遊戲的顯示名稱: GET /api/bot/<遊戲> 的內容}。"""
-    lines = [f"  {name}：{text}" for name, text in ((name, describe_model(info)) for name, info in infos.items()) if text]
+    lines = [f"  {line}" for name, info in infos.items() for line in model_lines(name, info)]
     where = f"（{folder}）" if folder else ""
     if lines:
         print(f"可以選模型當電腦的遊戲{where}（在遊戲的規則說明或計分板裡選「電腦的打法」）：", flush=True)
