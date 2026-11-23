@@ -7,141 +7,17 @@
     <link rel="stylesheet" href="assets/layout.css">
     <link rel="stylesheet" href="assets/palette.css">
     <link rel="stylesheet" href="assets/tables.css">
+    <link rel="stylesheet" href="assets/poker-table.css">
     <style>
-        /* 拱豬自己的版面與牌面。顏色一律取共用主題（palette.css、tables.css）的變數，三種主題共用這一份；
-           這一段排在共用樣式之後，同名規則以這裡為準。 */
-        * {
-            box-sizing: border-box;
-            user-select: none;
-            -webkit-user-select: none;
-        }
         :root {
-            /* 畫面可見高度：手機瀏覽器的網址列與工具列會蓋住 100vh 的底部，支援時改用 100dvh */
-            --app-h: 100vh;
-        }
-        @supports (height: 100dvh) {
-            :root { --app-h: 100dvh; }
-        }
-        :root[data-game="gongzhu"] {
-            --gz-edge: 10px;                    /* 左右邊界，和頂欄對齊 */
-            --gz-gap: 8px;
-            --gz-gold: #fbbf24;                 /* 金框：可以出的牌、吃下這一墩的牌 */
-            --gz-mine: #be8b24;                 /* 各墩紀錄裡還沒打完的那一墩的外框 */
-            --trk-live-line: transparent;       /* 記牌表：別家的牌的外框（淺色主題才需要） */
-            --trk-mine: #fbbf24;                /* 記牌表：您的手牌的金底（和可出的牌的金框同一個金色） */
-            --trk-mine-line: #a8730a;
-            --trk-mine-ink: #2a1f04;
-            --trk-mine-red: #a80f2a;
-            --trk-out: .42;                     /* 記牌表：已出的牌淡到幾成 */
-            --gz-dim: .76;                      /* 不能出的手牌暗到幾成 */
-            --cw: 72px;                         /* 一張牌的寬度：手牌區、桌上的位置各自改寫 */
-            --card-face: #fbfaf6;
-            --card-ink: #17212b;
-            --card-red: #d5233f;
-            --tone-neg: #d5233f;                /* 扣分 */
-            --tone-pos: #0c8457;                /* 加分 */
-            --tone-x2: #b4690e;                 /* 加倍 */
-        }
-        /* 紙上棋室的面板是淺色的：白底的牌要有外框才看得出來 */
-        :root[data-game="gongzhu"][data-theme="paper"] { --gz-dim: .87; --trk-live-line: #8f8468; --trk-out: .5; }
-        body {
-            min-height: var(--app-h);
-            overflow-x: clip;
-            touch-action: manipulation;
+            --gz-mine: #be8b24;
+            --tone-neg: #d5233f;
+            --tone-pos: #0c8457;
+            --tone-x2: #b4690e;
         }
         /* 彈窗最大高度同樣以可見高度為準 */
         .modal-h-88 { max-height: 88vh; max-height: 88dvh; }
         .modal-h-90 { max-height: 90vh; max-height: 90dvh; }
-
-        /* 頂欄：狀態列固定在正中央，和下面的牌桌、手牌同一條中線（窄螢幕沿用共用樣式的兩行排法） */
-        @media (min-width: 781px) {
-            :root[data-game="gongzhu"] .table-header { display: grid; grid-template-columns: 1fr auto 1fr; }
-            :root[data-game="gongzhu"] .table-tools { justify-self: end; }
-        }
-
-        /* ───────── 版面 ─────────
-           直式（手機、直放的平板）由上到下：三家座位、牌桌、自己的座位、手牌、記牌、計分。
-           記牌和計分排在最後：畫面不夠高時先被擠到下面的是它們，出牌用得到的都留在第一個畫面。
-           橫式（電腦、橫放的平板與手機）：記牌在左、計分在右，兩欄一樣寬，牌桌和手牌就落在畫面正中央。 */
-        main.gz-layout {
-            --plate-w: clamp(104px, 12.5vw, 188px);
-            --rail-w: clamp(150px, 15.5vw, 224px);
-            --cell-h: clamp(18px, 2.6dvh, 24px);
-            flex: 1 0 auto;
-            width: 100%;
-            display: grid;
-            gap: var(--gz-gap);
-            grid-template-columns: minmax(0, 1fr);
-            grid-template-rows: 1fr auto auto auto;
-            grid-template-areas: "table" "hand" "played" "scores";
-            padding: 13px max(var(--gz-edge), calc((100% - 1380px) / 2)) max(8px, env(safe-area-inset-bottom));
-        }
-        .gz-table {
-            grid-area: table;
-            align-self: center;
-            min-width: 0;
-            height: 100%;
-            /* 桌面照寬度算出的高度，加上上面一排座位牌（留兩列計分牌的高度）和自己的座位牌：
-               畫面再高，座位牌也貼著牌桌。內容比這個高時以內容為準（min-height），不會疊到手牌上 */
-            max-height: calc(min(583px, 100vw - 2 * var(--gz-edge)) * 41 / 47 + 154px + 2 * var(--gz-gap));
-            min-height: min-content;
-            display: grid;
-            gap: var(--gz-gap);
-            grid-template-columns: repeat(3, minmax(0, 1fr));
-            grid-template-rows: auto minmax(232px, 1fr) auto;
-            grid-template-areas: "west north east" "mat mat mat" "south south south";
-        }
-        #panel-west { grid-area: west; }
-        #panel-north { grid-area: north; }
-        #panel-east { grid-area: east; }
-        #panel-south { grid-area: south; }
-
-        /* ───────── 座位牌：四家同一個樣子（名字、本局分數、吃到的計分牌） ───────── */
-        .gz-seat {
-            position: relative;
-            min-width: 0;
-            display: flex;
-            flex-direction: column;
-            gap: 6px;
-            padding: 7px 9px;
-            border: 1px solid var(--line);
-            background: var(--surface);
-            color: var(--ink);
-        }
-        .gz-seat-head {
-            display: flex;
-            flex-wrap: wrap;
-            align-items: baseline;
-            gap: 0 6px;
-            line-height: 1.35;
-            white-space: nowrap;
-        }
-        .gz-seat-head strong { font-size: 15px; font-weight: 750; letter-spacing: .03em; }
-        .gz-seat-head small { color: var(--muted); font-size: 11px; font-weight: 600; }
-        .gz-seat-score {
-            margin-left: auto;
-            color: var(--muted);
-            font-size: 11px;
-            font-variant-numeric: tabular-nums;
-        }
-        .gz-seat-score b { margin-left: 2px; font-size: 15px; font-weight: 800; color: var(--ink); }
-        .gz-seat-score b.pos, .gz-score-row b.pos { color: var(--positive); }
-        .gz-seat-score b.neg, .gz-score-row b.neg { color: var(--negative); }
-        /* 輪到誰：浮在座位牌上緣的小標籤，出現、消失都不會把版面撐開 */
-        .gz-turn {
-            position: absolute;
-            top: 0;
-            right: 9px;
-            z-index: 4;
-            transform: translateY(-58%);
-            padding: 1px 8px;
-            border-radius: 999px;
-            background: var(--mark);
-            color: var(--mark-ink);
-            font: 800 11px/1.5 var(--sans);
-            white-space: nowrap;
-            box-shadow: 0 1px 4px rgb(0 0 0 / .28);
-        }
         .gz-captured {
             display: flex;
             flex-wrap: wrap;
@@ -151,28 +27,8 @@
             border-top: 1px solid var(--line);
         }
         .gz-captured:empty { display: none; }
-        /* 自己的座位牌是橫的一條：計分牌接在名字後面 */
-        #panel-south { flex-direction: row; flex-wrap: wrap; align-items: center; gap: 5px 12px; }
-        #panel-south .gz-seat-head { flex: none; min-width: min(100%, calc(var(--plate-w) - 20px)); }
         #panel-south .gz-captured { flex: 1 1 0; min-width: 0; padding: 0 0 0 12px; border-top: 0; border-left: 1px solid var(--line); }
 
-        /* 吃到的計分牌（亮牌區）和紀錄裡的小牌 */
-        .gz-chip {
-            display: inline-flex;
-            align-items: center;
-            gap: 1px;
-            min-height: 24px;
-            padding: 1px 6px;
-            border: 1px solid rgb(0 0 0 / .16);
-            border-radius: 5px;
-            background: var(--card-face);
-            color: var(--card-ink);
-            box-shadow: 0 1px 2px rgb(0 0 0 / .28);
-            font: 800 14px/1.2 var(--sans);
-            font-variant-numeric: tabular-nums;
-            white-space: nowrap;
-        }
-        .gz-chip.red { color: var(--card-red); }
         .gz-chip.tone-neg { border-color: var(--tone-neg); background: #fff0f2; }
         .gz-chip.tone-pos { border-color: var(--tone-pos); background: #eafaf1; }
         .gz-chip.tone-x2 { border-color: var(--tone-x2); background: #fff6dc; }
@@ -184,44 +40,6 @@
             100% { transform: scale(1); opacity: 1; }
         }
 
-        /* ───────── 牌桌 ─────────
-           桌面大小跟著這一格的寬高走（容器單位），桌上的牌再跟著桌面走：--tw 是桌上一張牌的寬度。
-           四張牌排成十字，桌面是 4.7 × 4.1 張牌寬的橢圓。 */
-        .gz-trick {
-            grid-area: mat;
-            min-width: 0;
-            min-height: 0;
-            container-type: size;
-            display: grid;
-            place-items: center;
-        }
-        .gz-mat {
-            --tw: 56px;         /* 不認得容器單位的舊瀏覽器用固定大小 */
-            position: relative;
-            isolation: isolate;
-            flex: none;
-            width: calc(var(--tw) * 4.7);
-            height: calc(var(--tw) * 4.1);
-            /* 和其他幾桌的棋盤一樣：外框用 --frame、桌面用 --board，邊線用 --grid */
-            border: calc(var(--tw) * .07) solid var(--frame);
-            border-radius: 50%;
-            background: var(--board);
-            box-shadow: 0 0 0 1px var(--grid), var(--shadow), inset 0 0 0 1px var(--grid),
-                        inset 0 6px 22px rgb(0 0 0 / .14);
-        }
-        @supports (width: 1cqw) {
-            .gz-mat { --tw: min(100cqw / 4.7, 100cqh / 4.1, 124px); }
-        }
-        /* 桌面上一圈細線 */
-        .gz-mat::before {
-            content: "";
-            position: absolute;
-            inset: calc(var(--tw) * .13);
-            border: 1px solid rgb(255 255 255 / .14);
-            border-color: color-mix(in srgb, var(--grid) 55%, transparent);
-            border-radius: 50%;
-            pointer-events: none;
-        }
         /* 桌面中央：還沒有人出牌時，寫出這一墩輪到誰領牌 */
         .gz-status {
             position: absolute;
@@ -283,59 +101,6 @@
             white-space: normal;
         }
 
-        /* ───────── 撲克牌：手牌和桌上的牌同一個牌面，大小跟著 --cw（牌寬）走 ───────── */
-        .gz-card {
-            position: relative;
-            flex: none;
-            display: block;
-            width: var(--cw);
-            aspect-ratio: 9 / 13;
-            border-radius: calc(var(--cw) * .09);
-            background: linear-gradient(160deg, #fff, var(--card-face) 55%, #f0eee8);
-            color: var(--card-ink);
-            box-shadow: 0 0 0 1px rgb(0 0 0 / .16), 0 2px 5px rgb(0 0 0 / .3);
-            font-family: var(--sans);
-            font-variant-numeric: tabular-nums;
-            line-height: 1;
-        }
-        .gz-card.red { color: var(--card-red); }
-        /* 左上角的點數與花色：手牌疊起來時露在外面的就是這一條 */
-        .gz-card-idx {
-            position: absolute;
-            left: calc(var(--cw) * .065);
-            top: calc(var(--cw) * .065);
-            min-width: calc(var(--cw) * .24);
-            display: grid;
-            justify-items: center;
-            gap: calc(var(--cw) * .015);
-        }
-        .gz-card-idx b { font-size: calc(var(--cw) * .28); font-weight: 800; letter-spacing: -.05em; }
-        .gz-card-idx i { font-style: normal; font-size: calc(var(--cw) * .24); }
-        .gz-card-pip {
-            position: absolute;
-            left: 0;
-            right: 0;
-            bottom: calc(var(--cw) * .13);
-            text-align: center;
-            font-size: calc(var(--cw) * .5);
-        }
-        /* 計分牌的分數標在點數下面，疊起來也看得到 */
-        .gz-card-tag {
-            position: absolute;
-            left: calc(var(--cw) * .05);
-            top: calc(var(--cw) * .64);
-            display: inline-flex;
-            align-items: center;
-            gap: .3em;
-            font: 800 max(9px, calc(var(--cw) * .13))/1.3 var(--sans);
-            letter-spacing: -.02em;
-            white-space: nowrap;
-            color: var(--tone-neg);
-        }
-        .gz-card-tag u { text-decoration: none; }
-        .gz-card-tag.pill { padding: 0 .38em; border-radius: 3px; color: #fff; background: var(--tone-neg); }
-        .gz-card.tone-pos .gz-card-tag.pill { background: var(--tone-pos); }
-        .gz-card.tone-x2 .gz-card-tag.pill { background: var(--tone-x2); }
         .gz-card.tone-neg { background: linear-gradient(160deg, #fff, #fff0f2 55%, #ffe1e6); }
         .gz-card.tone-pos { background: linear-gradient(160deg, #fff, #ebfaf2 55%, #d8f4e5); }
         .gz-card.tone-x2 { background: linear-gradient(160deg, #fff, #fff7df 55%, #fbeab9); }
@@ -365,33 +130,6 @@
             transition: translate .42s ease-in, scale .42s ease-in, opacity .42s ease-in;
         }
 
-        /* ───────── 手牌：放得下就攤平，放不下才疊，疊的時候每一張露出一樣寬 ───────── */
-        .gz-hand {
-            --cw: clamp(56px, 15vw, 64px);
-            --lift: calc(var(--cw) * .14);
-            --hand-gap: 5px;
-            grid-area: hand;
-            min-width: 0;
-        }
-        .gz-hand-row {
-            display: flex;
-            justify-content: center;
-            padding: calc(var(--lift) * 1.8 + 5px) 3px 4px;
-        }
-        .gz-hand-slot {
-            position: relative;
-            flex: 0 1 calc(var(--cw) + var(--hand-gap));
-            min-width: calc(var(--cw) * .3);
-            height: calc(var(--cw) * 13 / 9);
-        }
-        .gz-hand-slot:last-child { flex: 0 0 var(--cw); }
-        .gz-hand-slot > .gz-card {
-            position: absolute;
-            left: 0;
-            top: 0;
-            transition: transform .2s cubic-bezier(.2, .8, .2, 1), box-shadow .2s ease, filter .2s ease;
-        }
-        /* 可以出的牌往上抬並亮起金框 */
         .gz-hand-slot.is-playable > .gz-card {
             cursor: pointer;
             transform: translateY(calc(-1 * var(--lift)));
@@ -419,74 +157,6 @@
             100% { transform: translate(-50%, -38px) scale(0.95); opacity: 0; }
         }
 
-        /* ───────── 記牌、計分兩塊資訊板（按了會開完整的紀錄／計分板） ───────── */
-        .gz-panel {
-            appearance: none;
-            min-width: 0;
-            margin: 0;
-            padding: 8px 10px;
-            display: grid;
-            gap: 6px 10px;
-            align-items: center;
-            border: 1px solid var(--line);
-            border-radius: 12px;
-            background: var(--surface);
-            box-shadow: 0 2px 6px #0a1a1714;
-            color: var(--ink);
-            font: inherit;
-            text-align: left;
-            cursor: pointer;
-        }
-        .gz-panel:hover { border-color: var(--hover-line); }
-        .gz-panel-head { display: flex; align-items: baseline; gap: 8px; min-width: 0; line-height: 1.3; white-space: nowrap; }
-        .gz-panel-head strong { color: var(--accent); font-size: 15px; font-weight: 750; letter-spacing: .06em; }
-        .gz-count { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
-        .gz-count b { color: var(--ink); font-weight: 750; }
-        .gz-more { display: inline-flex; align-items: center; gap: 3px; margin-left: auto; color: var(--muted); font-size: 12px; }
-        .gz-more .ui-icon { font-size: 12px; }
-        .gz-more span { display: none; }
-        .gz-panel:hover .gz-more { color: var(--accent); }
-
-        .gz-tracker { grid-area: played; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "head key" "deck deck"; }
-        .gz-tracker .gz-panel-head { grid-area: head; }
-        .gz-tracker .gz-key { grid-area: key; }
-        .gz-tracker .gz-deck { grid-area: deck; }
-
-        /* 記牌表：白底＝還在別家手上，金底＝在您手上，淡掉＝已經出過。
-           直式版面是 13 欄（點數）× 4 列（花色），橫式版面和「已出牌紀錄」視窗是 4 欄（花色）× 13 列（點數）。 */
-        .gz-deck { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 3px; }
-        .gz-deck em { display: none; font-style: normal; }
-        .gz-deck i {
-            position: relative;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 1px;
-            height: var(--cell-h, 28px);
-            border: 1px solid transparent;
-            border-radius: 5px;
-            font: 800 15px/1 var(--sans);
-            font-variant-numeric: tabular-nums;
-        }
-        .gz-deck i small { font-size: 12px; font-weight: 400; }
-        /* 三種狀態用底色分：別家＝白底的牌（最顯眼，要找的就是它）、您的＝金底、已出＝沒有底、字淡掉 */
-        .gz-deck i.is-live, .gz-key i.is-live {
-            border-color: var(--trk-live-line);
-            background: var(--card-face);
-            color: var(--card-ink);
-            box-shadow: 0 1px 2px rgb(0 0 0 / .3);
-        }
-        .gz-deck i.is-mine, .gz-key i.is-mine {
-            border-color: var(--trk-mine-line);
-            background: var(--trk-mine);
-            color: var(--trk-mine-ink);
-            box-shadow: 0 1px 2px rgb(0 0 0 / .3);
-        }
-        .gz-deck i.is-live.red { color: var(--card-red); }
-        .gz-deck i.is-mine.red { color: var(--trk-mine-red); }
-        .gz-deck i.is-out, .gz-key i.is-out { color: var(--muted); opacity: var(--trk-out); }
-        .gz-deck i.is-out.red { color: var(--negative); }
-        .gz-deck i.is-out small { opacity: .7; }
         /* 豬、羊、變壓器在表上多一個小圓點 */
         .gz-deck i:is([data-card="S12"], [data-card="D11"], [data-card="C10"])::after {
             content: "";
@@ -503,108 +173,14 @@
         .gz-deck i.is-out[data-card="S12"]::after { background: var(--negative); }
         .gz-deck i.is-out[data-card="D11"]::after { background: var(--positive); }
         .gz-deck i.is-out[data-card="C10"]::after { background: var(--warning); }
-        .gz-tracker .gz-deck {
-            grid-auto-flow: column;
-            grid-template-columns: repeat(13, minmax(0, 1fr));
-            grid-template-rows: auto repeat(4, var(--cell-h));
-            gap: 2px;
-        }
-        .gz-tracker .gz-deck em { display: block; color: var(--muted); font: 700 12px/1.25 var(--sans); text-align: center; }
-        .gz-tracker .gz-deck i { font-size: 14px; }
-        .gz-tracker .gz-deck :is(b, small) { display: none; }
-        .gz-key { display: flex; flex-wrap: wrap; gap: 3px 9px; color: var(--muted); font-size: 12px; line-height: 1.3; }
-        .gz-key span { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
-        .gz-key i {
-            display: grid;
-            place-items: center;
-            width: 20px;
-            height: 17px;
-            border: 1px solid transparent;
-            border-radius: 4px;
-            font: 800 11px/1 var(--sans);
-        }
-
-        /* 計分：直式版面是一行累計總分，橫式版面是四家的本局與累計 */
-        .gz-scores { grid-area: scores; grid-template-columns: auto minmax(0, 1fr); }
-        .gz-scores .for-rail, .gz-score-list > em, .gz-score-row .live { display: none; }
-        .gz-scores .gz-panel-head { display: contents; }
-        .gz-scores .gz-more { grid-column: 3; grid-row: 1; }
-        .gz-score-list {
-            grid-column: 2;
-            grid-row: 1;
-            display: flex;
-            flex-wrap: wrap;
-            gap: 2px 14px;
-            font-variant-numeric: tabular-nums;
-        }
-        .gz-score-row { display: inline-flex; align-items: baseline; gap: 5px; white-space: nowrap; }
-        .gz-score-row .who { color: var(--muted); font-size: 12px; font-weight: 650; }
-        .gz-score-row.me .who { color: var(--ink); }
-        .gz-score-row b { font-size: 14px; font-weight: 800; }
-
         @media (max-width: 639px) {
-            /* 手機上三家並排，座位牌很窄：名字旁邊只留分數（「本局」兩個字只留在自己的座位牌），才不會有的一行、有的兩行 */
-            .gz-seat-head { gap: 0 4px; }
-            .gz-seat-score b { font-size: 14px; }
             .gz-seat:not(#panel-south) .gz-seat-score span { display: none; }
             .gz-captured .gz-emo { display: none; }
             /* 三家的紅心收成一張「♥×幾張」：座位牌不會越吃越高、把牌桌擠小（是哪幾張看記牌或計分板） */
             .gz-seat:not(#panel-south) .gz-chip.heart { display: none; }
             .gz-seat:not(#panel-south) .gz-chip.hearts-sum { display: inline-flex; }
-            .gz-hand .gz-card-tag u { display: none; }
         }
-        @media (max-width: 380px) {
-            .gz-seat { padding-inline: 7px; }
-            .gz-seat-head strong { font-size: 14px; }
-            .gz-key { gap: 3px 6px; }
-        }
-        @media (min-width: 640px) {
-            :root[data-game="gongzhu"] { --gz-gap: 10px; }
-            .gz-seat { padding: 8px 11px; }
-            /* 畫面夠寬時，自己的座位牌不必撐滿整排 */
-            #panel-south { justify-self: center; width: fit-content; min-width: min(100%, 260px); max-width: 100%; }
-            .gz-hand { --cw: clamp(62px, 9.5vw, 88px); --hand-gap: 6px; }
-            .gz-more span { display: inline; }
-            .gz-tracker .gz-deck i { font-size: 15px; }
-            .gz-key { font-size: 12px; }
-        }
-        @media (min-width: 781px) {
-            :root[data-game="gongzhu"] { --gz-edge: 20px; }
-        }
-
-        /* 橫式版面 */
         @media (min-width: 1024px), (min-width: 820px) and (max-height: 640px) {
-            :root[data-game="gongzhu"] { --gz-gap: 10px; }
-            main.gz-layout {
-                --cell-h: clamp(17px, 3.05dvh, 30px);
-                --col-gap: clamp(10px, 1.2vw, 18px);
-                /* 桌面最寬能到多少：畫面寬度扣掉兩邊的資訊板和左右兩家的座位牌，最多 124px × 4.7 */
-                --mat-w: min(583px, min(100vw, 1380px + 2 * var(--gz-edge)) - 2 * var(--gz-edge)
-                    - 2 * var(--rail-w) - 2 * var(--col-gap) - 2 * var(--plate-w) - 2 * var(--gz-gap));
-                grid-template-columns: var(--rail-w) minmax(0, 1fr) var(--rail-w);
-                grid-template-rows: 1fr auto;
-                grid-template-areas: "played table scores" "hand hand hand";
-                column-gap: var(--col-gap);
-                padding-top: 16px;
-            }
-            .gz-table {
-                /* 桌面照寬度算出的高度，加上上下兩家的座位牌：畫面再高，座位牌也貼著牌桌 */
-                max-height: calc(var(--mat-w) * 41 / 47 + 2 * 44px + 2 * var(--gz-gap));
-                grid-template-columns: var(--plate-w) minmax(0, 583px) var(--plate-w);
-                grid-template-rows: auto minmax(150px, 1fr) auto;
-                grid-template-areas: "north north north" "west mat east" "south south south";
-                justify-content: center;
-            }
-            #panel-west, #panel-east { align-self: center; }
-            /* 上下兩家：沒吃到牌時和左右兩家一樣寬，吃到的計分牌往旁邊排，不佔牌桌的高度 */
-            #panel-north, #panel-south {
-                justify-self: center;
-                width: fit-content;
-                min-width: var(--plate-w);
-                max-width: 100%;
-            }
-            #panel-north { flex-direction: row; flex-wrap: wrap; align-items: center; gap: 5px 12px; }
-            #panel-north .gz-seat-head, #panel-south .gz-seat-head { flex: 1 0 auto; min-width: calc(var(--plate-w) - 24px); }
             #panel-north .gz-captured, #panel-south .gz-captured {
                 flex: 0 1 auto;
                 min-width: 0;
@@ -612,50 +188,6 @@
                 border-top: 0;
                 border-left: 1px solid var(--line);
             }
-            .gz-hand { --cw: clamp(56px, min(5.9vw, 13dvh), 96px); --hand-gap: 6px; }
-            .gz-panel { align-self: center; padding: 11px 11px 10px; gap: 9px; }
-            .gz-tracker { grid-template-columns: minmax(0, 1fr); grid-template-areas: "head" "deck" "key"; }
-            .gz-tracker .gz-panel-head { flex-wrap: wrap; gap: 3px 8px; }
-            .gz-tracker .gz-count { order: 3; flex-basis: 100%; }
-            .gz-tracker .gz-deck {
-                grid-auto-flow: row;
-                grid-template-columns: repeat(4, minmax(0, 1fr));
-                grid-template-rows: none;
-                gap: 3px;
-            }
-            .gz-tracker .gz-deck em { display: none; }
-            .gz-tracker .gz-deck i { font-size: clamp(13px, 1.22vw, 16px); }
-            .gz-tracker .gz-deck b { display: inline; }
-            .gz-scores { grid-template-columns: minmax(0, 1fr); }
-            .gz-scores .for-rail { display: inline; }
-            .gz-scores .for-strip { display: none; }
-            .gz-scores .gz-panel-head { display: flex; }
-            .gz-scores .gz-more { grid-column: auto; grid-row: auto; }
-            .gz-score-list {
-                grid-column: auto;
-                grid-row: auto;
-                display: grid;
-                grid-template-columns: minmax(0, 1fr) auto auto;
-                gap: 7px 12px;
-                align-items: baseline;
-            }
-            .gz-score-list > em { display: block; color: var(--muted); font-size: 11px; font-style: normal; text-align: right; }
-            .gz-score-row { display: contents; }
-            .gz-score-row .who { font-size: 13px; }
-            .gz-score-row .live { display: block; }
-            .gz-score-row b { min-width: 2.7em; text-align: right; }
-        }
-        @media (min-width: 1024px) {
-            :root[data-game="gongzhu"] { --gz-edge: 28px; }
-        }
-        /* 很矮的橫式畫面（橫放的手機）：座位牌縮小一點 */
-        @media (min-width: 820px) and (max-height: 640px) {
-            .gz-seat { padding: 6px 9px; }
-            .gz-panel { padding: 8px 9px; gap: 6px; }
-        }
-        /* 橫式版面裡比較窄的畫面：自己的座位牌省掉「您」，四家才一樣寬 */
-        @media (min-width: 820px) and (max-width: 1151px) {
-            #panel-south .gz-seat-head small { display: none; }
         }
 
         /* ───────── 已出牌紀錄視窗 ───────── */
@@ -2619,8 +2151,7 @@
             }
 
             /**
-             * 一張撲克牌（手牌和桌上的牌同一個牌面）。左上角是點數與花色，手牌疊起來時露在外面的就是這一條，
-             * 所以計分牌的分數也標在這一條裡（豬、羊的分數在有人收全紅之後對調）。
+             * 左上角的點數與花色在疊牌時仍可見。手牌上的豬、羊、變壓器以圖案辨識。
              * isTrick：桌上的牌，只印一般花色；isLead：這一墩領出的那一張，加上「首出」
              */
             createCardElement(card, options = {}) {
@@ -2628,26 +2159,22 @@
                 const suitInfo = this.SUITS[card.suit];
                 const emoji = symbol => `<span class="gz-emo">${symbol}</span>`;
 
-                let pip = suitInfo.symbol, tag = '', tone = '';
+                let pip = suitInfo.symbol, tone = '';
                 if (!isTrick) {
                     if (card.id === 'S12' || card.id === 'D11') {
                         const pig = card.id === 'S12';
                         const positive = this.hasAllHeartsOnTable() === pig;
                         pip = emoji(pig ? '🐷' : '🐑');
                         tone = positive ? 'tone-pos' : 'tone-neg';
-                        tag = `<span class="gz-card-tag pill"><u>${pig ? '豬' : '羊'}</u>${positive ? '+100' : '-100'}</span>`;
                     } else if (card.id === 'C10') {
                         pip = emoji('⚡');
                         tone = 'tone-x2';
-                        tag = '<span class="gz-card-tag pill"><u>變</u>×2</span>';
-                    } else if (card.suit === 'H') {
-                        tag = `<span class="gz-card-tag">${HEART_POINTS[card.rank - 2]}</span>`;
                     }
                 }
 
                 const div = document.createElement('div');
                 div.className = `gz-card${card.suit === 'H' || card.suit === 'D' ? ' red' : ''}${tone ? ` ${tone}` : ''}`;
-                div.innerHTML = `<span class="gz-card-idx"><b>${card.label}</b><i>${suitInfo.symbol}</i></span>${tag}`
+                div.innerHTML = `<span class="gz-card-idx"><b>${card.label}</b><i>${suitInfo.symbol}</i></span>`
                     + `<span class="gz-card-pip">${pip}</span>${isLead ? '<span class="gz-card-lead">首出</span>' : ''}`;
                 return div;
             }
@@ -2768,7 +2295,7 @@
                 const slots = new Map();
                 for (const slot of [...container.children]) slots.set(slot.dataset.card, slot);
                 hand.forEach((card, idx) => {
-                    // 豬、羊的分數在有人收全紅之後對調，牌面要重畫
+                    // 有人收全紅時，豬、羊的加扣分底色也跟著對調
                     const face = card.id + (flipped && (card.id === 'S12' || card.id === 'D11') ? '!' : '');
                     let slot = slots.get(card.id);
                     slots.delete(card.id);
