@@ -169,7 +169,9 @@ test('the score projections match game settlement for ordinary hands, flipped sp
         const kept = specials.filter((_, i) => mask & (1 << i));
         const full = game.calculatePlayerScore(kept.concat(hearts));
         assert.equal(full.cardPoints, expected);
-        assert.equal(full.score, 50 + expected, 'the base comes on top of a fixed award, it is not part of it');
+        assert.equal(full.score, expected, 'a seat scored on its own, outside a round, has no base');
+        assert.equal(game.calculatePlayerScore(kept.concat(hearts), false, -37.5).score, expected - 37.5,
+            'the base comes on top of a fixed award, it is not part of it');
         assert.equal(full.isGrandSlam, mask === 7);
         if (expected === 500) assert.match(full.formula, /特殊規則.*\+500/);
         for (const count of [0, 1, 12, 13]) {
@@ -178,7 +180,7 @@ test('the score projections match game settlement for ordinary hands, flipped sp
             // The computers weigh card points only: the base is the same for all four seats.
             const settled = game.calculatePlayerScore(cards, count === 13);
             assert.equal(ai.score(cap, count === 13), settled.cardPoints);
-            assert.equal(settled.score, 50 + settled.cardPoints);
+            assert.equal(settled.score, settled.cardPoints);
             assert.equal(ai.score(cap, true, true), expected);
         }
     }
@@ -202,26 +204,28 @@ test('card values, doubling and table-wide color changes are applied to their ho
     ]) {
         const round = game.calculateRoundScores(piles);
         assert.deepEqual(game.SEAT_ORDER.map(seat => round[seat].cardPoints), expected);
-        assert.deepEqual(game.SEAT_ORDER.map(seat => round[seat].score), expected.map(points => 50 + points));
+        const base = -expected.reduce((sum, points) => sum + points, 0) / 4;
+        assert.deepEqual(game.SEAT_ORDER.map(seat => round[seat].score), expected.map(points => base + points));
     }
 });
 
-test('all four seats start every round with 50, and neither doubling nor a fixed award touches that base', () => {
+test('every round the four seats get the same base, so that their scores add up to 0; doubling and fixed awards leave it alone', () => {
     const { game } = load({}, Math);
     const deck = game.createShuffledDeck();
     const hearts = deck.filter(c => c.suit === 'H');
     const [pig, sheep, transformer] = ['SQ', 'DJ', 'C10'].map(key => deck.find(c => name(c) === key));
     const scores = round => game.SEAT_ORDER.map(seat => round[seat].score);
-    assert.deepEqual(scores(game.calculateRoundScores()), [50, 50, 50, 50], 'before anyone has taken a card');
-    for (const [piles, expected] of [
-        [{ south: [pig, transformer], west: [sheep] }, [50 - 200, 50 + 100, 50, 50]],      // (-100) x 2, not (50 - 100) x 2
-        [{ south: [transformer], east: [pig] }, [50 + 50, 50, 50, 50 - 100]],              // the lone transformer is worth 50 of its own
-        [{ south: [...hearts, transformer], west: [pig] }, [50 + 500, 50 + 100, 50, 50]],  // the special sweep is 500 plus the base
-        [{ north: [...hearts, pig, sheep, transformer] }, [50, 50, 50 + 1000, 50]]
+    assert.deepEqual(scores(game.calculateRoundScores()), [0, 0, 0, 0], 'before anyone has taken a card');
+    for (const [piles, base, expected] of [
+        [{ south: [pig, transformer], west: [sheep] }, '+25', [25 - 200, 25 + 100, 25, 25]],         // (-100) x 2, not (25 - 100) x 2
+        [{ south: [transformer], east: [pig] }, '+12.5', [12.5 + 50, 12.5, 12.5, 12.5 - 100]],     // the lone transformer is worth 50 of its own
+        [{ south: [...hearts, transformer], west: [pig] }, '-150', [-150 + 500, -150 + 100, -150, -150]],    // the special sweep is 500 plus the base
+        [{ north: [...hearts, pig, sheep, transformer] }, '-250', [-250, -250, -250 + 1000, -250]]
     ]) {
         const round = game.calculateRoundScores(piles);
         assert.deepEqual(scores(round), expected);
-        for (const seat of game.SEAT_ORDER) assert.match(round[seat].formula, /^底分\(\+50\) /);
+        assert.equal(expected.reduce((sum, score) => sum + score, 0), 0, 'the round adds up to 0');
+        for (const seat of game.SEAT_ORDER) assert.ok(round[seat].formula.startsWith(`底分(${base}) `), round[seat].formula);
     }
     assert.match(game.calculatePlayerScore([hearts[0], transformer]).formula, /牌分 × 2$/, 'the formula says what is doubled');
 });
@@ -236,11 +240,11 @@ test('settlement credits a grand slam and a special sweep only once and records 
     game.finishRound();
     game.finishRound();
     assert.equal(game.roundHistory.length, 1);
-    assert.deepEqual(totals(), [50, 50, 50, 1050], 'the base is credited once per seat, however often the round is settled');
+    assert.deepEqual(totals(), [-250, -250, -250, 750], 'the round is credited once, however often it is settled');
 
     game.closeScoreModal = game.updateHeaderInfo = game.later = () => {};
     game.startNextRound();
-    assert.deepEqual(totals(), [50, 50, 50, 1050]);
+    assert.deepEqual(totals(), [-250, -250, -250, 750]);
     const opener = game.currentTurn;
     assert.ok(game.PLAYERS[opener].hand.some(c => c.id === 'S7'));
     assert.deepEqual(game.getLegalCards(opener), game.PLAYERS[opener].hand);
@@ -250,13 +254,15 @@ test('settlement credits a grand slam and a special sweep only once and records 
     game.PLAYERS.north.captured = [deck.find(c => c.id === 'D11')];
     game.finishRound();
     game.finishRound();
-    assert.deepEqual(totals(), [600, 200, 0, 1100]);
-    assert.deepEqual(game.roundHistory.map(round => round.scores.south), [550, 50]);
+    // card points 500, +100 (the pig turned), -100 (the sheep turned), 0: the base is -125
+    assert.deepEqual(totals(), [-250 + 375, -250 - 25, -250 - 225, 750 - 125]);
+    assert.equal(totals().reduce((sum, total) => sum + total, 0), 0, 'the totals keep an average of 0');
+    assert.deepEqual(game.roundHistory.map(round => round.scores.south), [375, -250]);
     const record = game.getRecord();
-    assert.equal(record.result.south.score, 550);
-    assert.match(record.result.south.formula, /^底分\(\+50\) 特殊規則/);
-    assert.equal(record.totals.east, 1050);
-    assert.deepEqual(record.settings, { scoringRuleMode: 'player_special', roundBase: 50 }, 'the record says which base its scores carry');
+    assert.equal(record.result.south.score, 375);
+    assert.match(record.result.south.formula, /^底分\(-125\) 特殊規則/);
+    assert.equal(record.totals.east, 750);
+    assert.deepEqual(record.settings, { scoringRuleMode: 'player_special', roundBase: 'zero-sum' }, 'the record says how its scores were based');
 });
 
 test('avoid doubling a pig, use another winner if forced, and double a sheep when it pays', () => {
