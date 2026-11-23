@@ -17,6 +17,7 @@ import array
 import collections
 import hashlib
 import io
+import json
 import math
 import os
 import pickle
@@ -239,6 +240,7 @@ def blob_id(data):
 # 一個遊戲可以有好幾個模型：train_out/<遊戲>/model.pt（train_gpu.py 練的，沒有名稱），
 # 和檔名帶名稱的 model_<名稱>.pt（例如拱豬的 model_20261123_b.pt，名稱是 20261123_b）。遊戲裡每個都能選。
 MODEL_FILE = re.compile(r"model(?:_([0-9A-Za-z][0-9A-Za-z_-]{0,39}))?\.pt")
+STRENGTH_FILE = "strength.json"     # 同一個資料夾裡，各個選項實際對打量出來的強度（見 Bots.strength()）
 
 
 class Bots:
@@ -328,14 +330,30 @@ class Bots:
 
     def info(self, slug):
         """給遊戲頁面和 status 看的：{"models": 能用的模型的說明（多一項 name，model.pt 是 ""），順序同 files(),
-        "model": 第一個（沒指定模型時用的）或 None, "why": 有模型檔卻不能用的原因（好幾個檔不能用就一個一個列）}。"""
+        "model": 第一個（沒指定模型時用的）或 None, "why": 有模型檔卻不能用的原因（好幾個檔不能用就一個一個列）,
+        "strength": 「電腦的打法」每個選項的強度（見 strength()）}。"""
         models, problems = [], []
         for name, loaded, why in self.load(slug):
             if loaded:
                 models.append(dict(loaded[2], name=name))
             elif why:
                 problems.append(f"{name}：{why}" if name else why)
-        return {"model": models[0] if models else None, "why": "；".join(problems) or None, "models": models}
+        return {"model": models[0] if models else None, "why": "；".join(problems) or None, "models": models,
+                "strength": self.strength(slug, models)}
+
+    def strength(self, slug, models):
+        """「電腦的打法」每個選項的強度 {選項: 數字}，選項是 "builtin"（原本的電腦）或 "<打法>:<模型名稱>"，最強的是 100。
+        讀 <遊戲>/strength.json（拱豬的由 tests/gongzhu/strength.cjs 量）。量的時候的模型檔要和現在的一模一樣，
+        換過、多了或少了一個模型，強度就對不上了，一個都不報（重量一次就好）。"""
+        try:
+            saved = json.loads((self.folder / slug / STRENGTH_FILE).read_text(encoding="utf-8"))
+            measured, ids = dict(saved["strength"]), dict(saved["models"])
+        except (OSError, ValueError, KeyError, TypeError):
+            return {}
+        if not models or ids != {model["name"]: model["id"] for model in models}:
+            return {}
+        return {option: value for option, value in measured.items()
+                if isinstance(option, str) and isinstance(value, (int, float)) and not isinstance(value, bool)}
 
     def play(self, slug, record, seat=None, mode="normal", model=None):
         """這一局打到 record 這裡，輪到的那一家該出什麼。model 是模型的名稱（model.pt 是 ""），None 是第一個模型。

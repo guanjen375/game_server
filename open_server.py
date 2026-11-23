@@ -66,7 +66,7 @@ RECORD_ID_RE = re.compile(r"\d{8}-\d{6}-[a-z0-9]{6}")    # 開局時間＋亂碼
 RECORD_LOCK = threading.Lock()
 
 # 沒有模型可以選時 GET /api/bot/<遊戲> 的回答（格式見 model_bot.Bots.info）
-NO_MODEL = {"model": None, "why": None, "models": []}
+NO_MODEL = {"model": None, "why": None, "models": [], "strength": {}}
 
 # 已知遊戲的顯示資料；games/ 裡其他的 .html 會用網頁標題列在「其他」
 CATALOG = {
@@ -303,19 +303,20 @@ window.GameBot = (function () {
     var API = '/api/bot/__GAME__';
     var WAIT_MS = 2500;     // 等伺服器回答最久多久，超過就當作連不上
     var REST_MS = 30000;    // 連不上之後隔多久才再問；這段時間電腦用遊戲自己的打法，不會每一手都卡住
-    var model = null, models = [], why = null, restUntil = 0, watchers = [];
+    var model = null, models = [], strength = {}, why = null, restUntil = 0, watchers = [];
 
     function changed() {
         watchers.forEach(function (fn) {
             try { fn(); } catch (e) { if (window.console) console.error('GameBot', e); }
         });
     }
-    function learn(next, reason, all) {
-        var before = JSON.stringify([model, why, models]);
+    function learn(next, reason, all, rated) {
+        var before = JSON.stringify([model, why, models, strength]);
         model = next || null;
         why = reason || null;
         models = model ? (Array.isArray(all) && all.length ? all : [model]) : [];
-        if (JSON.stringify([model, why, models]) !== before) changed();
+        strength = model && rated && typeof rated === 'object' ? rated : {};
+        if (JSON.stringify([model, why, models, strength]) !== before) changed();
     }
     function rest() {
         restUntil = Date.now() + REST_MS;
@@ -354,6 +355,8 @@ window.GameBot = (function () {
         model: function () { return model; },
         // 伺服器上這個遊戲的每個模型，格式同 model()，name 是模型的名稱（例如 '20261123_b'，沒有名稱的是 ''）
         models: function () { return models; },
+        // 「電腦的打法」每個選項量出來的強度 { 'builtin': 56, 'normal:20261123_b': 100, ... }，最強的是 100；沒量過是 {}
+        strength: function () { return strength; },
         // 有模型檔卻不能用的原因；沒有這種情況是 null
         why: function () { return why; },
         // 剛剛連不上伺服器，暫時不問
@@ -365,7 +368,7 @@ window.GameBot = (function () {
             return ask({ method: 'GET' }).then(function (answer) {
                 if (answer && answer.body) {
                     var ok = answer.status === 200;
-                    learn(ok && answer.body.model, answer.body.why, ok && answer.body.models);
+                    learn(ok && answer.body.model, answer.body.why, ok && answer.body.models, ok && answer.body.strength);
                 }
             });
         },

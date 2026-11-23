@@ -251,10 +251,10 @@ class Server(unittest.TestCase):
         return self.request("POST", f"/api/bot/{game}", {"record": record, "seat": seat, "mode": mode, **changes})
 
     def test_without_a_model_the_page_is_told_to_play_by_itself(self):
-        self.assertEqual(self.request("GET", "/api/bot/gongzhu"), (200, {"model": None, "why": None, "models": []}))
+        self.assertEqual(self.request("GET", "/api/bot/gongzhu"), (200, {"model": None, "why": None, "models": [], "strength": {}}))
         self.assertEqual(self.ask(5), (404, {"error": "no model"}))
         self.server.bots = None      # the server could not load model_bot at all
-        self.assertEqual(self.request("GET", "/api/bot/gongzhu"), (200, {"model": None, "why": None, "models": []}))
+        self.assertEqual(self.request("GET", "/api/bot/gongzhu"), (200, {"model": None, "why": None, "models": [], "strength": {}}))
         self.assertEqual(self.ask(5), (404, {"error": "no model"}))
 
     def test_a_model_is_used_as_soon_as_its_file_is_there_and_says_what_it_is(self):
@@ -307,7 +307,7 @@ class Server(unittest.TestCase):
         self.assertEqual(self.request("GET", "/api/bot/gongzhu")[1]["model"]["id"], first)
         self.assertEqual(self.ask(5)[0], 200)
         target.unlink()
-        self.assertEqual(self.request("GET", "/api/bot/gongzhu"), (200, {"model": None, "why": None, "models": []}))
+        self.assertEqual(self.request("GET", "/api/bot/gongzhu"), (200, {"model": None, "why": None, "models": [], "strength": {}}))
 
     def test_a_model_that_does_not_fit_is_left_alone_with_the_reason(self):
         self.install("banqi")
@@ -378,7 +378,7 @@ class Server(unittest.TestCase):
             return printed.getvalue()
 
         infos = open_server.ask_models(host, port)
-        self.assertEqual(infos, {"暗棋": {"model": None, "why": None, "models": []}, "拱豬": {"model": None, "why": None, "models": []}})
+        self.assertEqual(infos, {"暗棋": {"model": None, "why": None, "models": [], "strength": {}}, "拱豬": {"model": None, "why": None, "models": [], "strength": {}}})
         self.assertIn("還沒有訓練好的模型", shown(infos))
         self.install()
         self.install("banqi")
@@ -417,6 +417,27 @@ class Server(unittest.TestCase):
         self.assertEqual(self.ask(5, model=3)[0], 400)
         lines = open_server.model_lines("拱豬", info)
         self.assertEqual([line.split("：")[0] for line in lines], ["拱豬 20261123_b", "拱豬 20261122", "拱豬"])
+
+    def test_the_strength_of_each_choice_is_told_only_while_the_models_it_was_measured_with_are_there(self):
+        ids = {name: self.install_as(name, comment) for name, comment in (("20261122", b"old"), ("20261123_b", b"new"))}
+        measured = {"builtin": 56, "normal:20261123_b": 100, "weak:20261123_b": 97, "normal:20261122": 61, "weak:20261122": 48}
+        target = self.models / "gongzhu" / "strength.json"
+        target.write_text(json.dumps({"models": ids, "strength": measured}), encoding="utf-8")
+        self.assertEqual(self.request("GET", "/api/bot/gongzhu")[1]["strength"], measured)
+
+        self.install_as("20261123_b", b"retrained")      # the same name, another file
+        self.assertEqual(self.request("GET", "/api/bot/gongzhu")[1]["strength"], {}, "measured with another file")
+        self.install_as("20261123_b", b"new")
+        self.install_as("20261123_a", b"added")
+        self.assertEqual(self.request("GET", "/api/bot/gongzhu")[1]["strength"], {}, "a model it never met")
+        (self.models / "gongzhu" / "model_20261123_a.pt").unlink()
+        self.assertEqual(self.request("GET", "/api/bot/gongzhu")[1]["strength"], measured, "back to the models it met")
+
+        for broken in ("{not json", json.dumps({"strength": measured}), json.dumps([1, 2])):
+            target.write_text(broken, encoding="utf-8")
+            self.assertEqual(self.request("GET", "/api/bot/gongzhu")[1]["strength"], {})
+        target.write_text(json.dumps({"models": ids, "strength": dict(measured, odd="x", flag=True)}), encoding="utf-8")
+        self.assertEqual(self.request("GET", "/api/bot/gongzhu")[1]["strength"], measured, "only numbers")
 
     def test_a_model_that_cannot_be_used_is_named_and_the_others_still_play(self):
         self.install_as("20261123_b")

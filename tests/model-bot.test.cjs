@@ -147,6 +147,28 @@ test('the script: with several models, models() lists them and choose() asks the
     assert.deepEqual(clone(p.bot.models()), [MODEL]);
 });
 
+test('the script: strength() hands over how strong the server measured each choice', async () => {
+    const p = page('gongzhu');
+    assert.deepEqual(clone(p.bot.strength()), {});
+    const strength = { builtin: 56, 'normal:20261123_b': 100, 'weak:20261123_b': 97 };
+    let asking = p.bot.refresh();
+    p.requests.shift().answer(200, { model: MODELS[0], why: null, models: MODELS, strength });
+    await asking;
+    assert.deepEqual(clone(p.bot.strength()), strength);
+    assert.equal(p.changes.length, 1);
+
+    asking = p.bot.refresh();
+    p.requests.shift().answer(200, { model: MODELS[0], why: null, models: MODELS, strength: {} });
+    await asking;
+    assert.deepEqual(clone(p.bot.strength()), {});
+    assert.equal(p.changes.length, 2, 'a change of strength is news to the page');
+
+    asking = p.bot.refresh();
+    p.requests.shift().answer(200, { model: null, why: null, models: [], strength });
+    await asking;
+    assert.deepEqual(clone(p.bot.strength()), {}, 'no model, nothing to rate');
+});
+
 test('the script: a model that has been taken away is forgotten', async () => {
     const p = page();
     await p.known();
@@ -266,6 +288,8 @@ function fakeBot(model = MODEL, list = null) {
         info: model, list, off: false, asked: [], watchers: [], refreshed: 0, looking: null,
         model() { return this.info; },
         models() { return this.info ? this.list || [this.info] : []; },
+        rated: {},
+        strength() { return this.info ? this.rated : {}; },
         why() { return null; },
         resting() { return this.off; },
         watch(fn) { this.watchers.push(fn); },
@@ -537,6 +561,23 @@ test('gongzhu: the model picked is remembered, and the first one stands in for a
     gone.game.setBotMode('builtin');
     assert.equal(gone.game.botModel, null);
     assert.equal(disk.has('game_setting:gongzhu:bot_model'), false);
+});
+
+test('gongzhu: each choice carries the strength the server measured, when it measured one', async () => {
+    const bot = fakeBot(MODELS[0], MODELS);
+    const env = open(15, bot);
+    const labels = () => clone(env.game.botChoices()).map(([value, text]) => `${value}=${text}`);
+    assert.deepEqual(labels(), ['builtin=原本的電腦（遊戲內建的算法）',
+        'normal:20261123_b=模型 20261123_b・正常', 'weak:20261123_b=模型 20261123_b・較弱',
+        'normal:20261123_a=模型 20261123_a・正常', 'weak:20261123_a=模型 20261123_a・較弱',
+        'normal:20261122=模型 20261122・正常', 'weak:20261122=模型 20261122・較弱'], 'seven choices for three models');
+    bot.rated = { builtin: 56, 'normal:20261123_b': 100, 'weak:20261123_b': 97, 'normal:20261122': 61 };
+    assert.deepEqual(labels().slice(0, 3), ['builtin=原本的電腦（遊戲內建的算法，強度 56）',
+        'normal:20261123_b=模型 20261123_b・正常（強度 100）', 'weak:20261123_b=模型 20261123_b・較弱（強度 97）']);
+    assert.equal(labels()[3], 'normal:20261123_a=模型 20261123_a・正常', 'not measured: no number');
+    assert.equal(labels()[5], 'normal:20261122=模型 20261122・正常（強度 61）');
+    assert.deepEqual(clone(open(16, fakeBot(MODEL)).game.botChoices()).map(([value]) => value), ['builtin', 'normal:', 'weak:'],
+        'a single model.pt has no name');
 });
 
 test('gongzhu: a device that picked the model when there was only one asks the first of several by name', async () => {
