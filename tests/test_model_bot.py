@@ -12,17 +12,21 @@ MODEL_BOT_REQUESTS 帶進來；單獨執行這個檔案時會跳過。
 import contextlib
 import hashlib
 import http.client
+import importlib.util
 import io
 import json
 import os
 import pickle
 import random
+import re
 import shutil
 import struct
+import subprocess
 import sys
 import tempfile
 import threading
 import unittest
+import unittest.mock
 import zipfile
 from pathlib import Path
 from urllib.parse import quote
@@ -384,6 +388,131 @@ class Server(unittest.TestCase):
         self.assertIn(f"拱豬：用 {saved['data']['used_rounds']} 局練的模型", text)
         self.assertIn("暗棋：有模型檔但不能用", text)
         self.assertIsNone(open_server.ask_models("127.0.0.1", 1), "a server that cannot be asked")
+
+
+SHIPPED = ROOT / "train_out" / "gongzhu" / "model.pt"
+SEARCH_CASE = FIXTURE / "gongzhu" / "search-case.json"
+PAGE_SEATS = ["south", "west", "north", "east"]     # the Gong Zhu page's playing order
+
+
+def special_round(rng):
+    """One round under the player's own rules (player_special), as the page records it:
+    whoever holds ♠7 leads with any card. Everybody plays a random card they may play."""
+    deck = [suit + str(n) for suit in "SHCD" for n in range(2, 15)]
+    rng.shuffle(deck)
+    hands = {seat: deck[i * 13:(i + 1) * 13] for i, seat in enumerate(PAGE_SEATS)}
+    left = {seat: list(cards) for seat, cards in hands.items()}
+    leader = next(seat for seat in PAGE_SEATS if "S7" in left[seat])
+    tricks = []
+    for _ in range(13):
+        trick = []
+        for turn in range(4):
+            seat = PAGE_SEATS[(PAGE_SEATS.index(leader) + turn) % 4]
+            legal = [card for card in left[seat] if trick and card[0] == trick[0]["card"][0]] or left[seat]
+            card = rng.choice(legal)
+            left[seat].remove(card)
+            trick.append({"seat": seat, "card": card})
+        leader = max((p for p in trick if p["card"][0] == trick[0]["card"][0]), key=lambda p: int(p["card"][1:]))["seat"]
+        tricks.append(trick)
+    return {"finished": True, "round": 1, "settings": {"scoringRuleMode": "player_special", "roundBase": 50},
+            "seats": PAGE_SEATS, "players": {seat: {"name": seat, "ai": seat != "south"} for seat in PAGE_SEATS},
+            "hands": hands, "totals": {seat: 0 for seat in PAGE_SEATS}, "tricks": tricks, "result": None}
+
+
+class Searching(unittest.TestCase):
+    """The Gong Zhu model in train_out/ (20261123 on) thinks ahead before every card (gongzhu_search/).
+    The server then needs NumPy and a C++17 compiler; without them these tests are skipped."""
+
+    @classmethod
+    def setUpClass(cls):
+        if importlib.util.find_spec("numpy") is None:
+            raise unittest.SkipTest("NumPy is not installed")
+        if not shutil.which(os.environ.get("CXX", "c++")):
+            raise unittest.SkipTest("no C++ compiler")
+        if not SHIPPED.exists() or "search" not in model_bot.read_model(SHIPPED):
+            raise unittest.SkipTest("train_out/gongzhu/model.pt does not search")
+        folder = tempfile.TemporaryDirectory()
+        cls.addClassCleanup(folder.cleanup)
+        cls.folder = Path(folder.name)
+        (cls.folder / "gongzhu").mkdir()
+        shutil.copyfile(SHIPPED, cls.folder / "gongzhu" / "model.pt")
+        cls.bots = model_bot.Bots(cls.folder)
+        cls.info = cls.bots.info("gongzhu")
+        cls.wait = int(re.search(r"WAIT_MS = (\d+)", open_server.BOT).group(1)) / 1000
+
+    def test_it_loads_and_says_how_it_searches(self):
+        self.assertIsNone(self.info["why"])
+        search = self.info["model"]["search"]
+        self.assertEqual(search["rules"], "player_special")
+        self.assertGreater(search["settings"]["worlds"], 1)
+        self.assertIn("出牌前會先推算", open_server.describe_model(self.info), "status shows the server really searches")
+        plain = dict(self.info, model={k: v for k, v in self.info["model"].items() if k != "search"})
+        self.assertNotIn("推算", open_server.describe_model(plain), "a server still on the old code does not")
+
+    def test_the_position_checked_when_it_was_handed_over_gets_the_same_card(self):
+        case = json.loads(SEARCH_CASE.read_text(encoding="utf-8"))
+        if self.info["model"]["id"] != case["expected"]["model"]:
+            self.skipTest("train_out/gongzhu/model.pt is not the 20261123 model any more")
+        asked_for = case["request"]
+        self.assertEqual(self.bots.play("gongzhu", asked_for["record"], asked_for["seat"], asked_for["mode"]),
+                         case["expected"])
+
+    def questions(self):
+        """(record so far, seat to play) at the start, inside tricks, and in the last two tricks of two rounds."""
+        rng = random.Random(20261123)
+        for record in (special_round(rng) for _ in range(2)):
+            plays = [play for trick in record["tricks"] for play in trick]
+            for count in (0, 1, 2, 3, 4, 13, 22, 31, 40, 43, 44, 46, 49, 51):
+                yield asked(record, count), plays[count]["seat"]
+
+    def test_it_plays_cards_that_seat_may_play_and_the_same_again(self):
+        worlds = self.info["model"]["search"]["settings"]["worlds"]
+        for question, seat in self.questions():
+            turn, x, mask, _ = GAME.upcoming(dict(question, status="unfinished"))
+            self.assertEqual(turn, seat)
+            legal = sum(mask)
+            for mode in ("normal", "weak"):
+                answer = self.bots.play("gongzhu", question, seat, mode)
+                self.assertEqual((answer["play"]["seat"], answer["mode"]), (seat, mode))
+                self.assertTrue(mask[GAME.card(answer["play"]["card"])], f"{answer['play']} is not allowed")
+                self.assertEqual(answer["search"]["legal_actions"], legal)
+                self.assertEqual(answer["search"]["root_successors"], worlds * legal if legal > 1 else 0)
+                self.assertEqual(self.bots.play("gongzhu", question, seat, mode), answer, "asked again")
+
+    def test_a_server_answers_well_before_the_page_stops_waiting(self):
+        # In a fresh interpreter, loaded the way open_server.py loads it: here PyTorch may already have
+        # brought in NumPy with all its threads, which a server never does (see SEARCH_THREADS).
+        program = ("import json, sys, time\n"
+                   "sys.path.insert(0, sys.argv[1])\n"
+                   "import open_server, model_bot\n"
+                   "bots = model_bot.Bots(sys.argv[2])\n"
+                   "numpy_before = 'numpy' in sys.modules\n"
+                   "slowest = 0.0\n"
+                   "for record, seat in json.load(sys.stdin):\n"
+                   "    started = time.perf_counter()\n"
+                   "    bots.play('gongzhu', record, seat, 'normal')\n"
+                   "    slowest = max(slowest, time.perf_counter() - started)\n"
+                   "print(json.dumps({'slowest': slowest, 'numpy_before': numpy_before,\n"
+                   "                  'threads': [model_bot.os.environ[n] for n in model_bot.SEARCH_THREADS]}))\n")
+        env = {name: value for name, value in os.environ.items() if name not in model_bot.SEARCH_THREADS}
+        run = subprocess.run([sys.executable, "-c", program, str(ROOT), str(self.folder)], env=env,
+                             input=json.dumps(list(self.questions())), capture_output=True, text=True, timeout=300)
+        self.assertEqual(run.returncode, 0, run.stderr)
+        result = json.loads(run.stdout)
+        self.assertFalse(result["numpy_before"])
+        self.assertEqual(result["threads"], ["1"] * len(model_bot.SEARCH_THREADS))
+        self.assertLess(result["slowest"], self.wait / 2, "the page stops waiting after WAIT_MS")
+
+    def test_rounds_under_other_rules_are_left_to_the_page(self):
+        classic = made.rounds(1, seed=3)[0]
+        with self.assertRaisesRegex(model_bot.Refused, "個人特殊規則"):
+            self.bots.play("gongzhu", asked(classic, 5), None, "normal")
+
+    def test_without_numpy_or_a_compiler_the_reason_is_shown(self):
+        with unittest.mock.patch.dict(sys.modules, {"gongzhu_search.serving": None}):
+            info = model_bot.Bots(self.folder).info("gongzhu")
+        self.assertIsNone(info["model"])
+        self.assertIn("拱豬搜尋引擎無法載入", info["why"])
 
 
 @unittest.skipUnless(made.HAVE_TORCH, "needs PyTorch")

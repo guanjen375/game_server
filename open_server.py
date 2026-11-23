@@ -859,6 +859,8 @@ def describe_model(info):
         text += f"（{str(model['saved'])[:16].replace('T', ' ')} 存檔）"
     if model.get("accuracy") is not None:
         text += f"，沒練過的對局裡猜中 {model['accuracy']:.1%}"
+    if model.get("search"):     # 只有載入了推算程式（gongzhu_search）的伺服器才會回報這一項
+        text += "，出牌前會先推算"
     return text + ("" if model.get("finished") else "，還沒練完")
 
 

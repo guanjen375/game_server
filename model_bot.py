@@ -17,8 +17,10 @@ import collections
 import hashlib
 import io
 import math
+import os
 import pickle
 import random
+import subprocess
 import sys
 import threading
 import zipfile
@@ -36,6 +38,11 @@ WEAK_TEMPERATURE = 1.0      # 較弱：1＝照模型估的機率抽；調大會�
 #   FLOOR 0.10、TEMPERATURE 2：約 23 分        FLOOR 0.05、TEMPERATURE 1：約 23 分
 #   FLOOR 0.05、TEMPERATURE 2：約 29 分        FLOOR 0.02、TEMPERATURE 3：約 41 分（一半以上不是第一選擇）
 MODEL_MAX_BYTES = 200_000_000
+# 拱豬的模型出牌前會推算（gongzhu_search/），一次只算一桌的一手，工作量小，NumPy 和 OpenMP 開多條執行緒反而慢：
+# 2026-11-23 在 60 核心的 H200 那台量 416 手，一條執行緒中位數 0.02 秒、最慢 0.12 秒、每手用掉 0.03 秒 CPU；
+# 照預設開 60 條是 0.05 秒、最慢 0.7 秒，每手還空轉掉 7.5 秒 CPU（選的牌都一樣），機器忙的時候更會拖過遊戲頁面等的 2.5 秒。
+# 所以沒有另外指定時只用一條執行緒。第一次 import numpy 之前設才有用：伺服器裡 numpy 是讀拱豬模型時才第一次 import。
+SEARCH_THREADS = {"OMP_NUM_THREADS": "1", "OPENBLAS_NUM_THREADS": "1", "MKL_NUM_THREADS": "1"}
 
 
 class Unusable(Exception):
@@ -270,7 +277,18 @@ class Bots:
         if saved.get("encoder") != train_gpu.encoder_of(game):
             raise Unusable("這個模型是用舊的看牌方式練的，和現在的程式對不上，要重新訓練")
         try:
-            policy = Policy(saved)
+            if "search" in saved:
+                if slug != "gongzhu":
+                    raise Unusable("這個遊戲不支援拱豬搜尋")
+                for name, value in SEARCH_THREADS.items():
+                    os.environ.setdefault(name, value)
+                try:
+                    from gongzhu_search.serving import LivePolicy
+                    policy = LivePolicy(saved)
+                except (ImportError, OSError, subprocess.SubprocessError) as error:
+                    raise Unusable(f"拱豬搜尋引擎無法載入（{error}）") from None
+            else:
+                policy = Policy(saved)
             result, data_used = saved.get("result") or {}, saved.get("data") or {}
             info = {
                 "id": blob_id(data), "saved": saved.get("saved"), "finished": bool(result.get("finished")),
@@ -278,6 +296,8 @@ class Bots:
                 "decisions": (data_used.get("train_decisions") or 0) + (data_used.get("validation_decisions") or 0),
                 "accuracy": result.get("validation_accuracy"), "chance": result.get("chance"),
             }
+            if "search" in saved:
+                info["search"] = saved["search"]
         except (KeyError, IndexError, TypeError, ValueError, AttributeError) as error:
             raise Unusable(f"模型檔的內容不完整（{type(error).__name__}：{error}）") from None
         return game, policy, info
@@ -307,4 +327,16 @@ class Bots:
         if seat is not None and seat != turn:
             raise Refused(f"現在輪到的是 {turn}，不是 {seat}")
         key = hashlib.sha256(bytes(x) + bytes(mask)).hexdigest()     # 那一家看到的一樣，就算同一個局面
-        return {"play": entry(pick(policy.scores(x, mask), mode, key)), "mode": mode, "model": info["id"]}
+        answer = {"mode": mode, "model": info["id"]}
+        if "search" in info:
+            if record["settings"]["scoringRuleMode"] != info["search"]["rules"]:
+                raise Refused("這個搜尋模型只適用於個人特殊規則")
+            # 首出者持有黑桃 7。這是公開牌局資訊，搜尋只接收出牌者自己的觀測。
+            first = record["tricks"][0][0]["seat"] if record["tricks"] else turn
+            seats = record["seats"]
+            opener = (seats.index(first) - seats.index(turn)) % 4
+            scores, answer["search"] = policy.for_turn(x, mask, opener)
+        else:
+            scores = policy.scores(x, mask)
+        answer["play"] = entry(pick(scores, mode, key))
+        return answer
