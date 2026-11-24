@@ -421,7 +421,7 @@
                 </div>
                 <div class="flex">
                     <div id="rowLabels" class="flex flex-col" style="padding-top: 3px;"></div>
-                    <div id="board" class="rv-board"></div>
+                    <div id="board" class="rv-board" data-key-columns="8" role="group" tabindex="0" aria-label="黑白棋棋盤" aria-keyshortcuts="ArrowLeft ArrowRight ArrowUp ArrowDown Enter"></div>
                 </div>
                 <!-- 中央動態提示橫幅（跳過、提示、勝負訊息） -->
                 <div id="centerToastContainer" class="absolute inset-0 pointer-events-none z-40"></div>
@@ -583,6 +583,7 @@
                 </div>
 
                 <div class="bg-slate-800/80 border border-white/10 rounded-xl p-3.5 text-xs text-slate-300">
+                    用方向鍵選合法格，Enter 落子。在最上方可選的一排再按 ↑ 到功能列，← → 選功能，↓ 回棋盤。選單用 ↑ ↓ 選項目、Enter 確認。<br>
                     💡 <strong>貼心防呆設計：</strong>輪到您時，能下的格子會出現金色小點；用滑鼠時，移到格子上會先預覽下下去的樣子，會被翻面的棋子會亮起金色虛線圈。棋子中央的紅點是上一手下的位置。點擊上方「走棋提示」可獲得電腦的建議；下錯了也能「悔棋」。
                 </div>
             </div>
@@ -1790,6 +1791,9 @@
                 for (let sq = 0; sq < SQUARES; sq++) {
                     const cell = document.createElement('div');
                     cell.className = 'rv-cell';
+                    cell.setAttribute('role', 'button');
+                    cell.tabIndex = -1;
+                    cell.dataset.keyCell = sq;
                     cell.addEventListener('click', () => this.onCellClick(sq));
                     // 只有滑鼠移過去才預覽；手指點的時候不預覽
                     cell.addEventListener('pointerenter', e => {
@@ -1836,6 +1840,9 @@
                 for (let sq = 0; sq < SQUARES; sq++) {
                     const cell = this.cellEls[sq], v = b[sq];
                     const legal = human && v === EMPTY && Engine.isLegal(b, sq, color);
+                    cell.dataset.gameChoice = String(legal);
+                    cell.setAttribute('aria-disabled', String(!legal));
+                    cell.setAttribute('aria-label', `${sqName(sq)} ${v === EMPTY ? '空格' : COLOR_NAMES[v]}`);
                     cell.classList.toggle('playable', legal);
                     cell.classList.toggle('show-dot', legal && showDots);
                     cell.classList.toggle('hint', sq === this.hint);

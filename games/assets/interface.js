@@ -79,15 +79,41 @@
         filters.hidden = false;
     }
 
+    function visibleControls(area, selector = 'button, select, input, textarea, a[href], summary') {
+        return [...area.querySelectorAll(selector)].filter(el =>
+            !el.matches(':disabled, [aria-disabled="true"]') && el.getClientRects().length);
+    }
+
+    function arrowStep(key) {
+        if (key === 'ArrowUp' || key === 'ArrowLeft') return -1;
+        if (key === 'ArrowDown' || key === 'ArrowRight') return 1;
+        return 0;
+    }
+
+    function modifiedKey(event) {
+        return event.altKey || event.ctrlKey || event.metaKey || event.shiftKey || event.isComposing;
+    }
+
+    function adjacent(items, current, step) {
+        const index = items.indexOf(current);
+        if (index < 0) return step > 0 ? items[0] : items.at(-1);
+        return items[index + step];
+    }
+
     function setupMenu() {
         const menu = document.querySelector('.table-menu');
         if (!menu) return;
         const trigger = menu.querySelector('summary');
+        const items = () => visibleControls(menu, '.menu-panel button');
         // 開彈窗前先將焦點交回選單開關，關閉彈窗時可從同一處繼續操作。
         menu.addEventListener('click', event => {
             if (event.target.closest('.menu-panel button')) {
                 trigger.focus({ preventScroll: true });
                 menu.open = false;
+            } else if (trigger.contains(event.target) && event.detail === 0 && !menu.open) {
+                event.preventDefault();
+                menu.open = true;
+                items()[0]?.focus();
             }
         }, true);
         function closeOutside(event) {
@@ -96,10 +122,18 @@
         document.addEventListener('pointerdown', closeOutside);
         document.addEventListener('focusin', closeOutside);
         document.addEventListener('keydown', event => {
-            if (event.key === 'Escape' && menu.open) {
-                event.stopImmediatePropagation();
+            if (!menu.open || event.defaultPrevented || modifiedKey(event)) return;
+            const key = event.key;
+            if (key !== 'Escape' && !arrowStep(key)) return;
+            const buttons = items(), current = document.activeElement;
+            event.preventDefault();
+            event.stopImmediatePropagation();
+            if (key === 'Escape' || key === 'ArrowLeft' ||
+                (key === 'ArrowUp' && (current === trigger || current === buttons[0]))) {
                 menu.open = false;
                 trigger.focus();
+            } else if (key === 'ArrowUp' || key === 'ArrowDown') {
+                adjacent(buttons, current, arrowStep(key))?.focus();
             }
         }, true);
     }
@@ -128,10 +162,8 @@
 
     function setupDialogs() {
         const dialogs = [...document.querySelectorAll('div[role="dialog"]')];
-        if (!dialogs.length) return;
+        if (!dialogs.length && !document.querySelector('dialog')) return;
         let active, previous;
-        const controls = dialog => [...dialog.querySelectorAll('button:enabled, select:enabled, input:enabled, a[href], summary')]
-            .filter(control => control.getClientRects().length);
         function sync() {
             const visible = dialogs.filter(dialog => !dialog.classList.contains('hidden'));
             const next = visible[visible.length - 1];
@@ -149,7 +181,23 @@
         for (const dialog of dialogs) observer.observe(dialog, { attributes: true, attributeFilter: ['class'] });
         sync();
         document.addEventListener('keydown', event => {
-            if (!active) return;
+            const dialog = document.querySelector('dialog[open]') || active;
+            if (!dialog || event.defaultPrevented) return;
+            const step = arrowStep(event.key);
+            if (step) {
+                if (modifiedKey(event) || event.target.isContentEditable || event.target.closest?.('input, textarea')) return;
+                const vertical = event.key === 'ArrowUp' || event.key === 'ArrowDown';
+                if (vertical && event.target.closest?.('select')) return;
+                event.preventDefault();
+                const content = vertical && dialog.querySelector('.overflow-y-auto, .modal-body, .info-content');
+                if (content && (step > 0 ? content.scrollTop + content.clientHeight < content.scrollHeight - 1 : content.scrollTop > 0)) {
+                    content.scrollBy(0, step * 48);
+                } else {
+                    adjacent(visibleControls(dialog), document.activeElement, step)?.focus();
+                }
+                return;
+            }
+            if (dialog !== active) return; // 原生 dialog 自行處理 Tab 與 Escape。
             if (event.key === 'Escape') {
                 const close = active.querySelector('button[aria-label="關閉視窗"], button[onclick^="game.close"]');
                 if (close) {
@@ -160,7 +208,7 @@
                 return;
             }
             if (event.key !== 'Tab') return;
-            const items = controls(active);
+            const items = visibleControls(active);
             if (!items.length) { event.preventDefault(); return; }
             const index = items.indexOf(document.activeElement);
             if (event.shiftKey && index <= 0) {
@@ -173,11 +221,107 @@
         }, true);
     }
 
+    // 棋格已依畫面順序排列（含執黑時翻轉的象棋盤）。上下換排時盡量維持同一列。
+    function nextBoardChoice(choices, current, columns, key, step) {
+        const square = el => Number(el.dataset.keyCell);
+        const vertical = key === 'ArrowUp' || key === 'ArrowDown';
+        const position = vertical ? el => Math.floor(square(el) / columns) : square;
+        const from = position(current);
+        const ahead = choices.filter(el => (position(el) - from) * step > 0);
+        const next = step > 0 ? ahead[0] : ahead.at(-1);
+        if (!vertical || !next) return next;
+        const row = position(next);
+        const distance = el => Math.abs(square(el) % columns - square(current) % columns);
+        return ahead.filter(el => position(el) === row).reduce((a, b) => distance(a) <= distance(b) ? a : b);
+    }
+
+    function setupGameKeyboard() {
+        if (!root.dataset.game) return;
+        const header = document.querySelector('.table-header');
+        const board = document.querySelector('[data-key-columns]');
+        const playArea = board ?? document.querySelector('#hand, #playerHand, .gz-hand');
+        if (playArea && !playArea.hasAttribute('tabindex')) playArea.tabIndex = -1;
+        const commands = document.querySelector('[data-table-commands]');
+        const towardCommands = commands?.dataset.tableCommands === 'above' ? 'ArrowUp' : 'ArrowDown';
+        const choiceSelector = '[data-game-choice="true"]:not(:disabled)';
+        const toolSelector = '.table-home, .table-tools > button:not(.unavailable), .table-menu > summary';
+        let lastChoice = null;
+        document.addEventListener('focusin', event => {
+            if (event.target.matches(choiceSelector)) lastChoice = event.target;
+        });
+        function enterToolbar() {
+            const tools = visibleControls(header, toolSelector);
+            (tools.find(el => !el.matches('.table-home')) ?? tools[0])?.focus();
+        }
+        function returnToPlay(choices) {
+            let next = lastChoice;
+            if (lastChoice && !choices.includes(lastChoice)) {
+                // 重畫會替換麻將牌或象棋落點。相同的麻將牌依手牌位置區分。
+                const label = lastChoice.getAttribute('aria-label');
+                next = choices.find(el => label
+                    ? el.getAttribute('aria-label') === label && el.dataset.i === lastChoice.dataset.i
+                    : el.isEqualNode(lastChoice));
+            }
+            (next ?? choices[0] ?? playArea)?.focus();
+        }
+        document.addEventListener('keydown', event => {
+            const key = event.key, step = arrowStep(key);
+            const activate = key === 'Enter' || key === ' ';
+            if (event.defaultPrevented || (!step && !activate)) return;
+            const control = event.target.closest?.('[data-game-choice]');
+            const blocked = modifiedKey(event) || event.target.isContentEditable || event.target.closest?.('input, select, textarea')
+                || document.querySelector('dialog[open], div[role="dialog"]:not(.hidden), .table-menu[open]');
+            if (activate) {
+                if (event.repeat && event.target.closest?.('button, summary, a[href], [role="button"]')) {
+                    event.preventDefault();
+                    return;
+                }
+                if (!control) return;
+                if (blocked || control.dataset.gameChoice !== 'true') event.preventDefault();
+                else if (control.matches('[role="button"]:not(button)')) {
+                    event.preventDefault();
+                    control.click();
+                }
+                return;
+            }
+            if (blocked) return;
+
+            const choices = visibleControls(document, choiceSelector);
+            if (board) choices.sort((a, b) => Number(a.dataset.keyCell) - Number(b.dataset.keyCell));
+            const buttons = commands ? visibleControls(document, 'button[data-table-commands], [data-table-commands] button') : [];
+            const playable = choices.length ? choices : buttons;
+            const current = document.activeElement;
+            const horizontal = key === 'ArrowLeft' || key === 'ArrowRight';
+            event.preventDefault();
+            if (header.contains(current)) {
+                if (key === 'ArrowDown') returnToPlay(playable);
+                if (horizontal) adjacent(visibleControls(header, toolSelector), current, step)?.focus();
+            } else if (commands?.contains(current)) {
+                if (horizontal) adjacent(buttons, current, step)?.focus();
+                else if (key !== towardCommands && choices.length) returnToPlay(choices);
+                else if (key === 'ArrowUp') enterToolbar();
+            } else if (board && current?.hasAttribute('data-key-cell')) {
+                const next = nextBoardChoice(choices, current, Number(board.dataset.keyColumns), key, step);
+                if (next) next.focus();
+                else if (key === 'ArrowUp') enterToolbar();
+            } else if (key === towardCommands && buttons.length && choices.includes(current)) {
+                buttons[0].focus();
+            } else if (key === 'ArrowUp') {
+                enterToolbar();
+            } else if (key === 'ArrowDown') {
+                returnToPlay(playable);
+            } else {
+                adjacent(playable, current, step)?.focus();
+            }
+        }, true);
+    }
+
     document.addEventListener('DOMContentLoaded', () => {
         setupPicker();
         setupFilters();
         setupMenu();
         setupTileInfo();
         setupDialogs();
+        setupGameKeyboard();
     });
 })();

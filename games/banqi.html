@@ -439,7 +439,7 @@
                     </div>
                     <div class="flex">
                         <div id="rowLabels" class="flex flex-col" style="padding-top: 8px;"></div>
-                        <div id="board" class="board-grid"></div>
+                        <div id="board" class="board-grid" data-key-columns="8" role="group" tabindex="0" aria-label="暗棋棋盤" aria-keyshortcuts="ArrowLeft ArrowRight ArrowUp ArrowDown Enter"></div>
                     </div>
                     <!-- 中央動態提示橫幅（翻棋、吃子、勝負訊息） -->
                     <div id="centerToastContainer" class="absolute inset-0 pointer-events-none z-40"></div>
@@ -633,6 +633,7 @@
                 </div>
 
                 <div class="bg-slate-800/80 border border-white/10 rounded-xl p-3.5 text-xs text-slate-300">
+                    用方向鍵選暗棋或能走的棋子，按 Enter 翻棋或選子。選子後，用方向鍵選落點，再按 Enter 走棋或吃子。在最上方可選的一排再按 ↑ 到功能列，← → 選功能，↓ 回棋盤。選單用 ↑ ↓ 選項目、Enter 確認。<br>
                     💡 <strong>貼心防呆設計：</strong>輪到您時，滑過暗棋會亮起金框；點選己方棋子後，可走的空格會出現金色光點、可吃的敵子會亮起紅圈，不合規則的點擊會直接提示原因。點擊上方「走棋提示」可獲得電腦的建議；誤觸也能「悔棋」（悔棋只收回走過的步，蓋著的暗棋不會重洗）。
                 </div>
             </div>
@@ -2322,6 +2323,9 @@
                 for (let sq = 0; sq < SQUARES; sq++) {
                     const cell = document.createElement('div');
                     cell.className = 'board-cell';
+                    cell.setAttribute('role', 'button');
+                    cell.tabIndex = -1;
+                    cell.dataset.keyCell = sq;
                     cell.addEventListener('click', () => this.onCellClick(sq));
                     board.appendChild(cell);
                     this.cellEls.push(cell);
@@ -2381,6 +2385,10 @@
 
                 for (let sq = 0; sq < SQUARES; sq++) {
                     const cell = this.cellEls[sq], p = st.board[sq];
+                    const choice = human && (this.selectedSq < 0 ? p === HIDDEN || movable.has(sq) : sq === this.selectedSq || targets.has(sq));
+                    cell.dataset.gameChoice = String(choice);
+                    cell.setAttribute('aria-disabled', String(!choice));
+                    cell.setAttribute('aria-label', `${sqName(sq)} ${p === HIDDEN ? '暗棋' : p === EMPTY ? '空格' : pieceName(p)}`);
                     cell.innerHTML = '';
                     let cls = 'board-cell';
                     if (lm) {

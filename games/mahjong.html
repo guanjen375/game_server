@@ -412,7 +412,7 @@
             </div>
         </div>
 
-        <button type="button" class="mj-info-button" aria-controls="tileInfoDialog" aria-haspopup="dialog">
+        <button type="button" class="mj-info-button" data-table-commands="above" aria-controls="tileInfoDialog" aria-haspopup="dialog">
             <i class="ui-icon i-card-list" aria-hidden="true"></i>加台牌與聽牌進度<i class="ui-icon i-arrow-right" aria-hidden="true"></i>
         </button>
 
@@ -423,7 +423,7 @@
             <div id="actionBar" class="w-full flex flex-wrap items-center justify-center py-1.5"></div>
             <!-- 玩家手牌（含自己吃碰槓的牌） -->
             <div class="w-full flex justify-center items-end pb-1 overflow-x-auto">
-                <div id="playerHand" class="flex flex-col items-start"></div>
+                <div id="playerHand" class="flex flex-col items-start" role="group" aria-label="您的手牌" aria-keyshortcuts="ArrowLeft ArrowRight ArrowUp ArrowDown Enter"></div>
             </div>
         </div>
     </main>
@@ -516,6 +516,7 @@
                 <div class="bg-slate-800/80 border border-white/10 rounded-xl p-3.5 text-xs text-slate-300">
                     💡 <strong>貼心設計：</strong>輪到您時，點一下手牌會抬起並顯示「打這張會聽哪些牌、還剩幾張」，場上（牌河、明牌）同一種牌也會跟著閃藍光，方便打別人打過的牌；可以吃碰槓胡時下方會跳出按鈕，不想要就按「過」。點擊上方「出牌提示」可得到電腦建議的出牌。<br>
                     🤖 聽牌後下方會出現「自動胡牌」：按下去就摸什麼打什麼（不吃、不碰、不槓），有人放槍、自摸或可以搶槓時自動胡牌；想自己打就按「取消自動」，每局開始時也會自動關掉。<br>
+                    ← → 選手牌或吃、碰、槓、胡，Enter 確認。↑ 到功能列，窄螢幕會先經過「加台牌與聽牌進度」。← → 選功能，↓ 回牌桌。選單用 ↑ ↓ 選項目、Enter 確認。<br>
                     ↩️ 按錯或打錯牌時，按上方的「悔牌」就回到您上一步（出牌、吃、碰、槓、胡、過，或自動胡牌替您打的那一張）之前，可以連續按；一局結算之後就不能悔牌了。悔牌只會把牌局退回去，還沒摸的牌不會重洗。<br>
                     ⭐ 手牌中的圈風、門風會在右上角標出金色「+1」（圈風剛好也是門風時是「+2」），代表湊成刻子能加的台數；左側「加台牌」列出這一局的圈風、門風與正花，右側則有聽牌進度與還沒出現的餘牌張數。
                 </div>
@@ -2414,20 +2415,22 @@
 
             renderHand() {
                 const container = document.getElementById('playerHand');
+                const focused = document.activeElement?.closest('#playerHand [data-i]:focus-visible');
                 const p = this.players[0];
                 const tiles = this.handDisplayOrder();
                 const myTurn = this.phase === 'turn' && this.turn === 0;
+                const playable = myTurn && !this.autoWin;
                 const hasDrawn = myTurn && p.drawn !== null;
                 const hintIndex = myTurn && this.hintTile !== null ? tiles.lastIndexOf(this.hintTile) : -1;
                 const cells = tiles.map((t, i) => {
                     const cls = ['hand-tile-wrap'];
-                    if (myTurn && !this.autoWin) cls.push('playable');
+                    if (playable) cls.push('playable');
                     if (i === this.selectedIndex) cls.push('selected');
                     if (i === hintIndex) cls.push('hint');
                     if (hasDrawn && i === tiles.length - 1) cls.push('drawn');
                     const tai = this.windTai(0, t);
                     const badge = tai ? `<span class="tai-badge" title="${tai === 2 ? '圈風＋門風' : t === EAST + this.roundWind ? '圈風' : '門風'}：湊成刻子 +${tai} 台">+${tai}</span>` : '';
-                    return `<div class="${cls.join(' ')}" data-i="${i}">${TileArt.html(t, 'hand')}${badge}</div>`;
+                    return `<div class="${cls.join(' ')}" role="button" tabindex="${playable ? 0 : -1}" aria-label="${tileName(t)}" aria-disabled="${!playable}" data-game-choice="${playable}" data-i="${i}">${TileArt.html(t, 'hand')}${badge}</div>`;
                 });
                 // 手牌、剛摸那張（還沒摸時先留好位置，摸牌、打牌時牌才不會跳）、吃碰槓的牌依序排；
                 // width 是寬度、lead 是跟前一格的距離，都以牌寬為單位，要跟 CSS 的間距一致
@@ -2460,8 +2463,12 @@
                 }
                 container.innerHTML = rows.map(row => `<div class="hand-row">${row.map(item => item.html).join('')}</div>`).join('');
                 container.querySelectorAll('[data-i]').forEach(el => {
-                    el.addEventListener('click', () => this.onHandTileClick(Number(el.dataset.i)));
+                    el.addEventListener('click', event => this.onHandTileClick(Number(el.dataset.i), event.detail === 0));
                 });
+                if (playable && focused) {
+                    const tile = container.querySelector(`[data-i="${focused.dataset.i}"]`);
+                    if (tile?.getAttribute('aria-label') === focused.getAttribute('aria-label')) tile.focus({ preventScroll: true });
+                }
                 // 選牌一改就要更新場上的閃爍；render() 也是畫完牌河、面板才畫手牌，重畫後不會漏掉
                 this.highlightSameTiles(myTurn && this.selectedIndex >= 0 ? tiles[this.selectedIndex] : null);
             }
@@ -2514,7 +2521,7 @@
 
             /** 下方動作列：吃碰槓胡、自摸、槓、自動胡牌、出牌提示（內容沒變就不重畫，按鈕才不會一直重播彈出動畫、按到一半被換掉） */
             renderActions() {
-                const btn = (label, cls, onclick, extra = '') => `<button class="action-btn ${cls}" onclick="${onclick}">${label}${extra}</button>`;
+                const btn = (label, cls, onclick, extra = '') => `<button type="button" data-game-choice="true" class="action-btn ${cls}" onclick="${onclick}">${label}${extra}</button>`;
                 const mini = tiles => `<span class="flex items-end gap-[1px]">${tiles.map(t => TileArt.html(t, 'tiny')).join('')}</span>`;
                 const autoBtn = btn('🤖 自動胡牌', 'bg-violet-500 text-white', 'game.toggleAutoWin()');
                 let html = '';
@@ -2559,10 +2566,10 @@
 
             /* ===================== 玩家操作 ===================== */
 
-            onHandTileClick(index) {
+            onHandTileClick(index, fromKeyboard = false) {
                 if (this.phase !== 'turn' || this.turn !== 0 || this.autoWin) return;
                 const tiles = this.handDisplayOrder();
-                if (this.settings.discardMode === 'single' || this.selectedIndex === index) {
+                if (fromKeyboard || this.settings.discardMode === 'single' || this.selectedIndex === index) {
                     this.pushUndo();
                     this.discard(0, tiles[index]);
                     return;

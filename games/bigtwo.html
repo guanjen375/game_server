@@ -92,7 +92,7 @@
             transform: translateY(calc(-1.55 * var(--lift)));
             box-shadow: 0 0 0 2px var(--gz-gold), 0 5px 12px #0005;
         }
-        .gz-hand-slot .card:focus-visible { outline: 3px solid var(--info); outline-offset: 1px; }
+        .gz-hand-slot .card.can-add:focus-visible { transform: translateY(calc(-1.1 * var(--lift))); }
         .gz-hand-slot .card.selected::after, .opening-mark {
             position: absolute;
             top: calc(var(--cw) * .62);
@@ -311,10 +311,10 @@
             <section class="gz-seat" id="panel-south" aria-label="南家 您"></section>
         </div>
         <section class="gz-hand" aria-label="您的手牌與操作">
-            <div id="hand" class="gz-hand-row" role="group" aria-label="點選要出的手牌"></div>
+            <div id="hand" class="gz-hand-row" role="group" aria-label="您的手牌" aria-keyshortcuts="ArrowLeft ArrowRight ArrowUp ArrowDown Space Enter"></div>
             <div class="hand-controls">
                 <p class="selection-row" id="selectionInfo" role="status"></p>
-                <div class="actions">
+                <div class="actions" data-table-commands="below">
                     <button type="button" class="action-btn primary" id="playBtn" disabled>出牌</button>
                     <button type="button" class="action-btn" id="passBtn" disabled>不出</button>
                     <button type="button" class="action-btn subtle" id="clearBtn" disabled>取消選取</button>
@@ -348,7 +348,7 @@
     <p class="rule-small">💡 <strong>出牌提示</strong>會選取一組合法牌，重複按可換一組。輪到您時，能搭配已選手牌的牌會亮起；點選後會出現金框，再按「出牌」送出。開啟視窗時，電腦會暫停等待。</p>
     <p class="rule-small">↶ <strong>悔牌</strong>：按錯、出錯牌或誤按「不出」時，按上方的「悔牌」就回到您那一手之前，可以連續按；一局結算之後就不能悔牌了。悔牌只會把出過的牌收回，各家的手牌不會重洗。</p>
     <p class="rule-small">📋 <strong>出牌紀錄</strong>：記牌表依點數及花色由小到大排列。白底是別家的牌，金底是您的手牌，淡色是已出的牌。點記牌表或從選單開啟紀錄，可以看每一輪誰出了什麼。</p>
-    <p class="rule-small">鍵盤操作可用空白鍵選牌、Enter 出牌、P 不出、H 提示、Esc 取消選取。</p>
+    <p class="rule-small">← → 選牌，Enter 打出單張。空白鍵逐張選取或取消，再按 Enter 打出牌組。從手牌按 ↑ 到功能列，按 ↓ 到「出牌、不出、取消選取」。← → 選按鈕，Enter 執行。選單用 ↑ ↓ 選項目。P 不出、H 提示、Esc 清除選取。</p>
   </div><div class="modal-footer"><button class="action-btn primary" data-close>了解，繼續玩</button></div>
 </dialog>
 <dialog id="scoreDialog" aria-labelledby="scoreTitle"><div class="modal-header"><div><h2 id="scoreTitle">🏆 累計計分板</h2><p id="scoreSubtitle">四家累計分數</p></div><button class="close" data-close aria-label="關閉計分板">×</button></div><div class="modal-body" id="scoreBody"></div><div class="modal-footer"><button class="action-btn" data-close>返回牌桌</button><button class="action-btn primary" id="nextBtn" hidden>開始下一局 →</button></div></dialog>
@@ -1122,12 +1122,19 @@ class BigTwoApp {
     document.querySelectorAll('[data-close]').forEach(b=>b.addEventListener('click',()=>this.closeDialog()));
     document.querySelectorAll('dialog').forEach(d=>{d.addEventListener('cancel',e=>{e.preventDefault();this.closeDialog();});d.addEventListener('click',e=>{if(e.target===d){const r=d.getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)this.closeDialog();}});});
     document.addEventListener('keydown', e => {
-      if (this.modal || e.ctrlKey || e.altKey || e.metaKey || e.repeat || e.target.closest?.('.table-menu[open]')) return;
+      if (e.defaultPrevented || this.modal || e.ctrlKey || e.altKey || e.metaKey || e.shiftKey || e.repeat || e.isComposing
+          || e.target.isContentEditable || e.target.closest?.('input, select, textarea') || document.querySelector('.table-menu[open]')) return;
       const key = e.key.toLowerCase();
       if (key === 'escape') this.clearSelection();
       if (key === 'enter') {
         if (e.target.closest?.('button, a, summary, select') && !e.target.closest('#hand')) return;
         e.preventDefault();
+        const focused = e.target.closest?.('#hand button');
+        if (focused && !this.selected.size) {
+          const single = this.legalPlays.find(move => move.size === 1 && move.cards[0].id === focused.dataset.card);
+          if (single) return this.performPlay(0, single.cards);
+          return this.toast('這張牌要搭配其他牌才能出，按空白鍵選牌。');
+        }
         this.playSelected();
       } else if (key === 'p') {
         e.preventDefault();
@@ -1354,6 +1361,7 @@ class BigTwoApp {
     const possible = new Set(matches.flatMap(move => move.cards.map(card => card.id)));
     for (const button of $('hand').querySelectorAll('button')) {
       const id = button.dataset.card, selected = this.selected.has(id);
+      button.dataset.gameChoice = String(myTurn && (selected || possible.has(id)));
       button.setAttribute('aria-pressed', String(selected));
       button.classList.toggle('selected', selected);
       button.classList.toggle('can-add', myTurn && !selected && possible.has(id));

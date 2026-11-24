@@ -138,8 +138,35 @@ body.felt-table, .app {
     outline: 2px solid var(--accent);
     outline-offset: 2px;
 }
+/* 反白手牌的白框與深色外框，在深淺兩種桌面都能辨認。 */
+.gz-hand-row, #playerHand { --hand-focus-face: #17212b; }
+.gz-hand-slot > .gz-card[data-game-choice="true"]:enabled:focus-visible,
+.hand-tile-wrap.playable:focus-visible {
+    outline: 3px solid #fff;
+    outline-offset: 0;
+    box-shadow: 0 0 0 5px var(--hand-focus-face);
+}
+.gz-hand-slot > .gz-card[data-game-choice="true"]:enabled:focus-visible {
+    --card-ink: #fff;
+    --card-red: #ffb3c0;
+    background: var(--hand-focus-face);
+}
+.hand-tile-wrap.playable:focus-visible {
+    border-radius: calc(var(--hand-w) * 0.14);
+    transform: translateY(calc(var(--hand-w) * -0.24));
+    z-index: 2;
+}
+.hand-tile-wrap.playable:focus-visible > .mj-tile { background: var(--hand-focus-face); }
+.hand-tile-wrap.playable:focus-visible > .mj-tile svg { filter: invert(1) hue-rotate(180deg); }
 
 /* 棋盤與中央牌桌。SVG 只換象棋格線、九宮、河界字色。 */
+[data-key-columns] [data-game-choice="true"]:focus-visible {
+    outline: 3px solid var(--board-focus, var(--info));
+    outline-offset: -3px;
+    z-index: 4;
+}
+[data-key-columns] .xq-piece:focus-visible { outline-offset: 1px; border-radius: 50%; }
+[data-key-columns] .xq-dot:focus-visible { outline-offset: calc(var(--cell) * 0.14); }
 .board-frame, .rv-frame {
     background: var(--frame); border-color: var(--line); box-shadow: var(--shadow);
 }
@@ -250,6 +277,13 @@ body.felt-table, .app {
 .table-state > span + span { border-left: 1px solid var(--line); }
 .table-state b, .table-state > :first-child { color: var(--ink); }
 .table-tools { flex: none; gap: 7px; }
+@media (min-width: 640px) {
+    .table-tools::before { color: var(--muted); white-space: nowrap; font-size: 12px; }
+    body:has(main [data-game-choice]:focus-visible) .table-tools::before { content: "↑ 功能列"; }
+    body:has(main [data-key-columns] :focus-visible) .table-tools::before { content: "↑ 到頂進功能列"; }
+    .table-header:has(:focus-visible) .table-tools::before { content: "↓ 回牌桌"; }
+    .table-header:has(.table-menu[open] :focus-visible) .table-tools::before { content: "↑ ↓ 選項目"; }
+}
 .table-tool {
     appearance: none; justify-content: center; gap: 7px; min-height: 38px; padding: 4px 12px; margin: 0;
     border: 1px solid var(--line); border-radius: 8px; background: var(--inset); color: var(--ink);
@@ -272,7 +306,15 @@ body.felt-table, .app {
 .menu-panel .table-tool { justify-content: start; width: 100%; min-height: 43px; border: 0; background: transparent; }
 .menu-panel .table-tool:hover { background: var(--hover-surface); }
 .menu-panel .restart-tool { color: var(--negative); border-top: 1px solid var(--line); border-radius: 0 0 6px 6px; }
+.table-header .table-tool:focus-visible, .table-header .table-home:focus-visible,
+[data-table-commands] button:focus-visible, button[data-table-commands]:focus-visible {
+    color: var(--surface);
+    background: var(--ink);
+    outline: 3px solid var(--ink);
+    outline-offset: 2px;
+}
 .sound-state { margin-left: auto; color: var(--muted); font-size: 11px; }
+.sound-toggle:focus-visible .sound-state { color: inherit; }
 .sound-state::after { content: "開"; }
 .sound-toggle[aria-pressed="false"] .sound-state::after { content: "關"; }
 .sound-toggle[aria-pressed="false"] .ui-icon::before { content: "\f60d"; }
@@ -285,7 +327,7 @@ body.felt-table, .app {
 /* 棋盤用暖木與深格線，撲克與麻將桌用綠絨。輪到誰以實線框和既有的回合標籤表示。 */
 :root:is([data-game="xiangqi"], [data-game="banqi"]):is([data-theme="felt"], :not([data-theme])) {
     --board: repeating-linear-gradient(3deg, transparent 0 5px, #825d2d07 6px 7px), linear-gradient(130deg, #e8cb99, #cfaa73);
-    --frame: #745839; --grid: #7d603d;
+    --frame: #745839; --grid: #7d603d; --board-focus: #174766;
 }
 .felt-table::before { display: none; }
 .felt-table main { padding-bottom: max(.5rem, env(safe-area-inset-bottom)); }

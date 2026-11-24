@@ -591,9 +591,9 @@ test('gongzhu: the dealer enforces suit, heart, high spade and special-card limi
     // Every suit appears as a singleton and as an eight-card suit. South has 110 heart points, C10 and D11.
     const allowed = [
         'S3 S4 S5 S6 S7 S8 S13 S14 H14 H13 H11 C10 D11',
-        'H2 H3 H4 H5 H6 H7 H8 H9 S9 C13 C14 D12 D14',
-        'C2 C3 C4 C5 C6 C7 C8 C9 S10 S11 H12 D10 D13',
-        'D2 D3 D4 D5 D6 D7 D8 D9 S2 S12 H10 C11 C12'
+        'H2 H3 H4 H5 H6 H7 H8 H9 S9 C12 C13 C14 D12',
+        'C2 C3 C4 C5 C6 C7 C8 C9 S10 H12 D10 D13 D14',
+        'D2 D3 D4 D5 D6 D7 D8 D9 S2 S11 S12 H10 C11'
     ].flatMap(hand => hand.split(' '));
     function swap(...pairs) {
         const deck = allowed.slice();
@@ -606,21 +606,21 @@ test('gongzhu: the dealer enforces suit, heart, high spade and special-card limi
 
     const fourDiamonds = [['D2', 'D11'], ['D3', 'D12'], ['D4', 'D13'], ['D5', 'D14']];
     const fiveClubs = [['C2', 'C10'], ['C3', 'C11'], ['C4', 'C12'], ['C5', 'C13'], ['C6', 'C14']];
-    const threeHighSpades = [['D2', 'S13'], ['D3', 'S14'], ['D4', 'S11']]; // East has Q/K/A, 2 and J.
+    const threeHighSpades = [['D2', 'S13'], ['D3', 'S14'], ['D4', 'S3']]; // East has Q/K/A and 2/3/J.
     const rejected = [
         swap(['H11', 'H12']),                             // A + K + Q = 120
         swap(['H11', 'H4'], ['S4', 'H9'], ['S3', 'H2']), // 111 because the four counts as 10
-        swap(['H11', 'S10']),                             // nine spades
+        swap(['C10', 'S12'], ['H11', 'C11']),             // nine spades
         swap(['H10', 'H11'], ['C13', 'H10']),             // nine low hearts (only 60 points)
-        swap(['S10', 'C11']), swap(['S12', 'D10']),       // nine clubs, nine diamonds
-        swap(['S9', 'C11']), swap(['H12', 'S12']),        // void in spades, void in hearts
-        swap(['C10', 'D12']), swap(['D11', 'C13']),       // void in clubs, void in diamonds
-        swap(['S2', 'C13']), swap(['D2', 'S13']), swap(...threeHighSpades), // one low spade short in each case
+        swap(['D10', 'C13']), swap(['S12', 'D10'], ['D13', 'S3']), // nine clubs, nine diamonds
+        swap(['S9', 'D10']), swap(['H12', 'D2']),         // void in spades, void in hearts
+        swap(['C10', 'D2']), swap(['D11', 'C13']),        // void in clubs, void in diamonds
+        swap(['S2', 'C13']), swap(['D2', 'S13']), swap(...threeHighSpades), // equal low/high counts of 1, 2, 3
         swap(...fourDiamonds), swap(...fiveClubs), swap(['S13', 'S12'])     // a complete forbidden group
     ];
     const accepted = [
-        allowed,
-        swap(['S2', 'S11']), swap(['D2', 'S13'], ['D3', 'S11']), swap(...threeHighSpades, ['D5', 'S3']),
+        allowed, // West and North have one low spade and no high spades. East has two low spades and the queen.
+        swap(['D2', 'S13'], ['D3', 'S3']), swap(...threeHighSpades, ['D5', 'S4']), // 3 low / 2 high and 4 low / 3 high
         swap(['S13', 'S12'], ['C10', 'C11']), swap(['S13', 'S12'], ['D11', 'D2']) // the other special-card pairs
     ];
     for (const group of [fourDiamonds, fiveClubs]) {
@@ -646,7 +646,18 @@ test('gongzhu: the dealer enforces suit, heart, high spade and special-card limi
 });
 
 test('gongzhu: the last scoring card goes to the trick winner before the round ends with cards still in hand', () => {
-    const env = open('gongzhu', 1), game = env.game;
+    const env = open('gongzhu'), game = env.game;
+    // In this deal South leads D11 after the other 15 scoring cards have been collected.
+    const cards = new Map(game.createShuffledDeck().map(card => [card.id, card]));
+    const dealHands = game.dealHands;
+    game.dealHands = () => [
+        'S9 S4 H14 H13 H7 H4 C14 C13 C11 C8 D11 D8 D6',
+        'S12 S10 S5 S3 H8 H3 C7 C4 C3 C2 D14 D9 D7',
+        'S13 S8 S2 H9 H6 H5 H2 C9 C6 D10 D4 D3 D2',
+        'S14 S11 S7 S6 H12 H11 H10 C12 C10 C5 D13 D12 D5'
+    ].map(hand => hand.split(' ').map(id => cards.get(id)));
+    game.startRound();
+    game.dealHands = dealHands;
     game.chooseBestCardForAI = seat => {
         const legal = game.getLegalCards(seat);
         return legal.find(card => card.isScoring) || legal[0];
@@ -662,13 +673,13 @@ test('gongzhu: the last scoring card goes to the trick winner before the round e
     }
 
     const [record] = env.recorder.rounds;
-    assert.equal(record.tricks.length, 8);
-    assert.deepEqual(record.tricks.at(-1).map(play => play.card), ['D11', 'D14', 'D10', 'D12']);
+    assert.equal(record.tricks.length, 6);
+    assert.deepEqual(record.tricks.at(-1).map(play => play.card), ['D11', 'D14', 'D10', 'D13']);
     assert.ok(record.result.west.captured.includes('D11'));
     const settled = stateOf(env);
     env.driver.replay(record, settled);
     for (const seat of game.SEAT_ORDER) {
-        assert.equal(settled.hands[seat].length, 5);
+        assert.equal(settled.hands[seat].length, 7);
         assert.equal(game.getLegalCards(seat).length, 0);
     }
     game.onPlayerCardClick(settled.hands.south[0]);

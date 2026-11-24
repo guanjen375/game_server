@@ -101,9 +101,9 @@
             white-space: normal;
         }
 
-        .gz-card.tone-neg { background: linear-gradient(160deg, #fff, #fff0f2 55%, #ffe1e6); }
-        .gz-card.tone-pos { background: linear-gradient(160deg, #fff, #ebfaf2 55%, #d8f4e5); }
-        .gz-card.tone-x2 { background: linear-gradient(160deg, #fff, #fff7df 55%, #fbeab9); }
+        .gz-card.tone-neg { --hand-focus-face: #451e29; background: linear-gradient(160deg, #fff, #fff0f2 55%, #ffe1e6); }
+        .gz-card.tone-pos { --hand-focus-face: #17382d; background: linear-gradient(160deg, #fff, #ebfaf2 55%, #d8f4e5); }
+        .gz-card.tone-x2 { --hand-focus-face: #3e3017; background: linear-gradient(160deg, #fff, #fff7df 55%, #fbeab9); }
         /* 這一墩領出的牌 */
         .gz-card-lead {
             position: absolute;
@@ -130,12 +130,13 @@
             transition: translate .42s ease-in, scale .42s ease-in, opacity .42s ease-in;
         }
 
+        .gz-hand-slot > button { appearance: none; padding: 0; border: 0; }
         .gz-hand-slot.is-playable > .gz-card {
             cursor: pointer;
             transform: translateY(calc(-1 * var(--lift)));
             box-shadow: 0 0 0 2px var(--gz-gold), 0 6px 14px rgb(0 0 0 / .4);
         }
-        .gz-hand-slot.is-playable > .gz-card:hover { transform: translateY(calc(-1.8 * var(--lift))); }
+        .gz-hand-slot.is-playable > .gz-card:is(:hover, :focus-visible) { transform: translateY(calc(-1.8 * var(--lift))); }
         /* 不能出的牌變暗，底色保持不透明，疊著也看得清楚 */
         .gz-hand-slot.is-disabled > .gz-card { cursor: not-allowed; filter: brightness(var(--gz-dim)) saturate(.7); }
         /* 提示建議的那一張 */
@@ -360,7 +361,7 @@
             </section>
         </div>
 
-        <section class="gz-hand" aria-label="您的手牌">
+        <section class="gz-hand" aria-label="您的手牌" aria-keyshortcuts="ArrowLeft ArrowRight ArrowUp ArrowDown Enter">
             <div id="playerHandContainer" class="gz-hand-row"></div>
         </section>
 
@@ -401,7 +402,7 @@
                     <h3 class="text-amber-400 font-black text-base mb-1.5">發牌與出牌順序</h3>
                     <ul class="list-disc pl-5 space-y-1 text-slate-300">
                         <li>每人起手 13 張牌，四種花色各有 <strong>1 到 8 張</strong>。為避免一家拿到太多大紅心而容易通吃，起手紅心點數合計最多 <strong>110 點</strong>。</li>
-                        <li>♠Q、♠K、♠A 每拿到一張，手上就至少要有一張 ♠2 至 ♠J 搭配。</li>
+                        <li>每家手上的 ♠2 至 ♠J 至少要比 ♠Q、♠K、♠A 多一張。例如拿到 ♠Q 和 ♠K，就至少要有三張 ♠2 至 ♠J。</li>
                         <li>♦J、♦Q、♦K、♦A 四張至少分給兩家。♣10、♣J、♣Q、♣K、♣A 五張也至少分給兩家。</li>
                         <li>♠Q、♦J、♣10 這三張計分牌至少分給兩家。</li>
                         <li>持有 <strong>♠7</strong> 的玩家先手，可選任一張手牌領出，接著順時針出牌。</li>
@@ -460,6 +461,7 @@
 
                 <div class="bg-slate-800/80 border border-white/10 rounded-xl p-3.5 text-xs text-slate-300">
                     💡 <strong>貼心防呆設計：</strong>輪到您出牌時，系統會自動將可出的合法手牌向上抬起並亮起金框；不合規則的手牌則會變暗並鎖定，避免誤出。點擊上方「出牌提示」還可獲得策略建議！<br>
+                    ⌨️ <strong>鍵盤出牌</strong>　← → 選合法牌，Enter 出牌。↑ 到功能列，← → 選功能，↓ 回到手牌。選單用 ↑ ↓ 選項目、Enter 確認。<br>
                     ↩️ <strong>悔牌：</strong>按錯牌或出錯牌時，按上方的「悔牌」就回到您那一張出牌之前，可以連續按；一局結算之後就不能悔牌了。悔牌只會把出過的牌收回，各家的手牌不會重洗。<br>
                     🔄 <strong>本局重新發牌：</strong>拿到沒辦法打的牌時，在「選單」裡選「本局重新發牌」，這一局作廢、四家重新發牌，局數和累計總分都不變。<br>
                     🃏 牌桌上的<strong>「記牌」</strong>列出整副牌：白底的是還在別家手上的牌，金底的是您的手牌，沒有底色、字淡掉的是已經出過的。點一下可查看每一墩的出牌與贏家。
@@ -620,7 +622,7 @@
             const lowSpades = spades.length - highSpades;
             return heartPoints <= MAX_OPENING_HEART_POINTS
                 && Object.values(ranksBySuit).every(ranks => ranks.length > 0 && ranks.length <= MAX_OPENING_CARDS_PER_SUIT)
-                && lowSpades >= highSpades
+                && lowSpades >= highSpades + 1
                 && ![11, 12, 13, 14].every(rank => diamonds.includes(rank))
                 && ![10, 11, 12, 13, 14].every(rank => clubs.includes(rank))
                 && !(spades.includes(12) && diamonds.includes(11) && clubs.includes(10));
@@ -1771,7 +1773,7 @@
             }
 
             /**
-             * 玩家點擊手牌出牌
+             * 玩家點擊手牌或按 Enter 出牌
              */
             onPlayerCardClick(cardId) {
                 if (this.isProcessingTrick || this.currentTurn !== 'south') return;
@@ -2269,11 +2271,16 @@
                     }
                 }
 
-                const div = document.createElement('div');
-                div.className = `gz-card${card.suit === 'H' || card.suit === 'D' ? ' red' : ''}${tone ? ` ${tone}` : ''}`;
-                div.innerHTML = `<span class="gz-card-idx"><b>${card.label}</b><i>${suitInfo.symbol}</i></span>`
+                const face = document.createElement(isTrick ? 'div' : 'button');
+                if (!isTrick) {
+                    face.type = 'button';
+                    face.dataset.gameChoice = 'true';
+                    face.setAttribute('aria-label', `${suitInfo.name} ${card.label}`);
+                }
+                face.className = `gz-card${card.suit === 'H' || card.suit === 'D' ? ' red' : ''}${tone ? ` ${tone}` : ''}`;
+                face.innerHTML = `<span class="gz-card-idx"><b>${card.label}</b><i>${suitInfo.symbol}</i></span>`
                     + `<span class="gz-card-pip">${pip}</span>${isLead ? '<span class="gz-card-lead">首出</span>' : ''}`;
-                return div;
+                return face;
             }
 
             /**
@@ -2407,7 +2414,9 @@
                         slot.dataset.face = face;
                         slot.replaceChildren(this.createCardElement(card));
                     }
-                    const state = legalIds.has(card.id) ? ' is-playable' : isPlayerTurn ? ' is-disabled' : '';
+                    const playable = legalIds.has(card.id);
+                    slot.firstElementChild.disabled = !playable;
+                    const state = playable ? ' is-playable' : isPlayerTurn ? ' is-disabled' : '';
                     slot.className = `gz-hand-slot${state}${this.hintCardId === card.id ? ' is-hint' : ''}`;
                     if (container.children[idx] !== slot) container.insertBefore(slot, container.children[idx] || null);
                 });
