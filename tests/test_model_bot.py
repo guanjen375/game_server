@@ -504,7 +504,7 @@ def special_round(rng):
             trick.append({"seat": seat, "card": card})
         leader = max((p for p in trick if p["card"][0] == trick[0]["card"][0]), key=lambda p: int(p["card"][1:]))["seat"]
         tricks.append(trick)
-    return {"finished": True, "round": 1, "settings": {"scoringRuleMode": "player_special", "roundBase": "zero-sum"},
+    return {"finished": True, "round": 1, "settings": {"scoringRuleMode": "player_special", "centerTotals": True},
             "seats": PAGE_SEATS, "players": {seat: {"name": seat, "ai": seat != "south"} for seat in PAGE_SEATS},
             "hands": hands, "totals": {seat: 0 for seat in PAGE_SEATS}, "tricks": tricks, "result": None}
 

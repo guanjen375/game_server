@@ -398,9 +398,10 @@
             </div>
             <div class="p-6 overflow-y-auto space-y-5 text-sm text-slate-200 leading-relaxed">
                 <div>
-                    <h3 class="text-amber-400 font-black text-base mb-1.5">出牌順序</h3>
+                    <h3 class="text-amber-400 font-black text-base mb-1.5">發牌與出牌順序</h3>
                     <ul class="list-disc pl-5 space-y-1 text-slate-300">
-                        <li>四人各拿 13 張牌。持有 <strong>♠7</strong> 的玩家先手，可選任一張手牌領出，接著順時針出牌。</li>
+                        <li>每人起手 13 張牌，四種花色各有 <strong>1 到 8 張</strong>。為避免一家拿到太多大紅心而容易通吃，起手紅心點數合計最多 <strong>110 點</strong>。</li>
+                        <li>持有 <strong>♠7</strong> 的玩家先手，可選任一張手牌領出，接著順時針出牌。</li>
                         <li>有首張牌的花色就必須跟同花色，缺門時可以墊任一張牌。</li>
                         <li>首出花色中點數最大的人吃下這一墩，並領出下一墩。A 最大，2 最小。</li>
                     </ul>
@@ -408,7 +409,7 @@
 
                 <div>
                     <h3 class="text-amber-400 font-black text-base mb-2">計分牌</h3>
-                    <p class="text-slate-300 mb-2">每一局每人的分數是吃到的牌分加上<strong>底分</strong>。底分四家一樣，讓四家這一局的分數加起來剛好是 0（例如四家牌分合計 −230，底分就是 +57.5）。底分不會被加倍，也不算在下面的固定牌分裡。</p>
+                    <p class="text-slate-300 mb-2">本局得分依吃到的計分牌計算，沒吃到就是 0 分。結算時，各家先把本局得分加進累計總分，再各自減去四家的平均總分，讓累計平均為 0。</p>
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                         <div class="bg-rose-950/50 border border-rose-500/40 rounded-xl p-3">
                             <div class="font-black text-rose-300">♠Q　豬</div>
@@ -600,6 +601,19 @@
 
     <script>
         const HEART_POINTS = [-2, -3, -10, -5, -6, -7, -8, -9, -10, -20, -30, -40, -50]; // ♥2 到 ♥A
+        const MAX_OPENING_HEART_POINTS = 110;
+        const MAX_OPENING_CARDS_PER_SUIT = 8;
+
+        function isValidOpeningHand(hand) {
+            const suitCounts = { S: 0, H: 0, C: 0, D: 0 };
+            let heartPoints = 0;
+            for (const { suit, rank } of hand) {
+                suitCounts[suit]++;
+                if (suit === 'H') heartPoints -= HEART_POINTS[rank - 2];
+            }
+            return heartPoints <= MAX_OPENING_HEART_POINTS
+                && Object.values(suitCounts).every(count => count > 0 && count <= MAX_OPENING_CARDS_PER_SUIT);
+        }
 
         function compareDisplayRanks(a, b) {
             return a.rank - b.rank;
@@ -1610,6 +1624,15 @@
                 return deck;
             }
 
+            dealHands() {
+                let hands;
+                do {
+                    const deck = this.createShuffledDeck();
+                    hands = this.SEAT_ORDER.map((_, i) => deck.slice(i * 13, (i + 1) * 13));
+                } while (!hands.every(isValidOpeningHand));
+                return hands;
+            }
+
             /**
              * 判斷是否為拱豬計分牌（亮牌區顯示對象：♠Q、♦J、♣10 以及所有紅心 ♥2~♥A）
              */
@@ -1633,32 +1656,20 @@
                     this.SEAT_ORDER.map(seat => [seat, this.PLAYERS[seat].captured])
                 );
                 const roundHasAllHearts = this.hasAllHeartsOnTable(captures);
-                const points = this.SEAT_ORDER.map(seat => this.calculatePlayerScore(captures[seat] || [], roundHasAllHearts).cardPoints);
-                // 底分：四家一樣，讓四家這一局的分數加起來剛好是 0（四家牌分平均的正負相反）。
-                // 除不盡時是 0.25 的倍數，二進位剛好表示得出來，累計也不會有誤差
-                const base = 0 - points.reduce((sum, value) => sum + value, 0) / 4;
                 return Object.fromEntries(this.SEAT_ORDER.map(seat => [
-                    seat, this.calculatePlayerScore(captures[seat] || [], roundHasAllHearts, base)
+                    seat, this.calculatePlayerScore(captures[seat] || [], roundHasAllHearts)
                 ]));
             }
 
-            /**
-             * 一家這一局的分數：底分（base，見 calculateRoundScores）加上吃到的牌分。score 是合計，cardPoints 只有牌分，
-             * formula 是記進對局紀錄的算式（terms 是同一條算式的各項，計分板用），cards 是算式裡牌分的那一段。
-             * 底分四家都一樣、不影響分差，所以電腦評估出牌（GongZhuAI.score）只算牌分
-             */
-            calculatePlayerScore(capturedCards, roundHasAllHearts = false, base = 0) {
+            calculatePlayerScore(capturedCards, roundHasAllHearts = false) {
                 const pile = GongZhuAI.newCap((capturedCards ?? []).map(card => GongZhuAI.toInt(card)));
                 const shootMoon = pile.hearts === 13;
-                const details = [];
-                const cardPoints = GongZhuAI.score(pile, roundHasAllHearts, shootMoon, details);
-                const cards = details.join(' ');
+                const terms = [];
+                const score = GongZhuAI.score(pile, roundHasAllHearts, shootMoon, terms);
                 return {
-                    score: base + cardPoints,
-                    cardPoints,
-                    cards,
-                    terms: [`底分(${this.signed(base)})`, ...details],
-                    formula: `底分(${this.signed(base)}) ${cards}`,
+                    score,
+                    terms,
+                    formula: terms.join(' '),
                     shootMoon,
                     isGrandSlam: shootMoon && pile.pig && pile.sheep && pile.trans
                 };
@@ -1681,7 +1692,7 @@
             startRound(redeal = false) {
                 this.recordEnd();
                 this.cancelTimers();
-                const deck = this.createShuffledDeck();
+                const hands = this.dealHands();
                 this.trickNumber = 1;
                 this.leadSuit = null;
                 this.currentTrick = [];
@@ -1705,7 +1716,7 @@
 
                 this.SEAT_ORDER.forEach((seat, idx) => {
                     const p = this.PLAYERS[seat];
-                    p.hand = this.sortCards(deck.slice(idx * 13, (idx + 1) * 13));
+                    p.hand = this.sortCards(hands[idx]);
                     p.captured = [];
                 });
 
@@ -1941,7 +1952,7 @@
                 const winnerScore = this.calculatePlayerScore(winnerPlayer.captured, pigSheepChanged);
 
                 if (winnerScore.shootMoon && scoringInTrick.length) {
-                    this.showCenterBanner(`【${winnerPlayer.label}】${winnerScore.cards}`, 'bg-amber-400 text-slate-950');
+                    this.showCenterBanner(`【${winnerPlayer.label}】${winnerScore.formula}`, 'bg-amber-400 text-slate-950');
                 } else if (hasPig) {
                     this.showCenterBanner(`${winnerPlayer.label}收下 ♠Q（${pigSheepChanged ? '+100' : '-100'}）`, pigSheepChanged ? 'bg-emerald-500 text-slate-950' : 'bg-rose-600 text-white');
                 } else if (hasSheep) {
@@ -1996,6 +2007,8 @@
                 if (this.roundOver) return;
                 let anyGrandSlamOrMoon = false;
                 const roundScores = this.calculateRoundScores();
+                const meanTotal = this.SEAT_ORDER.reduce((sum, seat) =>
+                    sum + this.PLAYERS[seat].totalScore + roundScores[seat].score, 0) / this.SEAT_ORDER.length;
                 const roundSummary = {
                     round: this.roundNumber,
                     scores: {}
@@ -2004,12 +2017,13 @@
                 for (const seat of this.SEAT_ORDER) {
                     const p = this.PLAYERS[seat];
                     const result = roundScores[seat];
-                    p.totalScore += result.score;
+                    p.totalBeforeSettlement = p.totalScore;
+                    p.totalScore = p.totalBeforeSettlement + result.score - meanTotal;
                     roundSummary.scores[seat] = result.score;
 
                     if (result.shootMoon) {
                         anyGrandSlamOrMoon = true;
-                        this.showCenterBanner(`【${p.label}】${result.cards}`, result.isGrandSlam ? 'bg-amber-400 text-slate-950' : 'bg-emerald-400 text-slate-950');
+                        this.showCenterBanner(`【${p.label}】${result.formula}`, result.isGrandSlam ? 'bg-amber-400 text-slate-950' : 'bg-emerald-400 text-slate-950');
                     }
                 }
 
@@ -2032,8 +2046,7 @@
              * seats 是出牌順序；hands 是發牌時四家各拿到的 13 張；tricks 是每一墩依出牌順序誰出了哪一張
              * （您按過「提示」才出的那一張標 hint；模型替電腦選的那一張標 bot，值是當時的打法 normal 或 weak，
              * 沒標的是 GongZhuAI 算的）；有模型出的牌時 model 是那個模型檔的編號；totals 是這一局開始前的累計總分。
-             * settings.roundBase 是 'zero-sum'：每一局四家加上同一個底分，讓四家這一局的分數加起來是 0
-             * （之前的紀錄是 50：每人每局固定加 50）；result 裡的 score 已經含底分，formula 寫著底分是多少。
+             * settings.centerTotals 為 true 時，將 result 裡的本局牌分加進 totals 後，四家各自減去新的平均總分。
              * 這一局還沒打完、您也還沒出過牌時回傳 null（只是打開頁面，不用記）
              */
             getRecord() {
@@ -2046,11 +2059,10 @@
              */
             roundSoFar() {
                 const tricks = this.tricksSoFar();
-                const scores = this.calculateRoundScores();
                 const record = {
                     finished: this.roundOver,
                     round: this.roundNumber,
-                    settings: { scoringRuleMode: 'player_special', roundBase: 'zero-sum' },
+                    settings: { scoringRuleMode: 'player_special', centerTotals: true },
                     seats: this.SEAT_ORDER,
                     players: {},
                     hands: {},
@@ -2069,9 +2081,10 @@
                     const played = tricks.flatMap(trick => trick.filter(t => t.seat === seat).map(t => t.card));
                     record.players[seat] = { name: p.name, ai: p.isAI };
                     record.hands[seat] = this.sortCards(played.concat(p.hand)).map(c => c.id);
-                    record.totals[seat] = p.totalScore - (this.roundOver ? scores[seat].score : 0);
+                    record.totals[seat] = this.roundOver ? p.totalBeforeSettlement : p.totalScore;
                 }
                 if (this.roundOver) {
+                    const scores = this.calculateRoundScores();
                     record.result = {};
                     for (const seat of this.SEAT_ORDER) {
                         record.result[seat] = {
@@ -2317,7 +2330,7 @@
             }
 
             /**
-             * 牌桌旁的計分：四家這一局目前的分數，和這一局開始前的累計總分（完整的在計分板）
+             * 牌桌旁顯示本局牌分與截至最近一次結算的累計總分
              */
             renderScoreRail(roundScores) {
                 const rows = this.SEAT_ORDER.map(seat => {

@@ -265,12 +265,17 @@ const DRIVERS = {
                 leader = winner.seat;
             });
             seats.forEach(seat => assert.deepEqual(sorted(hands[seat]), final.hands[seat]));
-            if (!record.finished) return assert.equal(record.result, null);
+            if (!record.finished) {
+                assert.deepEqual(record.totals, final.totals);
+                return assert.equal(record.result, null);
+            }
             assert.equal(record.tricks.length, 13);
+            const totals = seats.map(seat => record.totals[seat] + record.result[seat].score);
+            const mean = record.settings.centerTotals ? totals.reduce((sum, score) => sum + score, 0) / seats.length : 0;
             let sum = 0;
-            for (const seat of seats) {
+            for (const [i, seat] of seats.entries()) {
                 assert.deepEqual(sorted(record.result[seat].captured), sorted(captured[seat]));
-                assert.equal(record.totals[seat] + record.result[seat].score, final.totals[seat]);
+                assert.equal(totals[i] - mean, final.totals[seat]);
                 sum += record.result[seat].captured.length;
             }
             assert.equal(sum, 16);
@@ -579,6 +584,51 @@ for (const name of GAMES) {
         assert.deepEqual(mine().map(entry => entry.hint), [true, undefined, undefined]);
     }));
 }
+
+test('gongzhu: every opening hand has one to eight cards per suit and at most 110 heart points', () => {
+    const env = open('gongzhu'), game = env.game;
+    const cards = new Map(game.createShuffledDeck().map(card => [card.id, card]));
+    // Every suit appears as a singleton and as an eight-card suit. South has 110 heart points and all three specials.
+    const allowed = [
+        'S2 S3 S4 S5 S6 S7 S8 S12 H14 H13 H11 C10 D11',
+        'H2 H3 H4 H5 H6 H7 H8 H9 S9 C13 C14 D12 D14',
+        'C2 C3 C4 C5 C6 C7 C8 C9 S10 S11 H12 D10 D13',
+        'D2 D3 D4 D5 D6 D7 D8 D9 S13 S14 H10 C11 C12'
+    ].flatMap(hand => hand.split(' '));
+    function swap(...pairs) {
+        const deck = allowed.slice();
+        for (const [first, second] of pairs) {
+            const a = deck.indexOf(first), b = deck.indexOf(second);
+            [deck[a], deck[b]] = [deck[b], deck[a]];
+        }
+        return deck;
+    }
+
+    const rejected = [
+        swap(['H11', 'H12']),                             // A + K + Q = 120
+        swap(['H11', 'H4'], ['S2', 'H9'], ['S3', 'H2']), // 111 because the four counts as 10
+        swap(['H11', 'S10']),                             // nine spades
+        swap(['H10', 'H11'], ['C13', 'H10']),             // nine low hearts (only 60 points)
+        swap(['S10', 'C11']), swap(['S13', 'D10']),       // nine clubs, nine diamonds
+        swap(['S9', 'C11']), swap(['H12', 'S13']),        // void in spades, void in hearts
+        swap(['C10', 'D12']), swap(['D11', 'C13'])        // void in clubs, void in diamonds
+    ];
+    // Put each invalid hand at every seat in turn.
+    const candidates = rejected.flatMap(deck => game.SEAT_ORDER.map((_, i) =>
+        deck.slice(i * 13).concat(deck.slice(0, i * 13))));
+    candidates.push(allowed);
+    game.createShuffledDeck = () => {
+        assert.ok(candidates.length, 'the deal at the exact limits should be accepted');
+        return candidates.shift().map(id => cards.get(id));
+    };
+
+    game.redealRound();
+    assert.equal(candidates.length, 0, 'all invalid deals were rejected');
+    const hands = stateOf(env).hands;
+    for (const [i, seat] of game.SEAT_ORDER.entries()) {
+        assert.deepEqual(hands[seat], sorted(allowed.slice(i * 13, (i + 1) * 13)));
+    }
+});
 
 // 本局重新發牌 (the menu's "deal this round again"): the round number and the totals stay, the cards are dealt afresh.
 test('gongzhu: dealing the round again before the player has played changes the cards and nothing else', () => onFirstSuitableDeal(seed => {
