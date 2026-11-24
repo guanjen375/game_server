@@ -138,35 +138,35 @@ body.felt-table, .app {
     outline: 2px solid var(--accent);
     outline-offset: 2px;
 }
-/* 反白手牌的白框與深色外框，在深淺兩種桌面都能辨認。 */
+/* 鍵盤模式也標示換手後自動取得焦點的牌，包含剛用觸控點牌的情況。 */
 .gz-hand-row, #playerHand { --hand-focus-face: #17212b; }
-.gz-hand-slot > .gz-card[data-game-choice="true"]:enabled:focus-visible,
-.hand-tile-wrap.playable:focus-visible {
+.gz-hand-slot > .gz-card[data-game-choice="true"]:enabled:is(:focus-visible, :where([data-keyboard-mode]) :focus),
+.hand-tile-wrap.playable:is(:focus-visible, :where([data-keyboard-mode]) :focus) {
     outline: 3px solid #fff;
     outline-offset: 0;
     box-shadow: 0 0 0 5px var(--hand-focus-face);
 }
-.gz-hand-slot > .gz-card[data-game-choice="true"]:enabled:focus-visible {
+.gz-hand-slot > .gz-card[data-game-choice="true"]:enabled:is(:focus-visible, :where([data-keyboard-mode]) :focus) {
     --card-ink: #fff;
     --card-red: #ffb3c0;
     background: var(--hand-focus-face);
 }
-.hand-tile-wrap.playable:focus-visible {
+.hand-tile-wrap.playable:is(:focus-visible, :where([data-keyboard-mode]) :focus) {
     border-radius: calc(var(--hand-w) * 0.14);
     transform: translateY(calc(var(--hand-w) * -0.24));
     z-index: 2;
 }
-.hand-tile-wrap.playable:focus-visible > .mj-tile { background: var(--hand-focus-face); }
-.hand-tile-wrap.playable:focus-visible > .mj-tile svg { filter: invert(1) hue-rotate(180deg); }
+.hand-tile-wrap.playable:is(:focus-visible, :where([data-keyboard-mode]) :focus) > .mj-tile { background: var(--hand-focus-face); }
+.hand-tile-wrap.playable:is(:focus-visible, :where([data-keyboard-mode]) :focus) > .mj-tile svg { filter: invert(1) hue-rotate(180deg); }
 
 /* 棋盤與中央牌桌。SVG 只換象棋格線、九宮、河界字色。 */
-[data-key-columns] [data-game-choice="true"]:focus-visible {
+[data-key-columns] [data-game-choice="true"]:is(:focus-visible, :where([data-keyboard-mode]) :focus) {
     outline: 3px solid var(--board-focus, var(--info));
     outline-offset: -3px;
     z-index: 4;
 }
-[data-key-columns] .xq-piece:focus-visible { outline-offset: 1px; border-radius: 50%; }
-[data-key-columns] .xq-dot:focus-visible { outline-offset: calc(var(--cell) * 0.14); }
+[data-key-columns] .xq-piece:is(:focus-visible, :where([data-keyboard-mode]) :focus) { outline-offset: 1px; border-radius: 50%; }
+[data-key-columns] .xq-dot:is(:focus-visible, :where([data-keyboard-mode]) :focus) { outline-offset: calc(var(--cell) * 0.14); }
 .board-frame, .rv-frame {
     background: var(--frame); border-color: var(--line); box-shadow: var(--shadow);
 }
@@ -279,8 +279,8 @@ body.felt-table, .app {
 .table-tools { flex: none; gap: 7px; }
 @media (min-width: 640px) {
     .table-tools::before { color: var(--muted); white-space: nowrap; font-size: 12px; }
-    body:has(main [data-game-choice]:focus-visible) .table-tools::before { content: "↑ 功能列"; }
-    body:has(main [data-key-columns] :focus-visible) .table-tools::before { content: "↑ 到頂進功能列"; }
+    body:has(main [data-game-choice]:is(:focus-visible, :where([data-keyboard-mode]) :focus)) .table-tools::before { content: "↑ 功能列"; }
+    body:has(main [data-key-columns] :is(:focus-visible, :where([data-keyboard-mode]) :focus)) .table-tools::before { content: "↑ 到頂進功能列"; }
     .table-header:has(:focus-visible) .table-tools::before { content: "↓ 回牌桌"; }
     .table-header:has(.table-menu[open] :focus-visible) .table-tools::before { content: "↑ ↓ 選項目"; }
 }
@@ -307,6 +307,7 @@ body.felt-table, .app {
 .menu-panel .table-tool:hover { background: var(--hover-surface); }
 .menu-panel .restart-tool { color: var(--negative); border-top: 1px solid var(--line); border-radius: 0 0 6px 6px; }
 .table-header .table-tool:focus-visible, .table-header .table-home:focus-visible,
+[data-turn-action]:is(:focus-visible, :where([data-keyboard-mode]) :focus),
 [data-table-commands] button:focus-visible, button[data-table-commands]:focus-visible {
     color: var(--surface);
     background: var(--ink);

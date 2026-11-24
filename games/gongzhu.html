@@ -136,7 +136,7 @@
             transform: translateY(calc(-1 * var(--lift)));
             box-shadow: 0 0 0 2px var(--gz-gold), 0 6px 14px rgb(0 0 0 / .4);
         }
-        .gz-hand-slot.is-playable > .gz-card:is(:hover, :focus-visible) { transform: translateY(calc(-1.8 * var(--lift))); }
+        .gz-hand-slot.is-playable > .gz-card:is(:hover, :focus-visible, :where([data-keyboard-mode]) :focus) { transform: translateY(calc(-1.8 * var(--lift))); }
         /* 不能出的牌變暗，底色保持不透明，疊著也看得清楚 */
         .gz-hand-slot.is-disabled > .gz-card { cursor: not-allowed; filter: brightness(var(--gz-dim)) saturate(.7); }
         /* 提示建議的那一張 */

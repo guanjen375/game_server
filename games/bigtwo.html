@@ -92,7 +92,7 @@
             transform: translateY(calc(-1.55 * var(--lift)));
             box-shadow: 0 0 0 2px var(--gz-gold), 0 5px 12px #0005;
         }
-        .gz-hand-slot .card.can-add:focus-visible { transform: translateY(calc(-1.1 * var(--lift))); }
+        .gz-hand-slot .card.can-add:is(:focus-visible, :where([data-keyboard-mode]) :focus) { transform: translateY(calc(-1.1 * var(--lift))); }
         .gz-hand-slot .card.selected::after, .opening-mark {
             position: absolute;
             top: calc(var(--cw) * .62);
@@ -316,7 +316,7 @@
                 <p class="selection-row" id="selectionInfo" role="status"></p>
                 <div class="actions" data-table-commands="below">
                     <button type="button" class="action-btn primary" id="playBtn" disabled>出牌</button>
-                    <button type="button" class="action-btn" id="passBtn" disabled>不出</button>
+                    <button type="button" class="action-btn" id="passBtn" data-turn-action disabled>不出</button>
                     <button type="button" class="action-btn subtle" id="clearBtn" disabled>取消選取</button>
                 </div>
             </div>

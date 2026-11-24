@@ -2521,7 +2521,10 @@
 
             /** 下方動作列：吃碰槓胡、自摸、槓、自動胡牌、出牌提示（內容沒變就不重畫，按鈕才不會一直重播彈出動畫、按到一半被換掉） */
             renderActions() {
-                const btn = (label, cls, onclick, extra = '') => `<button type="button" data-game-choice="true" class="action-btn ${cls}" onclick="${onclick}">${label}${extra}</button>`;
+                const claimOptions = this.phase === 'claim' && this.claim?.humanOpt;
+                const canRob = this.phase === 'rob' && this.claim;
+                const turnAction = !this.autoWin && (claimOptions || canRob) ? ' data-turn-action' : '';
+                const btn = (label, cls, onclick, extra = '') => `<button type="button" data-game-choice="true"${turnAction} class="action-btn ${cls}" onclick="${onclick}">${label}${extra}</button>`;
                 const mini = tiles => `<span class="flex items-end gap-[1px]">${tiles.map(t => TileArt.html(t, 'tiny')).join('')}</span>`;
                 const autoBtn = btn('🤖 自動胡牌', 'bg-violet-500 text-white', 'game.toggleAutoWin()');
                 let html = '';
@@ -2529,8 +2532,8 @@
                     // 輪到誰都顯示一樣的內容，自動打牌時動作列就不會跟著重畫
                     html += `<span class="bar-text text-violet-200 font-bold">🤖 自動胡牌中・聽：${this.waitsText(this.tingWaits())}</span>`;
                     html += btn('取消自動', 'bg-slate-700 text-white', 'game.toggleAutoWin()');
-                } else if (this.phase === 'claim' && this.claim && this.claim.humanOpt) {
-                    const o = this.claim.humanOpt, t = this.claim.tile;
+                } else if (claimOptions) {
+                    const o = claimOptions, t = this.claim.tile;
                     // 碰、槓圈風、門風或三元牌會加台：按鈕上直接標出來
                     const tai = isDragon(t) ? 1 : this.windTai(0, t);
                     const taiTag = tai ? `<span class="text-[0.65em] font-black px-1 rounded bg-black/20">+${tai}台</span>` : '';
@@ -2542,7 +2545,7 @@
                         html += btn('吃', 'bg-sky-500 text-slate-950', `game.humanClaim('chow', ${i})`, mini(sortTiles([...combo, t])));
                     });
                     html += btn('過', 'bg-slate-700 text-white', "game.humanClaim('pass')");
-                } else if (this.phase === 'rob' && this.claim) {
+                } else if (canRob) {
                     html += `<span class="bar-text flex items-center gap-1.5 text-amber-200 font-bold">${this.players[this.claim.seat].short} 加槓 ${mini([this.claim.tile])}，可以搶槓胡</span>`;
                     html += btn('搶槓胡', 'bg-rose-600 text-white', 'game.humanRob(true)');
                     html += btn('過', 'bg-slate-700 text-white', 'game.humanRob(false)');

@@ -240,11 +240,13 @@
         const header = document.querySelector('.table-header');
         const board = document.querySelector('[data-key-columns]');
         const playArea = board ?? document.querySelector('#hand, #playerHand, .gz-hand');
-        if (playArea && !playArea.hasAttribute('tabindex')) playArea.tabIndex = -1;
+        if (!playArea) return;
+        if (!playArea.hasAttribute('tabindex')) playArea.tabIndex = -1;
         const commands = document.querySelector('[data-table-commands]');
         const towardCommands = commands?.dataset.tableCommands === 'above' ? 'ArrowUp' : 'ArrowDown';
-        const choiceSelector = '[data-game-choice="true"]:not(:disabled)';
+        const choiceSelector = '[data-game-choice="true"]:not(:disabled, [aria-disabled="true"])';
         const toolSelector = '.table-home, .table-tools > button:not(.unavailable), .table-menu > summary';
+        const openOverlay = 'dialog[open], div[role="dialog"]:not(.hidden), .table-menu[open]';
         let lastChoice = null;
         document.addEventListener('focusin', event => {
             if (event.target.matches(choiceSelector)) lastChoice = event.target;
@@ -253,7 +255,12 @@
             const tools = visibleControls(header, toolSelector);
             (tools.find(el => !el.matches('.table-home')) ?? tools[0])?.focus();
         }
-        function returnToPlay(choices) {
+        function gameChoices(area) {
+            const choices = visibleControls(area, choiceSelector);
+            if (board) choices.sort((a, b) => Number(a.dataset.keyCell) - Number(b.dataset.keyCell));
+            return choices;
+        }
+        function returnToPlay(choices, options) {
             let next = lastChoice;
             if (lastChoice && !choices.includes(lastChoice)) {
                 // 重畫會替換麻將牌或象棋落點。相同的麻將牌依手牌位置區分。
@@ -262,7 +269,48 @@
                     ? el.getAttribute('aria-label') === label && el.dataset.i === lastChoice.dataset.i
                     : el.isEqualNode(lastChoice));
             }
-            (next ?? choices[0] ?? playArea)?.focus();
+            (next ?? choices[0] ?? playArea)?.focus(options);
+        }
+        function focusTurn() {
+            const current = document.activeElement;
+            if (document.hidden || !current || document.querySelector(openOverlay)) return;
+            if (current !== document.body && current !== playArea) {
+                // 保留正在操作的功能、表單，以及仍可出的那張牌。
+                if (!current.matches('[data-game-choice], [data-turn-action]')) return;
+                if (current.matches(choiceSelector + ', [data-turn-action]:enabled') && current.getClientRects().length) return;
+            }
+            const plays = gameChoices(playArea);
+            const choices = plays.length ? plays : visibleControls(document, '[data-turn-action]');
+            if (choices.length) returnToPlay(choices, { preventScroll: true });
+        }
+        function enableKeyboardMode() {
+            root.dataset.keyboardMode = '';
+            // 每批重畫結束後才恢復焦點。等電腦出牌時沒有可選項，就等下次畫面更新。
+            const observer = new MutationObserver(focusTurn);
+            const changes = { childList: true, subtree: true, attributeFilter: ['data-game-choice', 'disabled', 'hidden'] };
+            observer.observe(playArea, changes);
+            const actions = document.getElementById('actionBar');
+            if (actions) observer.observe(actions, changes);
+            for (const dialog of document.querySelectorAll('dialog, div[role="dialog"]')) {
+                observer.observe(dialog, { attributeFilter: ['open', 'class'] });
+            }
+            document.addEventListener('visibilitychange', focusTurn);
+            requestAnimationFrame(focusTurn);
+        }
+        const modeKey = 'game-keyboard-mode';
+        let usedKeyboard = false;
+        try { usedKeyboard = sessionStorage.getItem(modeKey) === '1'; } catch { /* 此頁仍可使用鍵盤。 */ }
+        if (usedKeyboard) enableKeyboardMode();
+        else {
+            window.addEventListener('keydown', function firstKey(event) {
+                if (event.ctrlKey || event.metaKey || event.altKey || event.isComposing || event.target.isContentEditable
+                    || event.target.closest?.('input, textarea')) return;
+                const key = event.key;
+                if (key.length !== 1 && !arrowStep(key) && !['Tab', 'Enter', 'Escape'].includes(key)) return;
+                window.removeEventListener('keydown', firstKey, true);
+                try { sessionStorage.setItem(modeKey, '1'); } catch { /* 保留本頁的鍵盤模式。 */ }
+                enableKeyboardMode();
+            }, true);
         }
         document.addEventListener('keydown', event => {
             const key = event.key, step = arrowStep(key);
@@ -270,7 +318,7 @@
             if (event.defaultPrevented || (!step && !activate)) return;
             const control = event.target.closest?.('[data-game-choice]');
             const blocked = modifiedKey(event) || event.target.isContentEditable || event.target.closest?.('input, select, textarea')
-                || document.querySelector('dialog[open], div[role="dialog"]:not(.hidden), .table-menu[open]');
+                || document.querySelector(openOverlay);
             if (activate) {
                 if (event.repeat && event.target.closest?.('button, summary, a[href], [role="button"]')) {
                     event.preventDefault();
@@ -286,8 +334,7 @@
             }
             if (blocked) return;
 
-            const choices = visibleControls(document, choiceSelector);
-            if (board) choices.sort((a, b) => Number(a.dataset.keyCell) - Number(b.dataset.keyCell));
+            const choices = gameChoices(document);
             const buttons = commands ? visibleControls(document, 'button[data-table-commands], [data-table-commands] button') : [];
             const playable = choices.length ? choices : buttons;
             const current = document.activeElement;
