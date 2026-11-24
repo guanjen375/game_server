@@ -55,19 +55,15 @@ function worker() {
 
     // One round of the deal with these options at the seats (in the page's seat order); returns the four scores.
     async function play(dealSeed, seating, gameSeed) {
-        const random = rng(gameSeed);
-        const { game, ai } = load({}, Object.assign(Object.create(Math), { random }));
+        // All four rotations use the page's dealer with the same seed, then play with independent random choices.
+        const math = Object.assign(Object.create(Math), { random: rng(dealSeed) });
+        const { game, ai } = load({}, math);
+        const hands = game.dealHands();
+        math.random = rng(gameSeed);
         Object.assign(ai, { BUDGET_MS: Infinity, MIN_SAMPLES: SAMPLES, MAX_SAMPLES: SAMPLES });
-        // The page shuffles with its own Math.random: cards in a fixed order first, then this deal's shuffle.
-        const deck = game.createShuffledDeck().sort((a, b) => (a.id < b.id ? -1 : 1));
-        const shuffle = rng(dealSeed);
-        for (let i = deck.length - 1; i > 0; i--) {
-            const j = Math.floor(shuffle() * (i + 1));
-            [deck[i], deck[j]] = [deck[j], deck[i]];
-        }
         const seats = game.SEAT_ORDER;
         seats.forEach((seat, i) => Object.assign(game.PLAYERS[seat], {
-            hand: game.sortCards(deck.slice(i * 13, i * 13 + 13)), captured: [], totalScore: 0, isAI: true }));
+            hand: game.sortCards(hands[i]), captured: [], totalScore: 0, isAI: true }));
         Object.assign(game, { trickHistory: [], currentTrick: [], leadSuit: null, trickNumber: 1, roundNumber: 1, roundOver: false });
         let leader = seats.find(seat => game.PLAYERS[seat].hand.some(card => card.id === 'S7'));
         while (!game.allScoringCardsCaptured()) {

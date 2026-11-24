@@ -585,15 +585,15 @@ for (const name of GAMES) {
     }));
 }
 
-test('gongzhu: every opening hand has one to eight cards per suit and at most 110 heart points', () => {
+test('gongzhu: the dealer enforces suit, heart, high spade and special-card limits at every seat', () => {
     const env = open('gongzhu'), game = env.game;
     const cards = new Map(game.createShuffledDeck().map(card => [card.id, card]));
-    // Every suit appears as a singleton and as an eight-card suit. South has 110 heart points and all three specials.
+    // Every suit appears as a singleton and as an eight-card suit. South has 110 heart points, C10 and D11.
     const allowed = [
-        'S2 S3 S4 S5 S6 S7 S8 S12 H14 H13 H11 C10 D11',
+        'S3 S4 S5 S6 S7 S8 S13 S14 H14 H13 H11 C10 D11',
         'H2 H3 H4 H5 H6 H7 H8 H9 S9 C13 C14 D12 D14',
         'C2 C3 C4 C5 C6 C7 C8 C9 S10 S11 H12 D10 D13',
-        'D2 D3 D4 D5 D6 D7 D8 D9 S13 S14 H10 C11 C12'
+        'D2 D3 D4 D5 D6 D7 D8 D9 S2 S12 H10 C11 C12'
     ].flatMap(hand => hand.split(' '));
     function swap(...pairs) {
         const deck = allowed.slice();
@@ -604,30 +604,45 @@ test('gongzhu: every opening hand has one to eight cards per suit and at most 11
         return deck;
     }
 
+    const fourDiamonds = [['D2', 'D11'], ['D3', 'D12'], ['D4', 'D13'], ['D5', 'D14']];
+    const fiveClubs = [['C2', 'C10'], ['C3', 'C11'], ['C4', 'C12'], ['C5', 'C13'], ['C6', 'C14']];
+    const threeHighSpades = [['D2', 'S13'], ['D3', 'S14'], ['D4', 'S11']]; // East has Q/K/A, 2 and J.
     const rejected = [
         swap(['H11', 'H12']),                             // A + K + Q = 120
-        swap(['H11', 'H4'], ['S2', 'H9'], ['S3', 'H2']), // 111 because the four counts as 10
+        swap(['H11', 'H4'], ['S4', 'H9'], ['S3', 'H2']), // 111 because the four counts as 10
         swap(['H11', 'S10']),                             // nine spades
         swap(['H10', 'H11'], ['C13', 'H10']),             // nine low hearts (only 60 points)
-        swap(['S10', 'C11']), swap(['S13', 'D10']),       // nine clubs, nine diamonds
-        swap(['S9', 'C11']), swap(['H12', 'S13']),        // void in spades, void in hearts
-        swap(['C10', 'D12']), swap(['D11', 'C13'])        // void in clubs, void in diamonds
+        swap(['S10', 'C11']), swap(['S12', 'D10']),       // nine clubs, nine diamonds
+        swap(['S9', 'C11']), swap(['H12', 'S12']),        // void in spades, void in hearts
+        swap(['C10', 'D12']), swap(['D11', 'C13']),       // void in clubs, void in diamonds
+        swap(['S2', 'C13']), swap(['D2', 'S13']), swap(...threeHighSpades), // one low spade short in each case
+        swap(...fourDiamonds), swap(...fiveClubs), swap(['S13', 'S12'])     // a complete forbidden group
     ];
+    const accepted = [
+        allowed,
+        swap(['S2', 'S11']), swap(['D2', 'S13'], ['D3', 'S11']), swap(...threeHighSpades, ['D5', 'S3']),
+        swap(['S13', 'S12'], ['C10', 'C11']), swap(['S13', 'S12'], ['D11', 'D2']) // the other special-card pairs
+    ];
+    for (const group of [fourDiamonds, fiveClubs]) {
+        group.forEach((_, missing) => accepted.push(swap(...group.filter((_, i) => i !== missing))));
+    }
     // Put each invalid hand at every seat in turn.
     const candidates = rejected.flatMap(deck => game.SEAT_ORDER.map((_, i) =>
         deck.slice(i * 13).concat(deck.slice(0, i * 13))));
-    candidates.push(allowed);
+    candidates.push(...accepted);
     game.createShuffledDeck = () => {
         assert.ok(candidates.length, 'the deal at the exact limits should be accepted');
         return candidates.shift().map(id => cards.get(id));
     };
 
-    game.redealRound();
-    assert.equal(candidates.length, 0, 'all invalid deals were rejected');
-    const hands = stateOf(env).hands;
-    for (const [i, seat] of game.SEAT_ORDER.entries()) {
-        assert.deepEqual(hands[seat], sorted(allowed.slice(i * 13, (i + 1) * 13)));
+    for (const expected of accepted) {
+        game.redealRound();
+        const hands = stateOf(env).hands;
+        for (const [i, seat] of game.SEAT_ORDER.entries()) {
+            assert.deepEqual(hands[seat], sorted(expected.slice(i * 13, (i + 1) * 13)));
+        }
     }
+    assert.equal(candidates.length, 0);
 });
 
 test('gongzhu: the last scoring card goes to the trick winner before the round ends with cards still in hand', () => {

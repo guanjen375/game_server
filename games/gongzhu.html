@@ -401,6 +401,9 @@
                     <h3 class="text-amber-400 font-black text-base mb-1.5">發牌與出牌順序</h3>
                     <ul class="list-disc pl-5 space-y-1 text-slate-300">
                         <li>每人起手 13 張牌，四種花色各有 <strong>1 到 8 張</strong>。為避免一家拿到太多大紅心而容易通吃，起手紅心點數合計最多 <strong>110 點</strong>。</li>
+                        <li>♠Q、♠K、♠A 每拿到一張，手上就至少要有一張 ♠2 至 ♠J 搭配。</li>
+                        <li>♦J、♦Q、♦K、♦A 四張至少分給兩家。♣10、♣J、♣Q、♣K、♣A 五張也至少分給兩家。</li>
+                        <li>♠Q、♦J、♣10 這三張計分牌至少分給兩家。</li>
                         <li>持有 <strong>♠7</strong> 的玩家先手，可選任一張手牌領出，接著順時針出牌。</li>
                         <li>有首張牌的花色就必須跟同花色，缺門時可以墊任一張牌。</li>
                         <li>首出花色中點數最大的人吃下這一墩，並領出下一墩。A 最大，2 最小。</li>
@@ -606,14 +609,21 @@
         const MAX_OPENING_CARDS_PER_SUIT = 8;
 
         function isValidOpeningHand(hand) {
-            const suitCounts = { S: 0, H: 0, C: 0, D: 0 };
+            const ranksBySuit = { S: [], H: [], C: [], D: [] };
             let heartPoints = 0;
             for (const { suit, rank } of hand) {
-                suitCounts[suit]++;
+                ranksBySuit[suit].push(rank);
                 if (suit === 'H') heartPoints -= HEART_POINTS[rank - 2];
             }
+            const { S: spades, D: diamonds, C: clubs } = ranksBySuit;
+            const highSpades = spades.filter(rank => rank >= 12).length;
+            const lowSpades = spades.length - highSpades;
             return heartPoints <= MAX_OPENING_HEART_POINTS
-                && Object.values(suitCounts).every(count => count > 0 && count <= MAX_OPENING_CARDS_PER_SUIT);
+                && Object.values(ranksBySuit).every(ranks => ranks.length > 0 && ranks.length <= MAX_OPENING_CARDS_PER_SUIT)
+                && lowSpades >= highSpades
+                && ![11, 12, 13, 14].every(rank => diamonds.includes(rank))
+                && ![10, 11, 12, 13, 14].every(rank => clubs.includes(rank))
+                && !(spades.includes(12) && diamonds.includes(11) && clubs.includes(10));
         }
 
         function compareDisplayRanks(a, b) {
@@ -2536,7 +2546,7 @@
             }
 
             /**
-             * 本局重新發牌：拿到沒辦法打的牌（例如黑桃只有一張 ♠Q）時，把這一局作廢、四家重發；局數和累計總分不變。
+             * 本局重新發牌：把這一局作廢、四家重發，保留局數和累計總分。
              * 您這一局還沒出過牌就直接重發；已經出過牌的話先確認，免得按錯把打到一半的牌局丟掉。結算之後不能重發
              */
             redealRound() {
