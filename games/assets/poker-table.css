@@ -27,8 +27,10 @@
     --card-ink: #17212b;
     --card-red: #d5233f;
 }
-/* 紙上棋室的面板是淺色的：白底的牌要有外框才看得出來 */
+/* 淺色面板用外框區分白底牌，已出的牌用透明底與淡字。 */
 :root[data-game][data-theme="paper"] { --gz-dim: .87; --trk-live-line: #8f8468; --trk-out: .5; }
+:root[data-game]:is([data-theme="harbor"], [data-theme="sakura"]) { --gz-dim: .87; --trk-live-line: var(--grid); --trk-out: .88; }
+:root[data-game]:is([data-theme="amber"], [data-theme="graphite"]) { --trk-out: .76; }
 body {
     min-height: var(--app-h);
     overflow-x: clip;

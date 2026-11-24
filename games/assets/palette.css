@@ -1,5 +1,5 @@
 /* 字型授權見同目錄的 credits.txt。 */
-/* 桌遊室共用色票。大廳採用淺色紙面，桌內採用同一組主題的棋桌與面板色。 */
+/* 桌遊室共用色票。每套主題分別指定大廳的紙面與遊戲的桌面、面板色。 */
 :root {
     color-scheme: dark;
     --sans: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", system-ui, "Table symbols", sans-serif;
@@ -61,6 +61,46 @@
     --hover-surface: #3b425b; --tint: #3b3650; --mark: #c7b5ed; --mark-ink: #25253a;
     --paper: #1c2030; --card: #272c40; --letter: #eff0fa; --pencil: #b4bdd2;
     --rule: #434b62; --brand: #c6b5ed; --brand-text: #242438; --wash: #33394c;
+}
+:root[data-theme="harbor"] {
+    color-scheme: light;
+    --canvas: #ddebf1;
+    --backdrop: radial-gradient(ellipse at 12% 5%, #f4fafb, transparent 65%), linear-gradient(155deg, #e5f0f4, #cbdfe8);
+    --surface: #f6fbfd; --inset: #e4eff4; --ink: #183748; --muted: #405c6c;
+    --accent: #145b79; --line: #aec6d1; --hover-line: #568098;
+    --hover-surface: #d4e7ef; --tint: #dbecf2; --mark: #215d78; --mark-ink: #f7fcff;
+    --paper: #e6f0f5; --card: #f7fbfd; --letter: #193546; --pencil: #496676;
+    --rule: #b6ccd5; --brand: #205f7c; --brand-text: #f5fbfe; --wash: #d9e8ef;
+}
+:root[data-theme="sakura"] {
+    color-scheme: light;
+    --canvas: #f3e1e5;
+    --backdrop: radial-gradient(ellipse at 85% 12%, #fff6f2, transparent 65%), linear-gradient(130deg, #f7e9e5, #eed9e1);
+    --surface: #fff7f6; --inset: #f4e7e7; --ink: #472e39; --muted: #694d59;
+    --accent: #873853; --line: #d2b5c0; --hover-line: #a0667d;
+    --hover-surface: #f1d9e1; --tint: #f3e0e7; --mark: #873954; --mark-ink: #fff9f8;
+    --paper: #f6e8e9; --card: #fff9f7; --letter: #472d37; --pencil: #71515d;
+    --rule: #dfc4cc; --brand: #8d3b5a; --brand-text: #fff9f7; --wash: #eddbe0;
+}
+:root[data-theme="amber"] {
+    color-scheme: dark;
+    --canvas: #30241e;
+    --backdrop: radial-gradient(ellipse at 48% 25%, #60432f, transparent 72%), #30231e;
+    --surface: #3e2d24; --inset: #2e211c; --ink: #fff2da; --muted: #d7bfa3;
+    --accent: #f3c37b; --line: #765941; --hover-line: #d3a66b;
+    --hover-surface: #503b2c; --tint: #4d3928; --mark: #edbd74; --mark-ink: #392619;
+    --paper: #2c211d; --card: #3b2b24; --letter: #fbefda; --pencil: #d5bca0;
+    --rule: #634936; --brand: #edbd74; --brand-text: #332319; --wash: #49352a;
+}
+:root[data-theme="graphite"] {
+    color-scheme: dark;
+    --canvas: #222428;
+    --backdrop: linear-gradient(145deg, #383c40, #222428 75%);
+    --surface: #303337; --inset: #232529; --ink: #f4f4f1; --muted: #c1c5c7;
+    --accent: #dde1e3; --line: #585e63; --hover-line: #b0b8bc;
+    --hover-surface: #42464b; --tint: #3d4146; --mark: #dde1e1; --mark-ink: #282b30;
+    --paper: #222428; --card: #2c2f33; --letter: #f1f2ef; --pencil: #b8bfc1;
+    --rule: #50555a; --brand: #d8dddd; --brand-text: #262a2c; --wash: #3a3e42;
 }
 [hidden] { display: none !important; }
 @font-face {

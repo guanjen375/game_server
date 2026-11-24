@@ -1,6 +1,14 @@
 // 大廳與牌桌共用瀏覽器的主題偏好。獨立打開遊戲檔也能使用。
 (() => {
-    const themes = { felt: '經典牌桌', paper: '紙上棋室', night: '東京夜色' };
+    const themes = {
+        felt: '經典牌桌',
+        paper: '紙上棋室',
+        night: '東京夜色',
+        harbor: '港灣晨霧',
+        sakura: '春日櫻花',
+        amber: '琥珀茶室',
+        graphite: '石墨銀灰'
+    };
     const storageKey = 'game-lobby-theme';
     const root = document.documentElement;
     let picker;

@@ -1,4 +1,4 @@
-/* 三種主題共用這些介面樣式。棋子正面的陣營、牌面花色及提示都由遊戲決定。 */
+/* 棋盤與牌背沿用主題色。棋子正面的陣營、牌面花色及提示都由遊戲決定。 */
 :root[data-theme="paper"] {
     --board: linear-gradient(145deg, #f7ecd4, #e8d8b6);
     --piece-back: linear-gradient(145deg, #71909a, #416f7b 55%, #284d58);
@@ -30,6 +30,38 @@
     --warning-bg: #40384a;
     --negative-bg: #3d293c;
     --positive-bg: #263c40;
+}
+:root[data-theme="harbor"] {
+    --board: linear-gradient(145deg, #e1eff3, #c3dbe5);
+    --frame: #bfd5df; --grid: #597789;
+    --piece-back: linear-gradient(145deg, #7094aa, #416d84 55%, #294f65); --back-detail: #e1f2f6;
+    --shadow: 0 3px 0 #a3bbc8, 0 8px 18px #244d6421;
+    --positive: #205f45; --negative: #992c48; --info: #1a5578; --warning: #715112;
+    --warning-bg: #f3ead3; --negative-bg: #f5e2e7; --positive-bg: #dcefe6;
+}
+:root[data-theme="sakura"] {
+    --board: linear-gradient(140deg, #f8e8e4, #e6cdd4);
+    --frame: #e4cbd1; --grid: #856374;
+    --piece-back: linear-gradient(145deg, #ae788a, #854d66 55%, #60354e); --back-detail: #ffe4e8;
+    --shadow: 0 3px 0 #c8aab3, 0 8px 18px #68374420;
+    --positive: #255f49; --negative: #97314b; --info: #315b83; --warning: #775115;
+    --warning-bg: #f5e9d6; --negative-bg: #f6dfe4; --positive-bg: #e1eee5;
+}
+:root[data-theme="amber"] {
+    --board: repeating-linear-gradient(6deg, transparent 0 9px, #f4cf9309 10px 11px), linear-gradient(140deg, #694b35, #493424);
+    --frame: #3e2c21; --grid: #c2a27b;
+    --piece-back: linear-gradient(145deg, #aa7951, #805738 55%, #533824); --back-detail: #f4d4a2;
+    --shadow: 0 3px 0 #281b14, 0 8px 24px #160c0966;
+    --positive: #b6e1b0; --negative: #ffb5aa; --info: #acd6eb; --warning: #f7d28d;
+    --warning-bg: #554128; --negative-bg: #573631; --positive-bg: #384632;
+}
+:root[data-theme="graphite"] {
+    --board: linear-gradient(145deg, #50555a, #363a3e);
+    --frame: #2c2f32; --grid: #a4acb2;
+    --piece-back: linear-gradient(145deg, #81898e, #575e63 55%, #3c4146); --back-detail: #e2e6e5;
+    --shadow: 0 3px 0 #191b1d, 0 8px 24px #0c101466;
+    --positive: #ace0bd; --negative: #ffb2b4; --info: #b1d8f5; --warning: #ecd39d;
+    --warning-bg: #494136; --negative-bg: #503539; --positive-bg: #34463d;
 }
 
 html, body { background-color: var(--canvas); }
@@ -92,8 +124,8 @@ body.felt-table, .app {
 .felt-table :is(span.bg-slate-950, .bg-rose-600, .bg-emerald-600, .bg-sky-600, .bg-pink-500, .bg-violet-500,
     [class~="bg-rose-600/80"], [class~="bg-rose-600/85"], [class~="bg-sky-600/80"]) { color: white; }
 .felt-table [class~="bg-emerald-700/80"] { background: var(--positive-bg); color: var(--positive); border-color: var(--line); }
-:root[data-theme="paper"] button[class~="bg-sky-600/80"] { background-color: #22658b; }
-:root[data-theme="paper"] button:is([class~="bg-rose-600/80"], [class~="bg-rose-600/85"]) { background-color: #ab304e; }
+:root:is([data-theme="paper"], [data-theme="harbor"], [data-theme="sakura"]) button[class~="bg-sky-600/80"] { background-color: #22658b; }
+:root:is([data-theme="paper"], [data-theme="harbor"], [data-theme="sakura"]) button:is([class~="bg-rose-600/80"], [class~="bg-rose-600/85"]) { background-color: #ab304e; }
 .felt-table :is(header .bg-gradient-to-br, button.from-amber-400, button[class~="bg-amber-500/90"]),
 .felt-table [id$="Modal"] button.bg-amber-400 {
     background: var(--mark);
@@ -119,10 +151,11 @@ body.felt-table, .app {
 .coord, .xq-label { color: var(--muted); }
 .xq-lines [stroke] { stroke: var(--grid); }
 .xq-lines text { fill: var(--grid); }
-:root[data-theme="paper"] :is(.move-dot, .xq-dot), :root[data-theme="paper"] .rv-cell.show-dot:not(.hint):not(.preview-black):not(.preview-white)::before {
+:root:is([data-theme="paper"], [data-theme="harbor"], [data-theme="sakura"]) :is(.move-dot, .xq-dot),
+:root:is([data-theme="paper"], [data-theme="harbor"], [data-theme="sakura"]) .rv-cell.show-dot:not(.hint):not(.preview-black):not(.preview-white)::before {
     outline: 1px solid #956711;
 }
-:root[data-theme="paper"] .pip-live.black { background: #354348; }
+:root:is([data-theme="paper"], [data-theme="harbor"], [data-theme="sakura"]) .pip-live.black { background: #354348; }
 .pip-hidden { border-color: var(--warning); }
 .pip-dead { border-color: var(--line); }
 .pip-dead::after { background: var(--muted); }
@@ -250,7 +283,7 @@ body.felt-table, .app {
 .game-theme-setting select { min-height: 38px; padding: 4px 9px; font: inherit; border: 1px solid var(--line); border-radius: 7px; background: var(--surface); color: var(--ink); }
 
 /* 棋盤用暖木與深格線，撲克與麻將桌用綠絨。輪到誰以實線框和既有的回合標籤表示。 */
-:root:is([data-game="xiangqi"], [data-game="banqi"]):not([data-theme="paper"], [data-theme="night"]) {
+:root:is([data-game="xiangqi"], [data-game="banqi"]):is([data-theme="felt"], :not([data-theme])) {
     --board: repeating-linear-gradient(3deg, transparent 0 5px, #825d2d07 6px 7px), linear-gradient(130deg, #e8cb99, #cfaa73);
     --frame: #745839; --grid: #7d603d;
 }
@@ -265,8 +298,8 @@ body.felt-table, .app {
 }
 .felt-table [id^="turn-badge-"] { animation: none; }
 .felt-table [id^="turn-badge-"]:not(.hidden), .app .seat.active::after { color: var(--mark-ink); background: var(--mark); }
-:root[data-game="banqi"]:not([data-theme="paper"], [data-theme="night"]) .board-frame .coord { color: #fff0cf; }
-:root[data-game="xiangqi"]:not([data-theme="paper"], [data-theme="night"]) .xq-label { color: #e8dcbb; }
+:root[data-game="banqi"]:is([data-theme="felt"], :not([data-theme])) .board-frame .coord { color: #fff0cf; }
+:root[data-game="xiangqi"]:is([data-theme="felt"], :not([data-theme])) .xq-label { color: #e8dcbb; }
 .board-frame, .rv-frame { border-radius: 14px; }
 .app .board { border-radius: 17px; }
 .app .board::before { border-radius: 12px; }
@@ -314,10 +347,10 @@ body.felt-table, .app {
     *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
 }
 
-:root[data-game^="mahjong"]:not([data-theme="night"], [data-theme="paper"]) {
+:root[data-game^="mahjong"]:is([data-theme="felt"], :not([data-theme])) {
     --piece-back: linear-gradient(145deg, #709c82, #40785e 55%, #295840);
 }
-:root[data-game="bigtwo"]:not([data-theme="night"], [data-theme="paper"]) {
+:root[data-game="bigtwo"]:is([data-theme="felt"], :not([data-theme])) {
     --piece-back: linear-gradient(145deg, #925244, #713d33);
 }
 .felt-table main [id^="panel-"].active-turn-ring {
