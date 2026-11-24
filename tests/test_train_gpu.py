@@ -344,6 +344,21 @@ class ReadingRecords(unittest.TestCase):
         for name, why in data.skipped:
             self.assertTrue(why, name)
 
+    def test_early_settlement_is_replayed_to_the_last_scoring_trick_and_old_rounds_to_the_thirteenth(self):
+        game = train_gpu.GongZhu()
+        old = rounds(1, seed=12)[0]  # South holds both S7 and C2. H12 is the last scoring card, in trick 12.
+        old["settings"] = {"scoringRuleMode": game.PLAYER_RULES}
+        early = dict(old, settings=dict(old["settings"], endOnAllScoringCards=True), tricks=old["tricks"][:-1])
+
+        self.assertEqual(len(list(game.decisions(old))), 52)
+        self.assertEqual(len(list(game.decisions(early))), 48)
+        with self.assertRaisesRegex(train_gpu.Skip, "結算前中斷"):
+            list(game.decisions(dict(early, tricks=early["tricks"][:-1])))
+        with self.assertRaisesRegex(train_gpu.Skip, "結算後還有出牌"):
+            list(game.decisions(dict(early, tricks=old["tricks"])))
+        with self.assertRaisesRegex(train_gpu.Skip, "已經打完了"):
+            game.upcoming(dict(early, status="unfinished"))
+
     def test_hinted_plays_are_left_out_unless_asked_for(self):
         records = rounds(6, hint_every=4)       # the 4th, 8th and 12th trick of every round
         plain, with_hints = dataset(records), dataset(records, with_hints=True)

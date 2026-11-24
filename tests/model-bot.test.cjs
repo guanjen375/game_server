@@ -419,6 +419,12 @@ async function playRound(env, reply = lastLegal, answered = []) {
         assert.ok(guard < 60, 'the round does not end');
         act(env);
     }
+    const record = env.recorder.rounds.at(-1);
+    const scores = ({ card }) => card[0] === 'H' || ['S12', 'C10', 'D11'].includes(card);
+    assert.equal(record.finished, true);
+    assert.ok(record.tricks.every(trick => trick.length === 4));
+    assert.equal(record.tricks.flat().filter(scores).length, 16);
+    assert.ok(record.tricks.at(-1).some(scores), 'the round stops on the last scoring trick');
     return answered;
 }
 
@@ -439,10 +445,9 @@ test('gongzhu: once the model is picked the computers play the card the model an
     const record = env.recorder.rounds[0];
     assert.equal(record.finished, true);
     const plays = record.tricks.flat();
-    assert.equal(plays.length, 52);
     const computers = plays.filter(play => play.seat !== 'south');
-    assert.equal(computers.length, 39);
-    assert.equal(answered.length, 39, 'one question for every card of a computer');
+    assert.equal(computers.length, 3 * record.tricks.length);
+    assert.equal(answered.length, computers.length, 'one question for every card of a computer');
     answered.forEach(({ question, answer, played }, i) => {
         assert.deepEqual(computers[i], { seat: question.seat, card: answer.play.card, bot: 'normal' }, `card ${i + 1} of the computers`);
         assert.equal(question.mode, 'normal');
@@ -482,8 +487,9 @@ test('gongzhu: the computers wait until the page knows whether there is a model,
         assert.equal(bot.asked.length, 1, 'now the model is asked for the first card');
         assert.equal(game.tricksSoFar().flat().length, 0);
         const answered = await playRound(env);
-        assert.equal(answered.length, 39);
-        assert.equal(env.recorder.rounds[0].tricks.flat().filter(play => play.bot === 'normal').length, 39);
+        const tricks = env.recorder.rounds[0].tricks;
+        assert.equal(answered.length, 3 * tricks.length);
+        assert.equal(tricks.flat().filter(play => play.bot === 'normal').length, answered.length);
         return;
     }
     assert.fail('a computer never had the lead');
@@ -552,9 +558,9 @@ test('gongzhu: with several models each one can be picked, is asked for by name,
     assert.equal(env.game.botMode, 'weak');
     assert.equal(env.game.botModel, '20261123_a');
     const answered = await playRound(env, lastLegalFromNamed);
-    assert.equal(answered.length, 39);
-    assert.ok(answered.every(({ question }) => question.mode === 'weak' && question.name === '20261123_a'));
     const record = env.recorder.rounds[0];
+    assert.equal(answered.length, 3 * record.tricks.length);
+    assert.ok(answered.every(({ question }) => question.mode === 'weak' && question.name === '20261123_a'));
     assert.equal(record.model, MODELS[1].id, 'the record names the model by its file');
     assert.ok(record.tricks.flat().filter(play => play.seat !== 'south').every(play => play.bot === 'weak'));
 
@@ -635,9 +641,8 @@ test('gongzhu: without an answer, or with one that cannot be played, the page pl
     for (const [i, reply] of replies.entries()) {
         const env = open(5 + i, fakeBot(), 'normal');
         const answered = await playRound(env, reply);
-        assert.equal(answered.length, 39, `reply ${i}: the model was still asked every time`);
         const record = env.recorder.rounds[0];
-        assert.equal(record.tricks.flat().length, 52, `reply ${i}: the round is played to the end`);
+        assert.equal(answered.length, 3 * record.tricks.length, `reply ${i}: the model was still asked every time`);
         assert.ok(record.tricks.flat().every(play => play.bot === undefined), `reply ${i}: nothing is marked`);
         assert.equal('model' in record, false, `reply ${i}: and no model is named`);
     }
@@ -663,7 +668,7 @@ test('gongzhu: a card that breaks the rules is not played even when the model as
         const held = record.hands[play.seat].filter(card => !record.tricks.slice(0, t).flat().some(p => p.card === card));
         if (play.card[0] !== led) assert.ok(!held.some(card => card[0] === led), `${play.seat} fails to follow suit in trick ${t + 1}`);
     }));
-    assert.equal(record.tricks.flat().filter(play => play.bot).length, 39 - refused, 'only the cards that were the model\'s are marked');
+    assert.equal(record.tricks.flat().filter(play => play.bot).length, 3 * record.tricks.length - refused, 'only the cards that were the model\'s are marked');
 });
 
 test('gongzhu: an answer that comes back after the player took the move back is not played', async () => {
@@ -697,7 +702,6 @@ test('gongzhu: an answer that comes back after the player took the move back is 
         await playRound(env, lastLegal, answered);
         assert.ok(answered.length > 0, 'the computers ask anew and carry on');
         const record = env.recorder.rounds[0];
-        assert.equal(record.tricks.flat().length, 52);
         assert.ok(record.tricks.flat().filter(play => play.seat !== 'south').every(play => play.bot === 'normal'));
         checked++;
     }
@@ -748,7 +752,6 @@ test('gongzhu: an answer for a round that was restarted in the meantime is not p
     await settle();
     assert.deepEqual(hands(game), dealt, 'nobody has played a card of the new deal');
     await playRound(env);
-    assert.equal(env.recorder.rounds[env.recorder.rounds.length - 1].tricks.flat().length, 52, 'and the new round plays out');
 });
 
 test('gongzhu: the model is picked but the server has none, or cannot be reached: nothing is asked and nothing is marked', async () => {
@@ -758,7 +761,6 @@ test('gongzhu: the model is picked but the server has none, or cannot be reached
         const answered = await playRound(env);
         assert.equal(answered.length, 0);
         const record = env.recorder.rounds[0];
-        assert.equal(record.tricks.flat().length, 52);
         assert.deepEqual(Object.keys(record), ['finished', 'round', 'settings', 'seats', 'players', 'hands', 'totals', 'tricks', 'result'],
             'the record looks as it always did');
         assert.ok(record.tricks.flat().every(play => Object.keys(play).every(key => ['seat', 'card', 'hint'].includes(key))));
@@ -789,9 +791,9 @@ test('the server understands every question the page asks', async () => {
     for (const [seed, mode] of [[61, 'normal'], [62, 'weak']]) {
         const env = open(seed, fakeBot(), mode);
         const answered = await playRound(env);
+        assert.equal(answered.length, 3 * env.recorder.rounds[0].tricks.length);
         questions.push(...answered.map(({ question }) => ({ record: question.record, seat: question.seat, mode: question.mode })));
     }
-    assert.equal(questions.length, 78);
     const folder = fs.mkdtempSync(path.join(os.tmpdir(), 'game-bot-'));
     try {
         const file = path.join(folder, 'questions.json');

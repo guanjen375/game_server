@@ -298,7 +298,7 @@
                 <summary class="table-tool" aria-label="牌桌選單"><i class="ui-icon i-three-dots" aria-hidden="true"></i><span>選單</span></summary>
                 <div class="menu-panel">
                     <button type="button" class="table-tool" onclick="game.openPlayedModal()"><i class="ui-icon i-card-list" aria-hidden="true"></i><span>已出牌紀錄</span></button>
-                    <button type="button" class="table-tool" onclick="game.openScoreModal(false)"><i class="ui-icon i-trophy" aria-hidden="true"></i><span>計分板</span></button>
+                    <button type="button" class="table-tool" onclick="game.openScoreModal()"><i class="ui-icon i-trophy" aria-hidden="true"></i><span>計分板</span></button>
                     <button type="button" class="table-tool" onclick="game.openRulesModal()"><i class="ui-icon i-journal-text" aria-hidden="true"></i><span>規則與設定</span></button>
                     <button type="button" class="table-tool sound-toggle" id="btnSound" onclick="game.toggleSound()" aria-pressed="true"><i class="ui-icon i-volume-up" aria-hidden="true"></i><span>音效</span><span class="sound-state" aria-hidden="true"></span></button>
                     <button type="button" class="table-tool redeal-tool" onclick="game.redealRound()"><i class="ui-icon i-arrow-repeat" aria-hidden="true"></i><span>本局重新發牌</span></button>
@@ -378,7 +378,7 @@
 
         <!-- 計分：四家的本局分數與累計總分；按了開計分板 -->
         <button type="button" id="scoreRail" class="gz-panel gz-scores" aria-haspopup="dialog" aria-controls="scoreModal"
-                aria-label="計分，開啟計分板" onclick="game.openScoreModal(false)">
+                aria-label="計分，開啟計分板" onclick="game.openScoreModal()">
             <span class="gz-panel-head">
                 <strong><span class="for-rail">計分</span><span class="for-strip">累計</span></strong>
                 <span class="gz-more"><span>計分板</span><i class="ui-icon i-arrow-right" aria-hidden="true"></i></span>
@@ -404,6 +404,7 @@
                         <li>持有 <strong>♠7</strong> 的玩家先手，可選任一張手牌領出，接著順時針出牌。</li>
                         <li>有首張牌的花色就必須跟同花色，缺門時可以墊任一張牌。</li>
                         <li>首出花色中點數最大的人吃下這一墩，並領出下一墩。A 最大，2 最小。</li>
+                        <li>四家合計吃完 <strong>16 張計分牌</strong>（♥2 至 ♥A、♠Q、♣10、♦J）時，收完這一墩就結算本局。</li>
                     </ul>
                 </div>
 
@@ -1644,6 +1645,10 @@
                 return false;
             }
 
+            allScoringCardsCaptured() {
+                return this.SEAT_ORDER.reduce((total, seat) => total + this.PLAYERS[seat].captured.length, 0) === 16;
+            }
+
             hasAllHeartsOnTable(capturedBySeat = null) {
                 return this.SEAT_ORDER.some(seat => {
                     const cards = capturedBySeat === null ? this.PLAYERS[seat].captured : (capturedBySeat[seat] || []);
@@ -1738,7 +1743,7 @@
              */
             getLegalCards(seat) {
                 const hand = this.PLAYERS[seat].hand;
-                if (hand.length === 0) return [];
+                if (this.roundOver || hand.length === 0) return [];
 
                 // 若為該墩首出玩家，可出任意手牌
                 if (!this.leadSuit || this.currentTrick.length === 0) {
@@ -1777,7 +1782,7 @@
             playCardFromSeat(seat, cardId, hinted = false, bot = null) {
                 const player = this.PLAYERS[seat];
                 const cardIdx = player.hand.findIndex(c => c.id === cardId);
-                if (cardIdx === -1) return;
+                if (this.roundOver || cardIdx === -1) return;
                 if (!player.isAI) this.pushUndo();
 
                 const [card] = player.hand.splice(cardIdx, 1);
@@ -1842,7 +1847,7 @@
              * 見 open_server.py）；選的是原本的電腦、伺服器上沒有模型、或連不上的時候用 GongZhuAI 自己算
              */
             executeAITurn() {
-                if (this.isProcessingTrick) return;
+                if (this.roundOver || this.isProcessingTrick) return;
                 const seat = this.currentTurn;
                 if (!this.PLAYERS[seat].isAI) return;
 
@@ -1985,7 +1990,7 @@
                     this.leadSuit = null;
                     this.isProcessingTrick = false;
 
-                    if (this.trickNumber >= 13) {
+                    if (this.allScoringCardsCaptured()) {
                         this.finishRound();
                     } else {
                         this.trickNumber++;
@@ -2001,7 +2006,7 @@
             }
 
             /**
-             * 第 13 墩結束，進行本局結算並彈出計分板
+             * 收完最後一張計分牌所在的墩後，結算本局並彈出計分板
              */
             finishRound() {
                 if (this.roundOver) return;
@@ -2037,7 +2042,7 @@
                 this.roundOver = true;
                 this.recordEnd();
                 this.renderAllPlayers();
-                this.openScoreModal(true);
+                this.openScoreModal();
             }
 
             /**
@@ -2047,6 +2052,7 @@
              * （您按過「提示」才出的那一張標 hint；模型替電腦選的那一張標 bot，值是當時的打法 normal 或 weak，
              * 沒標的是 GongZhuAI 算的）；有模型出的牌時 model 是那個模型檔的編號；totals 是這一局開始前的累計總分。
              * settings.centerTotals 為 true 時，將 result 裡的本局牌分加進 totals 後，四家各自減去新的平均總分。
+             * settings.endOnAllScoringCards 為 true 時，最後一墩是吃完計分牌的那一墩，手上可能還有牌。
              * 這一局還沒打完、您也還沒出過牌時回傳 null（只是打開頁面，不用記）
              */
             getRecord() {
@@ -2062,7 +2068,7 @@
                 const record = {
                     finished: this.roundOver,
                     round: this.roundNumber,
-                    settings: { scoringRuleMode: 'player_special', centerTotals: true },
+                    settings: { scoringRuleMode: 'player_special', centerTotals: true, endOnAllScoringCards: true },
                     seats: this.SEAT_ORDER,
                     players: {},
                     hands: {},
@@ -2313,8 +2319,10 @@
                 // 桌面中央：還沒有人出牌時寫出這一墩誰領牌
                 const leader = turnSeat && this.currentTrick.length === 0 ? turnSeat : null;
                 const status = document.getElementById('matStatus');
-                status.textContent = !leader ? '' : leader === 'south' ? '請您領牌' : `${this.PLAYERS[leader].label}領牌`;
+                status.textContent = this.roundOver ? '本局已結算' : '';
+                if (leader) status.textContent = leader === 'south' ? '請您領牌' : `${this.PLAYERS[leader].label}領牌`;
                 status.classList.toggle('is-you', leader === 'south');
+                document.getElementById('btnHint').disabled = this.roundOver;
 
                 this.renderScoreRail(roundScores);
                 this.renderPlayerHand();
@@ -2426,23 +2434,21 @@
 
             /**
              * 開啟計分板彈窗
-             * @param {boolean} isEndOfRound 是否為第 13 墩結束時自動彈出
              */
-            openScoreModal(isEndOfRound = false) {
+            openScoreModal() {
                 const modal = document.getElementById('scoreModal');
                 const titleEl = document.getElementById('scoreModalTitle');
                 const subEl = document.getElementById('scoreModalSubtitle');
                 const nextBtn = document.getElementById('btnNextRound');
 
-                if (isEndOfRound) {
+                if (this.roundOver) {
                     titleEl.innerHTML = `🏆 第 ${this.roundNumber} 局結算計分板`;
-                    subEl.textContent = '特殊規則 · 13 墩已結束';
-                    nextBtn.classList.remove('hidden');
+                    subEl.textContent = `第 ${this.trickNumber} 墩結束 · 16 張計分牌已收齊`;
                 } else {
                     titleEl.innerHTML = `📊 第 ${this.roundNumber} 局即時戰況與計分板`;
                     subEl.textContent = `特殊規則 · 第 ${this.trickNumber} / 13 墩`;
-                    nextBtn.classList.toggle('hidden', this.PLAYERS.south.hand.length > 0 || this.currentTrick.length > 0);
                 }
+                nextBtn.classList.toggle('hidden', !this.roundOver);
 
                 // 渲染四家得分明細
                 const roundScores = this.calculateRoundScores();

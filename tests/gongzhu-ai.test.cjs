@@ -249,7 +249,7 @@ test('settlement records the raw slam and sweep scores and centers the cumulativ
     assert.equal(record.result.south.score, 500);
     assert.equal(record.result.south.formula, '特殊規則 · 全紅加 ♣10 (+500)');
     assert.deepEqual(record.totals, opening);
-    assert.deepEqual(record.settings, { scoringRuleMode: 'player_special', centerTotals: true });
+    assert.deepEqual(record.settings, { scoringRuleMode: 'player_special', centerTotals: true, endOnAllScoringCards: true });
 });
 
 test('centering uses the cumulative totals and keeps quarter points', () => {

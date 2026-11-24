@@ -324,6 +324,7 @@ class GongZhu(Game):
         human = [not record["players"][seat]["ai"] for seat in seats]
         totals = [record["totals"][seat] for seat in seats]
         mode = record["settings"]["scoringRuleMode"]
+        end_on_scoring_cards = record["settings"].get("endOnAllScoringCards", False)
         finished = record["status"] == "finished"
         played, taken = [set() for _ in seats], [set() for _ in seats]
         void = [[False] * 4 for _ in seats]
@@ -332,7 +333,9 @@ class GongZhu(Game):
         leader = next(seat for seat in range(4) if opening_card in hands[seat])
         tricks = record["tricks"]
         table = []
+        complete = False
         for number, trick in enumerate(tricks):
+            need(not complete, "本局結算後還有出牌")
             need(len(trick) == 4 or (0 < len(trick) < 4 and number == len(tricks) - 1 and not finished), "有一墩不是四張")
             table = []
             for turn, play in enumerate(trick):
@@ -356,8 +359,9 @@ class GongZhu(Game):
                     played[seat].add(card)
                     if self.SCORING[card] is not None:
                         taken[leader].add(self.SCORING[card])
+                complete = sum(map(len, taken)) == 16 if end_on_scoring_cards else number + 1 == 13
         if finished:
-            need(len(tricks) == 13, "打完的一局不是十三墩")
+            need(complete, "紀錄在本局結算前中斷")
             for seat, name in enumerate(seats):
                 captured = {self.SCORING[self.card(card)] for card in record["result"][name]["captured"]}
                 need(taken[seat] == captured, "吃到的計分牌和結果對不起來")
@@ -365,7 +369,7 @@ class GongZhu(Game):
             if len(table) == 4:     # 上一墩收完了：輪到吃下它的那一家帶頭
                 table = []
             number = len(tricks) - bool(table)
-            need(not finished and number < 13, "這一局已經打完了")
+            need(not finished and not complete, "這一局已經打完了")
             seat = (leader + len(table)) % 4
             legal = self.legal(hands[seat], table, number, mode)
             x = self.view(seat, hands[seat], table, played, taken, void, led, number, totals, mode)

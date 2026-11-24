@@ -269,7 +269,7 @@ const DRIVERS = {
                 assert.deepEqual(record.totals, final.totals);
                 return assert.equal(record.result, null);
             }
-            assert.equal(record.tricks.length, 13);
+            assert.ok(record.tricks.at(-1).some(play => scoring(play.card)), 'the last trick awarded a scoring card');
             const totals = seats.map(seat => record.totals[seat] + record.result[seat].score);
             const mean = record.settings.centerTotals ? totals.reduce((sum, score) => sum + score, 0) / seats.length : 0;
             let sum = 0;
@@ -628,6 +628,43 @@ test('gongzhu: every opening hand has one to eight cards per suit and at most 11
     for (const [i, seat] of game.SEAT_ORDER.entries()) {
         assert.deepEqual(hands[seat], sorted(allowed.slice(i * 13, (i + 1) * 13)));
     }
+});
+
+test('gongzhu: the last scoring card goes to the trick winner before the round ends with cards still in hand', () => {
+    const env = open('gongzhu', 1), game = env.game;
+    game.chooseBestCardForAI = seat => {
+        const legal = game.getLegalCards(seat);
+        return legal.find(card => card.isScoring) || legal[0];
+    };
+    while (wait(env)) {
+        const card = game.chooseBestCardForAI('south');
+        game.onPlayerCardClick(card.id);
+        if (card.id === 'D11') {
+            assert.equal(game.currentTrick.length, 1, 'south leads the last scoring card');
+            assert.equal(game.SEAT_ORDER.reduce((n, s) => n + game.PLAYERS[s].captured.length, 0), 15);
+            assert.equal(env.recorder.peek().finished, false);
+        }
+    }
+
+    const [record] = env.recorder.rounds;
+    assert.equal(record.tricks.length, 8);
+    assert.deepEqual(record.tricks.at(-1).map(play => play.card), ['D11', 'D14', 'D10', 'D12']);
+    assert.ok(record.result.west.captured.includes('D11'));
+    const settled = stateOf(env);
+    env.driver.replay(record, settled);
+    for (const seat of game.SEAT_ORDER) {
+        assert.equal(settled.hands[seat].length, 5);
+        assert.equal(game.getLegalCards(seat).length, 0);
+    }
+    game.onPlayerCardClick(settled.hands.south[0]);
+    game.undo();
+    while (env.step()) {}
+    assert.deepEqual(stateOf(env), settled);
+    game.startNextRound();
+    assert.equal(env.recorder.rounds.length, 1);
+    assert.equal(game.roundNumber, 2);
+    assert.deepEqual(stateOf(env).totals, settled.totals);
+    assert.ok(game.SEAT_ORDER.every(seat => game.PLAYERS[seat].hand.length === 13));
 });
 
 // 本局重新發牌 (the menu's "deal this round again"): the round number and the totals stay, the cards are dealt afresh.

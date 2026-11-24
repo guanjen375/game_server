@@ -70,7 +70,7 @@ function worker() {
             hand: game.sortCards(deck.slice(i * 13, i * 13 + 13)), captured: [], totalScore: 0, isAI: true }));
         Object.assign(game, { trickHistory: [], currentTrick: [], leadSuit: null, trickNumber: 1, roundNumber: 1, roundOver: false });
         let leader = seats.find(seat => game.PLAYERS[seat].hand.some(card => card.id === 'S7'));
-        for (let n = 0; n < 52; n++) {
+        while (!game.allScoringCardsCaptured()) {
             const seat = seats[(seats.indexOf(leader) + game.currentTrick.length) % SEATS];
             const legal = game.getLegalCards(seat);
             const option = seating[seats.indexOf(seat)];
