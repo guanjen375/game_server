@@ -96,6 +96,29 @@ async function pointerPlay(page, selector) {
     else await page.mouse.click(x, y);
 }
 
+async function checkSettlement(page, finishRound) {
+    const next = '[data-next-round]';
+    const round = () => page.evaluate(() => game.roundNumber ?? game.handNo);
+    const before = await round();
+    await page.mouse.move(0, 0);
+    await page.evaluate(finishRound);
+    await page.waitForSelector(next, {visible: true});
+    assert.ok(await activeMatches(page, next), 'keyboard settlement selects the next round');
+    assert.equal(await round(), before);
+    await page.keyboard.press('ArrowLeft');
+    assert.equal(await activeMatches(page, next), false, 'other result actions remain reachable');
+    await page.keyboard.press('ArrowRight');
+    assert.ok(await activeMatches(page, next));
+    await page.keyboard.press('Enter');
+    assert.equal(await round(), before + 1);
+    await page.waitForSelector(next, {hidden: true});
+
+    await pointerPlay(page, '.table-header h1');
+    await page.evaluate(finishRound);
+    await page.waitForSelector(next, {visible: true});
+    assert.equal(await activeMatches(page, next), false, 'pointer settlement keeps its usual focus');
+}
+
 async function gongzhu(page) {
     const legal = await page.evaluate(() => {
         game.cancelTimers();
@@ -165,11 +188,16 @@ async function gongzhu(page) {
         game.executeAITurn();
         for (let i = 0; i < 12 && tasks.length && (game.isProcessingTrick || game.currentTurn !== 'south'); i++) tasks.shift()();
     });
-    assert.ok(await activeMatches(page, `#playerHandContainer ${choice}`), 'focus returns even after a pointer play');
+    assert.equal(await activeMatches(page, choice), false, 'a pointer play stops autofocus on the following turn');
+    await page.keyboard.press('ArrowRight');
+    assert.ok(await activeMatches(page, `#playerHandContainer ${choice}`));
     await checkHandContrast(page);
     const next = await page.evaluate(() => document.activeElement.parentNode.dataset.card);
     await page.keyboard.press('Enter');
     assert.equal(await page.evaluate(() => game.currentTrick.at(-1).card.id), next);
+    await page.evaluate(() => game.openScoreModal());
+    assert.ok(await activeMatches(page, '#scoreModal'), 'a mid-round scoreboard has no default next round');
+    await checkSettlement(page, () => game.finishRound());
 }
 
 async function bigtwo(page) {
@@ -242,6 +270,12 @@ async function bigtwo(page) {
     assert.ok(await activeMatches(page, '#passBtn:enabled'), 'only passing is legal');
     await page.keyboard.press('Enter');
     assert.equal(await page.evaluate(() => game.round.actions.filter(a => a.seat === 0).at(-1).type), 'pass');
+    await checkSettlement(page, () => {
+        const deck = BigTwo.createDeck();
+        const hands = ['C3', 'D3', 'C4', 'C5'].map(id => [deck.find(card => card.id === id)]);
+        game.round = new BigTwo.Round({hands});
+        game.performPlay(0, game.round.hands[0]);
+    });
 }
 
 async function banqi(page) {
@@ -269,6 +303,7 @@ async function banqi(page) {
     await page.keyboard.press('ArrowRight');
     await page.keyboard.press('Enter');
     assert.deepEqual(await page.evaluate(() => game.lastMove), {type: 'capture', from: 8, to: 9});
+    await checkSettlement(page, () => game.finishRound('south', 'eliminate'));
 }
 
 async function reversi(page) {
@@ -316,6 +351,13 @@ async function reversi(page) {
     assert.ok(await activeMatches(page, choice));
     await page.reload();
     await page.waitForFunction(s => document.activeElement.matches(s), {}, choice);
+    await pointerPlay(page, '.table-header h1');
+    await page.reload();
+    assert.equal(await page.$('html[data-keyboard-mode]'), null, 'pointer mode survives reload');
+    assert.equal(await activeMatches(page, choice), false);
+    await page.keyboard.press('ArrowRight');
+    assert.ok(await activeMatches(page, choice));
+    await checkSettlement(page, () => game.finishRound());
 }
 
 async function xiangqi(page) {
@@ -343,6 +385,7 @@ async function xiangqi(page) {
         await page.keyboard.press('Enter');
         assert.deepEqual(await page.evaluate(() => game.lastMove), {from: move.from, to: move.to});
     }
+    await checkSettlement(page, () => game.finishRound(null, 'repetition'));
 }
 
 async function mahjong(page) {
@@ -388,7 +431,9 @@ async function mahjong(page) {
         game.render();
     });
     assert.equal(await page.$$eval(`#playerHand ${choice}`, els => els.length), 0);
-    assert.ok(await activeMatches(page, '#actionBar [data-turn-action]'), 'an opponent discard can require a claim');
+    assert.equal(await activeMatches(page, '#actionBar [data-turn-action]'), false, 'pointer play leaves claims unfocused');
+    await page.keyboard.press('ArrowRight');
+    assert.ok(await activeMatches(page, '#actionBar [data-turn-action]'));
     await navigateTo(page, '#actionBar button[onclick*="chow"]');
     await page.keyboard.press('Enter');
     assert.equal(await page.evaluate(() => game.players[0].melds.at(-1).type), 'chow');
@@ -397,6 +442,10 @@ async function mahjong(page) {
     const discard = await page.evaluate(() => Number(document.activeElement.firstElementChild.dataset.tile));
     await page.keyboard.press('Enter');
     assert.equal(await page.evaluate(() => game.players[0].discards.at(-1)), discard);
+    await checkSettlement(page, () => {
+        delete game.schedule;
+        game.exhaustiveDraw();
+    });
 }
 
 async function run() {

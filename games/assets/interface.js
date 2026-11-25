@@ -11,6 +11,7 @@
     };
     const storageKey = 'game-lobby-theme';
     const root = document.documentElement;
+    const keyboardModeAttr = 'data-keyboard-mode';
     let picker;
     let chrome = document.querySelector('meta[name="theme-color"]');
     if (!chrome) {
@@ -94,6 +95,31 @@
         return event.altKey || event.ctrlKey || event.metaKey || event.shiftKey || event.isComposing;
     }
 
+    function setupInputMode() {
+        const modeKey = 'game-keyboard-mode';
+        function restore() {
+            try { root.toggleAttribute(keyboardModeAttr, sessionStorage.getItem(modeKey) === '1'); }
+            catch { /* 此頁仍可切換操作方式。 */ }
+        }
+        function useKeyboard(enabled) {
+            if (root.hasAttribute(keyboardModeAttr) === enabled) return;
+            root.toggleAttribute(keyboardModeAttr, enabled);
+            try {
+                if (enabled) sessionStorage.setItem(modeKey, '1');
+                else sessionStorage.removeItem(modeKey);
+            } catch { /* 只在本頁記住操作方式。 */ }
+        }
+        restore();
+        window.addEventListener('pageshow', event => { if (event.persisted) restore(); });
+        window.addEventListener('pointerdown', () => useKeyboard(false), true);
+        window.addEventListener('keydown', event => {
+            if (event.ctrlKey || event.metaKey || event.altKey || event.isComposing || event.target.isContentEditable
+                || event.target.closest?.('input, textarea')) return;
+            const key = event.key;
+            if (key.length === 1 || arrowStep(key) || ['Tab', 'Enter', 'Escape'].includes(key)) useKeyboard(true);
+        }, true);
+    }
+
     function adjacent(items, current, step) {
         const index = items.indexOf(current);
         if (index < 0) return step > 0 ? items[0] : items.at(-1);
@@ -163,22 +189,32 @@
     function setupDialogs() {
         const dialogs = [...document.querySelectorAll('div[role="dialog"]')];
         if (!dialogs.length && !document.querySelector('dialog')) return;
-        let active, previous;
+        let active, previous, availableNextRound;
         function sync() {
             const visible = dialogs.filter(dialog => !dialog.classList.contains('hidden'));
             const next = visible[visible.length - 1];
-            if (next === active) return;
-            if (!active && next) previous = document.activeElement;
-            active = next;
-            if (active) {
-                active.tabIndex = -1;
-                active.focus({ preventScroll: true });
-            } else if (previous?.isConnected) {
-                previous.focus({ preventScroll: true });
+            let target;
+            if (next !== active) {
+                if (!active && next) previous = document.activeElement;
+                active = next;
+                if (active) {
+                    active.tabIndex = -1;
+                    target = active;
+                } else if (previous?.isConnected) {
+                    target = previous;
+                }
             }
+            const dialog = document.querySelector('dialog[open]') || active;
+            const nextRound = dialog && visibleControls(dialog, '[data-next-round]')[0];
+            // 即時計分板也可能直接變成結算畫面，只在「下一局」出現時選取一次。
+            if (nextRound && nextRound !== availableNextRound && root.hasAttribute(keyboardModeAttr)) target = nextRound;
+            availableNextRound = nextRound;
+            target?.focus({ preventScroll: true });
         }
         const observer = new MutationObserver(sync);
-        for (const dialog of dialogs) observer.observe(dialog, { attributes: true, attributeFilter: ['class'] });
+        for (const el of document.querySelectorAll('dialog, div[role="dialog"], [data-next-round]')) {
+            observer.observe(el, { attributeFilter: ['class', 'open', 'hidden', 'disabled'] });
+        }
         sync();
         document.addEventListener('keydown', event => {
             const dialog = document.querySelector('dialog[open]') || active;
@@ -273,7 +309,7 @@
         }
         function focusTurn() {
             const current = document.activeElement;
-            if (document.hidden || !current || document.querySelector(openOverlay)) return;
+            if (!root.hasAttribute(keyboardModeAttr) || document.hidden || !current || document.querySelector(openOverlay)) return;
             if (current !== document.body && current !== playArea) {
                 // 保留正在操作的功能、表單，以及仍可出的那張牌。
                 if (!current.matches('[data-game-choice], [data-turn-action]')) return;
@@ -283,10 +319,13 @@
             const choices = plays.length ? plays : visibleControls(document, '[data-turn-action]');
             if (choices.length) returnToPlay(choices, { preventScroll: true });
         }
-        function enableKeyboardMode() {
-            root.dataset.keyboardMode = '';
+        const observer = new MutationObserver(focusTurn);
+        function watchTurns() {
+            if (!root.hasAttribute(keyboardModeAttr)) {
+                observer.disconnect();
+                return;
+            }
             // 每批重畫結束後才恢復焦點。等電腦出牌時沒有可選項，就等下次畫面更新。
-            const observer = new MutationObserver(focusTurn);
             const changes = { childList: true, subtree: true, attributeFilter: ['data-game-choice', 'disabled', 'hidden'] };
             observer.observe(playArea, changes);
             const actions = document.getElementById('actionBar');
@@ -294,24 +333,11 @@
             for (const dialog of document.querySelectorAll('dialog, div[role="dialog"]')) {
                 observer.observe(dialog, { attributeFilter: ['open', 'class'] });
             }
-            document.addEventListener('visibilitychange', focusTurn);
             requestAnimationFrame(focusTurn);
         }
-        const modeKey = 'game-keyboard-mode';
-        let usedKeyboard = false;
-        try { usedKeyboard = sessionStorage.getItem(modeKey) === '1'; } catch { /* 此頁仍可使用鍵盤。 */ }
-        if (usedKeyboard) enableKeyboardMode();
-        else {
-            window.addEventListener('keydown', function firstKey(event) {
-                if (event.ctrlKey || event.metaKey || event.altKey || event.isComposing || event.target.isContentEditable
-                    || event.target.closest?.('input, textarea')) return;
-                const key = event.key;
-                if (key.length !== 1 && !arrowStep(key) && !['Tab', 'Enter', 'Escape'].includes(key)) return;
-                window.removeEventListener('keydown', firstKey, true);
-                try { sessionStorage.setItem(modeKey, '1'); } catch { /* 保留本頁的鍵盤模式。 */ }
-                enableKeyboardMode();
-            }, true);
-        }
+        new MutationObserver(watchTurns).observe(root, { attributeFilter: [keyboardModeAttr] });
+        document.addEventListener('visibilitychange', focusTurn);
+        watchTurns();
         document.addEventListener('keydown', event => {
             const key = event.key, step = arrowStep(key);
             const activate = key === 'Enter' || key === ' ';
@@ -364,6 +390,7 @@
     }
 
     document.addEventListener('DOMContentLoaded', () => {
+        setupInputMode();
         setupPicker();
         setupFilters();
         setupMenu();

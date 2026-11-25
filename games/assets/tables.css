@@ -134,11 +134,12 @@ body.felt-table, .app {
 }
 .felt-table button[class~="bg-emerald-800/80"]:enabled:hover,
 .felt-table button.bg-slate-700:enabled:hover { background: var(--hover-surface); color: var(--accent); }
-.felt-table :is(button, select):focus-visible, .app button:focus-visible, dialog button:focus-visible {
+.felt-table :is(button, select):focus-visible, .app button:focus-visible, dialog button:focus-visible,
+:where([data-keyboard-mode]) [data-next-round]:focus {
     outline: 2px solid var(--accent);
     outline-offset: 2px;
 }
-/* 鍵盤模式也標示換手後自動取得焦點的牌，包含剛用觸控點牌的情況。 */
+/* 鍵盤模式也標示換手後自動取得焦點的牌。 */
 .gz-hand-row, #playerHand { --hand-focus-face: #17212b; }
 .gz-hand-slot > .gz-card[data-game-choice="true"]:enabled:is(:focus-visible, :where([data-keyboard-mode]) :focus),
 .hand-tile-wrap.playable:is(:focus-visible, :where([data-keyboard-mode]) :focus) {
