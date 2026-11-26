@@ -369,7 +369,7 @@
         </div>
         <div class="table-state" aria-label="牌桌狀態"><span id="moveCounter">第 1 手</span><span>比分計數 <b id="drawCounter">0 / 50</b></span><span>暗子 <b id="hiddenCounter">32</b></span></div>
         <nav class="table-tools" aria-label="遊戲操作">
-            <button type="button" class="table-tool hint-tool" id="btnHint" onclick="game.showHint()" title="走棋提示" aria-label="走棋提示"><i class="ui-icon i-lightbulb" aria-hidden="true"></i><span>提示</span></button>
+            <button type="button" class="table-tool hint-tool" aria-controls="coachAdvice" id="btnHint" onclick="game.showHint()" title="專業教練" aria-label="專業教練"><i class="ui-icon i-lightbulb" aria-hidden="true"></i><span>教練</span></button>
             <button type="button" class="table-tool" onclick="game.undo()"><i class="ui-icon i-arrow-counterclockwise" aria-hidden="true"></i><span>悔棋</span></button>
             <details class="table-menu">
                 <summary class="table-tool" aria-label="牌桌選單"><i class="ui-icon i-three-dots" aria-hidden="true"></i><span>選單</span></summary>
@@ -382,6 +382,7 @@
             </details>
         </nav>
     </header>
+    <output id="coachAdvice" class="table-coach" aria-label="教練建議" aria-live="polite" aria-atomic="true"></output>
 
     <!-- 棋桌主要遊戲區 -->
     <main class="relative flex-1 min-h-0 w-full max-w-7xl mx-auto flex flex-col justify-between p-2 sm:p-4 overflow-hidden">
@@ -634,7 +635,7 @@
 
                 <div class="bg-slate-800/80 border border-white/10 rounded-xl p-3.5 text-xs text-slate-300">
                     用方向鍵選暗棋或能走的棋子，按 Enter 翻棋或選子。選子後，用方向鍵選落點，再按 Enter 走棋或吃子。在最上方可選的一排再按 ↑ 到功能列，← → 選功能，↓ 回棋盤。選單用 ↑ ↓ 選項目、Enter 確認。<br>
-                    💡 <strong>貼心防呆設計：</strong>輪到您時，滑過暗棋會亮起金框；點選己方棋子後，可走的空格會出現金色光點、可吃的敵子會亮起紅圈，不合規則的點擊會直接提示原因。點擊上方「走棋提示」可獲得電腦的建議；誤觸也能「悔棋」（悔棋只收回走過的步，蓋著的暗棋不會重洗）。
+                    💡 <strong>貼心防呆設計：</strong>輪到您時，滑過暗棋會亮起金框；點選己方棋子後，可走的空格會出現金色光點、可吃的敵子會亮起紅圈，不合規則的點擊會直接提示原因。點「教練」可查看翻棋機會、吃子得分或落點風險；誤觸也能「悔棋」（悔棋只收回走過的步，蓋著的暗棋不會重洗）。
                 </div>
             </div>
             <div class="px-6 py-3.5 bg-slate-950 border-t border-white/10 flex flex-wrap items-center justify-between gap-3">
@@ -1915,7 +1916,7 @@
              * 自動記錄用：這一局到目前為止的紀錄，內容和「匯出本局棋譜」一樣，另外寫明雙方是誰、下完了沒。
              * moves 每一手：kind 是 flip（翻棋）、move（走子）或 capture（吃子）；sq、from、to 是格子（列 × 8 ＋ 行，左上角是 0）；
              * code 是棋子（1～7 紅方帥仕相俥傌炮兵，8～14 黑方將士象車馬包卒）；color 0 紅、1 黑；電腦走的那一手附上它的思考統計（analysis）；
-             * 玩家按過「提示」才走的那一手標 hint。
+             * 玩家按過「教練」才走的那一手標 hint。
              * 這一局還沒下完、玩家也還沒走過任何一手時回傳 null（只是打開頁面，不用記）
              */
             getRecord() {
@@ -2241,7 +2242,7 @@
              */
             showHint() {
                 if (!this.isHumanTurn()) {
-                    this.showCenterBanner(this.gameOver ? '🏁 本局已結束' : '⏳ 請等待輪到您的回合再使用提示', 'bg-slate-800 text-amber-300');
+                    this.showCenterBanner(this.gameOver ? '🏁 本局已結束' : '⏳ 輪到您走棋時可以請教教練', 'bg-slate-800 text-amber-300');
                     return;
                 }
                 const player = this.PLAYERS[this.turn];
@@ -2252,16 +2253,28 @@
                 this.renderBoard();
                 this.updateActionHint();
 
-                const b = this.state.board;
-                let text;
+                const st = this.state, b = st.board;
+                let title, detail;
                 if (action.type === 'flip') {
-                    text = `💡 建議：翻開 ${sqName(action.sq)} 的暗棋`;
-                } else if (action.type === 'capture') {
-                    text = `💡 建議：${sqName(action.from)} 的「${pieceName(b[action.from])}」吃掉「${pieceName(b[action.to])}」`;
+                    title = `翻開 ${sqName(action.sq)}`;
+                    const red = st.pool.slice(1, 8).reduce((sum, count) => sum + count, 0);
+                    detail = `未翻棋中有紅子 ${red} 枚、黑子 ${st.hidden - red} 枚。`;
+                    if (player.color === null) detail += '首手翻出的顏色決定陣營，每格機會相同，教練隨機選一格。';
+                    else detail += `翻到己方棋子的機會是 ${player.color === RED ? red : st.hidden - red}/${st.hidden}。`;
                 } else {
-                    text = `💡 建議：「${pieceName(b[action.from])}」${sqName(action.from)} → ${sqName(action.to)}`;
+                    const { from, to } = action, mover = b[from], target = b[to], opp = 1 - player.color;
+                    title = `${sqName(from)} 的${pieceName(mover)}走到 ${sqName(to)}`;
+                    const next = Engine.cloneState(st);
+                    next.board[from] = EMPTY;
+                    next.board[to] = mover;
+                    detail = target ? `吃掉${pieceName(target)}可得 ${CAPTURE_POINTS[typeOf(target)]} 分。` : '';
+                    if (Engine.isAttackedBy(next, to, opp)) detail += '走完後，對方的明子可以立即吃掉這枚棋。';
+                    else if (Engine.isAttackedBy(st, from, opp)) detail += '這步避開原位的攻擊，對方的明子無法立即吃回。';
+                    else detail += '走完後，對方的明子無法立即吃掉這枚棋。';
                 }
-                this.showCenterBanner(text, 'bg-sky-500 text-slate-950');
+                const search = BanqiAI.lastSearch;
+                if (search) detail += search.completedDepth ? `搜尋完成 ${search.completedDepth} 層。` : '搜尋時間內未完成第一層，採用備選走法。';
+                document.getElementById('coachAdvice').textContent = `教練建議　${title}\n${detail}`;
             }
 
             /**
@@ -2335,6 +2348,7 @@
             }
 
             renderAll() {
+                if (!this.hint || this.gameOver) document.getElementById('coachAdvice').textContent = '';
                 this.renderHeader();
                 this.renderPanels();
                 this.renderBoard();

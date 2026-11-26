@@ -282,7 +282,7 @@
         </div>
         <p id="turnStatus" class="sr-only" role="status"></p>
         <nav class="table-tools" aria-label="遊戲操作">
-            <button type="button" class="table-tool hint-tool" id="hintBtn" aria-label="出牌提示" title="出牌提示 (H)"><i class="ui-icon i-lightbulb" aria-hidden="true"></i><span>提示</span></button>
+            <button type="button" class="table-tool hint-tool" aria-controls="coachAdvice" id="hintBtn" aria-label="專業教練" title="專業教練 (H)"><i class="ui-icon i-lightbulb" aria-hidden="true"></i><span>教練</span></button>
             <button type="button" class="table-tool" id="undoBtn"><i class="ui-icon i-arrow-counterclockwise" aria-hidden="true"></i><span>悔牌</span></button>
             <details class="table-menu">
                 <summary class="table-tool" aria-label="牌桌選單"><i class="ui-icon i-three-dots" aria-hidden="true"></i><span>選單</span></summary>
@@ -296,6 +296,7 @@
             </details>
         </nav>
     </header>
+    <output id="coachAdvice" class="table-coach" aria-label="教練建議" aria-live="polite" aria-atomic="true"></output>
     <main class="gz-layout" aria-label="大老二牌桌">
         <div class="gz-table">
             <section class="gz-seat" id="panel-west" aria-label="西家 BOT003"></section>
@@ -345,10 +346,10 @@
       <div class="rule-box"><h3>PASS · 本輪退出</h3><p>一旦不出，本輪就不能再出任何牌（包含切牌），系統會跳過您。等其他三家都已 PASS，最後出牌者自由領出；新一輪所有人恢復出牌。自由領出時不能 PASS。</p></div>
       <div class="rule-box"><h3>計分方式</h3><p>輸家剩 1–9 張，每張扣 1 分；剩 10–12 張加倍；剩 13 張乘 3。贏家取得所有扣分，四家總和為 0。</p></div>
     </div>
-    <p class="rule-small">💡 <strong>出牌提示</strong>會選取一組合法牌，重複按可換一組。輪到您時，能搭配已選手牌的牌會亮起；點選後會出現金框，再按「出牌」送出。開啟視窗時，電腦會暫停等待。</p>
+    <p class="rule-small">💡 <strong>教練</strong>會選取建議的牌組，說明出牌依據。再按一次可查看其他合法選擇。輪到您時，能搭配已選手牌的牌會亮起；點選後會出現金框，再按「出牌」送出。開啟視窗時，電腦會暫停等待。</p>
     <p class="rule-small">↶ <strong>悔牌</strong>：按錯、出錯牌或誤按「不出」時，按上方的「悔牌」就回到您那一手之前，可以連續按；一局結算之後就不能悔牌了。悔牌只會把出過的牌收回，各家的手牌不會重洗。</p>
     <p class="rule-small">📋 <strong>出牌紀錄</strong>：記牌表依點數及花色由小到大排列。白底是別家的牌，金底是您的手牌，淡色是已出的牌。點記牌表或從選單開啟紀錄，可以看每一輪誰出了什麼。</p>
-    <p class="rule-small">← → 選牌，Enter 打出單張。空白鍵逐張選取或取消，再按 Enter 打出牌組。從手牌按 ↑ 到功能列，按 ↓ 到「出牌、不出、取消選取」。← → 選按鈕，Enter 執行。選單用 ↑ ↓ 選項目。P 不出、H 提示、Esc 清除選取。</p>
+    <p class="rule-small">← → 選牌，Enter 打出單張。空白鍵逐張選取或取消，再按 Enter 打出牌組。從手牌按 ↑ 到功能列，按 ↓ 到「出牌、不出、取消選取」。← → 選按鈕，Enter 執行。選單用 ↑ ↓ 選項目。P 不出、H 教練、Esc 清除選取。</p>
   </div><div class="modal-footer"><button class="action-btn primary" data-close>了解，繼續玩</button></div>
 </dialog>
 <dialog id="scoreDialog" aria-labelledby="scoreTitle"><div class="modal-header"><div><h2 id="scoreTitle">🏆 累計計分板</h2><p id="scoreSubtitle">四家累計分數</p></div><button class="close" data-close aria-label="關閉計分板">×</button></div><div class="modal-body" id="scoreBody"></div><div class="modal-footer"><button class="action-btn" data-close>返回牌桌</button><button class="action-btn primary" id="nextBtn" data-next-round hidden>開始下一局 →</button></div></dialog>
@@ -852,7 +853,7 @@
 
   const AI_BUDGET_MS = 150, AI_CANDIDATES = 7, AI_MIN_SAMPLES = 30, AI_MAX_SAMPLES = 400;
 
-  function chooseFromView(view) {
+  function chooseFromView(view, analysis) {
     if (view.hand.length > 13) {
       // custom deals with more than 13 cards: the bit-mask planner is sized for one normal hand
       const moves = legalMoves(view.hand, view.target, view.opening);
@@ -922,18 +923,19 @@
       const se = Math.sqrt(Math.max(0, diffSq[i] / samples - gain * gain) / samples);
       if ((!early || gain > 2 * se) && gain > bestGain) { best = i; bestGain = gain; }
     }
+    if (analysis) Object.assign(analysis, { samples, candidates: candidates.length, mean: totals[best] / samples });
     return candidates[best].cards ? candidates[best].cards.slice() : null;
   }
 
   // options.round + options.seat give the full public view; the older options still work for custom hands.
   function chooseMove(hand, target = null, options = {}) {
-    if (options.round) return chooseFromView(viewOf(options.round, options.seat));
+    if (options.round) return chooseFromView(viewOf(options.round, options.seat), options.analysis);
     const counts = [hand.length, 13, 13, 13];
     if (options.opponentMin) counts[1] = options.opponentMin;
     return chooseFromView({
       hand, seat: 0, played: [], opening: !!options.mustIncludeC3, target: targetCombo(target),
       lastSeat: target ? 1 : null, counts, passed: [false, false, false, false], passes: 0
-    });
+    }, options.analysis);
   }
 
   class Round {
@@ -1197,6 +1199,7 @@ class BigTwoApp {
 
   render() {
     const r = this.round;
+    if (!this.hintKey || r.over) $('coachAdvice').textContent = '';
     $('roundBadge').textContent = `第 ${this.roundNumber} 局`;
     $('trickNumber').textContent = 1 + r.actions.filter(action => action.type === 'reset').length;
     $('turnStatus').textContent = r.over ? `${SHORT[r.winner]}獲勝` : `輪到${SHORT[r.turn]}出牌`;
@@ -1474,14 +1477,11 @@ class BigTwoApp {
   hint() {
     const r = this.round;
     if (this.modal || r.over || r.turn !== 0 || r.passed[0]) return;
-    if (!this.legalPlays.length) {
-      this.clearSelection();
-      return this.toast('目前沒有能壓過的牌，請按「不出」。');
-    }
     const key = r.hands[0].map(c => c.id).join(',') + '|' + (r.lastPlay ? r.lastPlay.cards.map(c => c.id).join(',') : 'free');
     if (this.hintKey !== key) {
       const moves = this.legalPlays.slice();
-      const recommended = BigTwo.chooseMove(r.hands[0], r.lastPlay, {round: r, seat: 0});
+      this.hintAnalysis = {};
+      const recommended = moves.length && BigTwo.chooseMove(r.hands[0], r.lastPlay, {round: r, seat: 0, analysis: this.hintAnalysis});
       if (recommended) {
         const ids = new Set(recommended.map(card => card.id));
         const index = moves.findIndex(move => move.size === ids.size && move.cards.every(card => ids.has(card.id)));
@@ -1491,21 +1491,32 @@ class BigTwoApp {
       this.hintIndex = 0;
       this.hintKey = key;
     }
-    const move = this.hintMoves[this.hintIndex++ % this.hintMoves.length];
-    if (!move) {
-      this.clearSelection();
-      return this.toast('建議先不出。再按提示可看能出的牌。');
-    }
-    this.selected = new Set(move.cards.map(card => card.id));
+    const index = this.hintIndex++ % this.hintMoves.length;
+    const move = this.hintMoves[index];
+    this.selected = new Set(move ? move.cards.map(card => card.id) : []);
     this.renderSelection();
-    this.toast(`建議出${move.name}，再按提示可換一組。`);
+    const faces = move && this.displayCards(move.cards, move).map(c => SUITS[c.suit].symbol + c.label).join(' ');
+    const title = move ? `出${move.name}　${faces}` : '不出';
+    let detail = r.lastPlay ? `桌面是${r.lastPlay.combo.name}，能壓過的牌組有 ${this.legalPlays.length} 組。`
+      : r.opening ? '首手必須包含 ♣3。' : '這手由您領出，可以選牌型。';
+    if (move) {
+      const left = r.hands[0].length - move.size;
+      detail += left ? `打出後手中剩 ${left} 張。` : '這組牌能一次出完，直接贏下本局。';
+    } else if (r.passes === 2) detail += `不出後由${SHORT[r.lastPlay.seat]}重新領牌。`;
+    else detail += '不出後，本輪要等到重新領牌才能再出。';
+    const analysis = this.hintAnalysis;
+    if (index === 0 && analysis.samples) {
+      detail += `用 ${analysis.samples} 次假想發牌比較 ${analysis.candidates} 種打法，這手的模擬平均結算為 ${analysis.mean.toFixed(1)} 分。`;
+    }
+    if (this.hintMoves.length > 1) detail += '再按教練可換一組。';
+    $('coachAdvice').textContent = `${index === 0 ? '教練建議' : '其他合法出法'}　${title}\n${detail}`;
   }
 
   scheduleAI(){clearTimeout(this.timer);this.timer=null;if(this.modal||this.round.over||this.round.turn===0)return;const round=this.round,seat=round.turn;this.timer=setTimeout(()=>{this.timer=null;if(this.modal||this.round!==round||round.over||round.turn!==seat)return;const cards=BigTwo.chooseMove(round.hands[seat],round.lastPlay,{round,seat});if(cards&&cards.length)this.performPlay(seat,cards);else this.performPass(seat);},950);}
   finish(){clearTimeout(this.timer);this.timer=null;this.result=this.round.scoreRound();this.stats.totals=this.stats.totals.map((n,i)=>n+this.result.deltas[i]);this.stats.played++;this.stats.history.push({winner:this.round.winner,deltas:this.result.deltas,number:this.stats.played});this.stats.history=this.stats.history.slice(-30);this.recordEnd();this.render();this.tone(this.round.winner===0?880:440,.3);this.showScore();}
   // 自動記錄用：這一局到目前為止的紀錄。牌的寫法是花色（C 梅花、D 方塊、H 紅心、S 黑桃）加點數，例如 C3 是梅花 3、S2 是黑桃 2。
   // 座位 0 是您，1、2、3 是東、北、西家。hands 是發牌時四家各拿到的 13 張；actions 依順序是誰出了哪些牌（type 是牌型）或不出（pass）；
-  // 您按過「提示」才出（或不出）的那一手標 hint；totals 是這一局開始前的累計分數；result 的 left 是結束時各家剩下的牌。
+  // 您按過「教練」才出（或不出）的那一手標 hint；totals 是這一局開始前的累計分數；result 的 left 是結束時各家剩下的牌。
   // 這一局還沒打完、您也還沒出過牌或按過不出時回傳 null（只是打開頁面，不用記）
   getRecord(){
     const r=this.round,acts=r.actions.filter(a=>a.type!=='reset'),ids=cards=>cards.map(c=>c.id);

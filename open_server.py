@@ -105,6 +105,11 @@ CATALOG = {
         "desc": "梅花 3 開局，比牌型、拚點數，搶先出完手牌。",
         "aliases": ["大老二"],
     },
+    "balatro": {
+        "name": "小丑牌：午夜劇場", "category": "撲克", "icon": "♦", "seats": 1,
+        "desc": "湊出撲克牌型，組合小丑效果，挑戰八幕盲注。",
+        "aliases": ["小丑牌", "午夜劇場"],
+    },
 }
 CATEGORY_ORDER = ["棋類", "麻將", "撲克", "其他"]
 SLUG_RE = re.compile(r"[a-z0-9][a-z0-9_-]*")

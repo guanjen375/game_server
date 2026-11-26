@@ -32,8 +32,7 @@ else worker();
 // ---------------------------------------------------------------- one table (in a worker thread)
 
 function worker() {
-    const html = fs.readFileSync(path.join(ROOT, 'games', 'gongzhu.html'), 'utf8');
-    const script = html.match(/<script>([\s\S]*?)<\/script>/)[1];
+    const script = require('./source.cjs');
     const load = compileFunction(script + '\nreturn { game, ai: GongZhuAI };', ['window', 'Math', 'document']);
 
     async function ask(record, seat, mode, model) {

@@ -321,8 +321,6 @@ function fakeBot(model = MODEL, list = null) {
 // `mode` is what the player picks for the computers right away ('normal', 'weak'); `disk` is the browser's
 // localStorage, which outlives the page.
 function open(seed, bot, mode = null, disk = new Map()) {
-    const html = fs.readFileSync(path.join(ROOT, 'games', 'gongzhu.html'), 'utf8');
-    const scripts = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(m => m[1]);
     const timers = [];
     let now = 0, ids = 0, clock = Date.UTC(2026, 10, 21), ticks = 0;
     const tick = () => (clock += 40);
@@ -358,7 +356,7 @@ function open(seed, bot, mode = null, disk = new Map()) {
     if (bot) sandbox.GameBot = bot;
     sandbox.window = sandbox;
     const context = vm.createContext(sandbox);
-    scripts.forEach((code, i) => vm.runInContext(code, context, { filename: `gongzhu.html#${i}` }));
+    vm.runInContext(require('./gongzhu/source.cjs'), context, { filename: 'gongzhu.html' });
     sandbox.onload();
     const game = vm.runInContext('game', context);
     game.sound.enabled = false;

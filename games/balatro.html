@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="zh-Hant" data-game="balatro">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+    <title>小丑牌：午夜劇場</title>
+    <link rel="stylesheet" href="assets/palette.css">
+    <link rel="stylesheet" href="assets/tables.css">
+    <link rel="stylesheet" href="assets/balatro.css">
+    <script defer src="assets/interface.js"></script>
+    <script defer src="assets/balatro.js"></script>
+    <script defer src="assets/balatro-table.js"></script>
+</head>
+<body>
+<header class="table-header">
+    <div class="table-identity">
+        <span class="table-emblem theatre-mark" data-game-mark aria-hidden="true">♦</span>
+        <div><h1>小丑牌</h1><p class="table-round">午夜劇場</p></div>
+    </div>
+    <nav class="table-tools" aria-label="牌桌工具">
+        <button type="button" class="table-tool" id="rulesButton"><i class="ui-icon i-journal-text" aria-hidden="true"></i>牌型與設定</button>
+        <button type="button" class="table-tool" id="restartButton"><i class="ui-icon i-arrow-repeat" aria-hidden="true"></i>重新開局</button>
+    </nav>
+</header>
+<main class="theatre">
+    <aside class="blind-ticket" aria-label="闖關進度">
+        <div class="poster">
+            <span id="actNumber"></span>
+            <h2 id="blindName"></h2>
+        </div>
+        <div class="ticket-body">
+            <div class="score-head"><span>本關籌碼</span><span>目標 <b id="goal"></b></span></div>
+            <div class="score-line"><strong class="total-score" id="score"></strong><span id="gain" aria-hidden="true"></span></div>
+            <progress id="goalMeter" aria-label="本關得分進度"></progress>
+            <ol class="route" aria-label="本幕盲注"><li>小盲</li><li>大盲</li><li>首領</li></ol>
+            <p id="bossRule" hidden></p>
+        </div>
+        <dl class="resources">
+            <div><dt>剩餘出牌</dt><dd id="plays"></dd></div>
+            <div><dt>剩餘棄牌</dt><dd id="discards"></dd></div>
+            <div><dt>金幣</dt><dd id="money"></dd></div>
+            <div><dt>抽牌堆</dt><dd id="stock"></dd></div>
+        </dl>
+    </aside>
+
+    <div class="stage">
+        <section class="cast-box" aria-labelledby="castHeading">
+            <header class="section-heading"><h2 id="castHeading">小丑席</h2><span id="castCount"></span></header>
+            <div id="cast" class="cast"></div>
+        </section>
+
+        <section class="tableau" id="playPanel" aria-labelledby="handHeading">
+            <header class="section-heading"><h2 id="handHeading">手牌</h2>
+                <div class="sort" role="group" aria-label="手牌排序"><button type="button" id="rankSort" aria-pressed="true">點數</button><button type="button" id="suitSort" aria-pressed="false">花色</button></div>
+            </header>
+            <div id="hand" class="hand" aria-label="選擇手牌"></div>
+            <div class="play-footer">
+                <div class="preview" aria-live="polite">
+                    <strong id="choice"></strong><span id="equation"></span>
+                    <small id="triggers" hidden></small>
+                </div>
+                <div class="commands" data-table-commands="below">
+                    <button class="action primary" type="button" id="playButton" data-turn-action disabled>出牌</button>
+                    <button class="action" type="button" id="discardButton" data-turn-action disabled>棄牌</button>
+                </div>
+            </div>
+        </section>
+
+        <section class="tableau" id="shopPanel" aria-labelledby="shopHeading" hidden>
+            <header class="section-heading"><h2 id="shopHeading">幕間商店</h2><span id="reward"></span></header>
+            <div id="offers" class="offers"></div>
+            <p id="nextBlind"></p>
+            <div class="shop-footer"><button class="action" type="button" id="rerollButton" data-game-choice="true"></button>
+                <button class="action primary" type="button" id="nextButton" data-game-choice="true"></button></div>
+        </section>
+
+        <section class="tableau ending" id="endPanel" aria-labelledby="endHeading" hidden>
+            <h2 id="endHeading"></h2><p id="endResult"></p>
+            <button class="action primary" type="button" id="againButton">再演一場</button>
+        </section>
+        <p id="notice" role="status" aria-live="polite"></p>
+    </div>
+</main>
+
+<dialog id="rulesDialog" aria-labelledby="rulesTitle">
+    <header class="dialog-head"><h2 id="rulesTitle">牌型與設定</h2><form method="dialog"><button class="action">回牌桌</button></form></header>
+    <div class="modal-body">
+        <p>每次選 1 至 5 張牌，籌碼乘以倍率就是這手得分，小數無條件捨去。棄牌可換新牌。用完出牌次數前達到目標，即可領獎金、逛商店。</p>
+        <p>只有組成牌型的牌會加上牌面籌碼。A 算 11，J、Q、K 算 10，其餘照點數。順子可用 A 接 2 或 K。</p>
+        <p>小丑由左至右觸發，可在商店換位或出售。每剩一次出牌多領 1 金幣，每存 5 金幣多領 1 金幣利息，利息最多 5 枚。</p>
+        <p>每幕有三關。下關會重洗整副牌，買到的小丑、牌型等級和銀箔牌會保留。闖過第八幕首領即通關。此瀏覽器會自動保存進度。</p>
+        <h3>本局牌型</h3>
+        <table class="hand-list"><thead><tr><th>牌型</th><th>等級</th><th>底籌 × 倍率</th></tr></thead><tbody id="guideHands"></tbody></table>
+    </div>
+</dialog>
+<dialog id="jokerDialog" aria-labelledby="jokerTitle">
+    <header class="dialog-head"><h2 id="jokerTitle"></h2><form method="dialog"><button class="action">返回</button></form></header>
+    <div class="modal-body"><div class="joker-info"><span id="jokerPortrait" class="portrait" aria-hidden="true"></span><p id="jokerText"></p></div>
+        <div class="joker-tools" id="jokerTools" hidden><button class="action" id="moveLeft" type="button">往左移</button><button class="action" id="moveRight" type="button">往右移</button><button class="action" id="sellButton" type="button"></button></div>
+    </div>
+</dialog>
+<dialog id="restartDialog" aria-labelledby="restartTitle">
+    <header class="dialog-head"><h2 id="restartTitle">重新開局？</h2></header>
+    <div class="modal-body"><p>目前的闖關進度會結束，從第一幕重新發牌。</p>
+        <form class="confirm-actions" method="dialog"><button class="action" autofocus>繼續這一局</button><button type="button" id="confirmRestart" class="action primary">重新開局</button></form>
+    </div>
+</dialog>
+</body>
+</html>

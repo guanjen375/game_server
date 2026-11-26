@@ -369,7 +369,7 @@
         </div>
         <div class="table-state" aria-label="牌桌狀態"><span id="moveCounter">第 1 手</span><span>黑 <b id="headerBlack">2</b> ／ 白 <b id="headerWhite">2</b></span><span>空格 <b id="emptyCounter">60</b></span></div>
         <nav class="table-tools" aria-label="遊戲操作">
-            <button type="button" class="table-tool hint-tool" onclick="game.showHint()" title="走棋提示" aria-label="走棋提示"><i class="ui-icon i-lightbulb" aria-hidden="true"></i><span>提示</span></button>
+            <button type="button" class="table-tool hint-tool" aria-controls="coachAdvice" onclick="game.showHint()" title="專業教練" aria-label="專業教練"><i class="ui-icon i-lightbulb" aria-hidden="true"></i><span>教練</span></button>
             <button type="button" class="table-tool" onclick="game.undo()"><i class="ui-icon i-arrow-counterclockwise" aria-hidden="true"></i><span>悔棋</span></button>
             <details class="table-menu">
                 <summary class="table-tool" aria-label="牌桌選單"><i class="ui-icon i-three-dots" aria-hidden="true"></i><span>選單</span></summary>
@@ -382,6 +382,7 @@
             </details>
         </nav>
     </header>
+    <output id="coachAdvice" class="table-coach" aria-label="教練建議" aria-live="polite" aria-atomic="true"></output>
 
     <!-- 棋桌主要遊戲區 -->
     <main class="rv-layout relative flex-1 min-h-0 w-full max-w-7xl mx-auto p-2 sm:p-4 gap-2 lg:gap-3 overflow-hidden">
@@ -584,7 +585,7 @@
 
                 <div class="bg-slate-800/80 border border-white/10 rounded-xl p-3.5 text-xs text-slate-300">
                     用方向鍵選合法格，Enter 落子。在最上方可選的一排再按 ↑ 到功能列，← → 選功能，↓ 回棋盤。選單用 ↑ ↓ 選項目、Enter 確認。<br>
-                    💡 <strong>貼心防呆設計：</strong>輪到您時，能下的格子會出現金色小點；用滑鼠時，移到格子上會先預覽下下去的樣子，會被翻面的棋子會亮起金色虛線圈。棋子中央的紅點是上一手下的位置。點擊上方「走棋提示」可獲得電腦的建議；下錯了也能「悔棋」。
+                    💡 <strong>貼心防呆設計：</strong>輪到您時，能下的格子會出現金色小點；用滑鼠時，移到格子上會先預覽下下去的樣子，會被翻面的棋子會亮起金色虛線圈。棋子中央的紅點是上一手下的位置。點「教練」可查看這手會翻幾子，以及留給對方哪些落點；下錯了也能「悔棋」。
                 </div>
             </div>
             <div class="px-6 py-3.5 bg-slate-950 border-t border-white/10 flex justify-end">
@@ -1242,10 +1243,11 @@
             /**
              * 為 color 方選一步，回傳格子編號（沒地方下回傳 -1）
              */
-            chooseMove(board, color, levelName) {
+            chooseMove(board, color, levelName, analysis) {
                 const lv = this.LEVELS[levelName] || this.LEVELS.normal;
                 const b = board.slice();
                 const moves = Engine.legalMoves(b, color);
+                if (analysis) analysis.legalCount = moves.length;
                 if (moves.length <= 1) return moves.length ? moves[0] : -1;
                 const pick = arr => arr[Math.floor(Math.random() * arr.length)];
 
@@ -1270,8 +1272,12 @@
                 const order = moves.slice().sort((x, y) => SQUARE_WEIGHTS[y] - SQUARE_WEIGHTS[x]);
 
                 if (lv.deep) {
-                    const { list, exact } = this.searchDeep(b, color, order, empties, lv);
+                    const { list, exact, depth } = this.searchDeep(b, color, order, empties, lv);
                     const best = list[0].score;
+                    if (analysis) {
+                        analysis.depth = depth;
+                        if (exact) analysis.finalMargin = best;
+                    }
                     return pick(list.filter(m => (exact ? m.score === best : m.score >= best - lv.margin)).map(m => m.sq));
                 }
 
@@ -1304,19 +1310,21 @@
                 const tryExact = empties <= lv.exact;
                 const midBudget = tryExact ? lv.timeMs * 0.3 : lv.timeMs;
                 let list = order.map(sq => ({ sq, score: 0 }));
+                let completedDepth = 0;
                 for (let depth = 1; depth <= empties; depth++) {
                     const res = this.searchRoot(b, color, list.map(m => m.sq), depth, lv.margin, ctx);
                     if (!res) break;
                     list = res;
+                    completedDepth = depth;
                     // 下一層通常要花好幾倍的時間：已用掉一半以上就不再加深
                     if (performance.now() - ctx.start > midBudget * 0.45) break;
                 }
                 if (tryExact) {
                     ctx.aborted = false;
                     const exactList = this.solveRoot(b, color, list.map(m => m.sq), ctx);
-                    if (exactList) return { list: exactList, exact: true };
+                    if (exactList) return { list: exactList, exact: true, depth: completedDepth };
                 }
-                return { list, exact: false };
+                return { list, exact: false, depth: completedDepth };
             }
         };
 
@@ -1639,7 +1647,7 @@
             /**
              * 自動記錄用：這一局到目前為止的紀錄。
              * moves 每一手：color 1 黑、2 白；sq 是下在哪一格（列 × 8 ＋ 行，左上角是 0）；flips 是翻了幾子；
-             * 沒地方下而跳過的那一手是 { pass: true }；玩家按過「提示」才下的那一手標 hint。
+             * 沒地方下而跳過的那一手是 { pass: true }；玩家按過「教練」才下的那一手標 hint。
              * 這一局還沒下完、玩家也還沒下過任何一手時回傳 null（只是打開頁面，不用記）
              */
             getRecord() {
@@ -1728,17 +1736,35 @@
              */
             showHint() {
                 if (!this.isHumanTurn()) {
-                    this.showCenterBanner(this.gameOver ? '🏁 本局已結束' : '⏳ 請等待輪到您的回合再使用提示', 'bg-slate-800 text-amber-300');
+                    this.showCenterBanner(this.gameOver ? '🏁 本局已結束' : '⏳ 輪到您走棋時可以請教教練', 'bg-slate-800 text-amber-300');
                     return;
                 }
                 const color = this.PLAYERS[this.turn].color;
-                const sq = ReversiAI.chooseMove(this.board, color, 'hint');
+                const analysis = {};
+                const sq = ReversiAI.chooseMove(this.board, color, 'hint', analysis);
                 if (sq < 0) return;
                 this.hint = sq;
                 this.renderBoard();
                 this.sound.playSelect();
-                const n = Engine.flipsOf(this.board, sq, color).length;
-                this.showCenterBanner(`💡 建議：下在 ${sqName(sq)}（可以翻 ${n} 子）`, 'bg-sky-500 text-slate-950');
+                const next = this.board.slice();
+                const flipped = Engine.play(next, sq, color, new Int8Array(SQUARES), 0);
+                const replies = Engine.legalMoves(next, 3 - color);
+                let detail = `可翻 ${flipped} 子。`;
+                if (CORNERS.includes(sq)) detail += '這枚角子往後都翻不動。';
+                if (replies.length) {
+                    detail += `對方有 ${replies.length} 個合法落點。`;
+                    const corners = replies.filter(s => CORNERS.includes(s));
+                    if (corners.length) detail += `留意對方可佔 ${corners.map(sqName).join('、')} 角。`;
+                } else {
+                    detail += Engine.hasMoves(next, color) ? '對方須跳過，您可再下一手。' : '雙方都無法再落子，本局結束。';
+                }
+                if (analysis.finalMargin !== undefined) {
+                    const diff = analysis.finalMargin;
+                    const result = diff === 0 ? '平手' : `${diff > 0 ? '贏' : '輸'} ${Math.abs(diff)} 子`;
+                    detail += `殘局已算到底，雙方最佳應對下您會${result}。`;
+                } else if (analysis.legalCount === 1) detail += '這是唯一合法落點。';
+                else detail += analysis.depth ? `搜尋完成 ${analysis.depth} 層。` : '搜尋未完成第一層，這是合法備選落點。';
+                document.getElementById('coachAdvice').textContent = `教練建議　下在 ${sqName(sq)}\n${detail}`;
             }
 
             /**
@@ -1817,6 +1843,7 @@
             }
 
             renderAll() {
+                if (this.hint < 0 || this.gameOver) document.getElementById('coachAdvice').textContent = '';
                 this.renderBoard();
                 this.renderHeader();
                 this.renderPanels();

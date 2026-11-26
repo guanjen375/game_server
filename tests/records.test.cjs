@@ -31,7 +31,9 @@ function nothing() {
 // Loads games/<name>.html the way a browser would, minus the screen. Time only moves when step() runs a timer.
 function open(name, seed = 1) {
     const html = fs.readFileSync(path.join(ROOT, 'games', `${name}.html`), 'utf8');
-    const scripts = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(m => m[1]);
+    const scripts = [...html.matchAll(/<script(?: src="(assets\/[\w-]+\.js)")?>([\s\S]*?)<\/script>/g)]
+        .filter(m => m[1] !== 'assets/interface.js')  // the DOM stand-in skips menus and keyboard navigation
+        .map(m => m[1] ? fs.readFileSync(path.join(ROOT, 'games', m[1]), 'utf8') : m[2]);
     const timers = [];
     let now = 0, ids = 0, clock = Date.UTC(2026, 10, 20), ticks = 0;
     const tick = () => (clock += 40);
@@ -50,8 +52,10 @@ function open(name, seed = 1) {
         },
         peek() { return this.current ? clone(this.current()) : null; }    // what leaving the page now would save
     };
+    const document = nothing(), element = nothing(), coach = { textContent: '' };
+    document.getElementById = id => id === 'coachAdvice' ? coach : element;
     const sandbox = {
-        document: nothing(), console, navigator: { userAgent: 'node' },
+        document, console, navigator: { userAgent: 'node' },
         localStorage: { getItem: () => null, setItem() {}, removeItem() {} },
         Math: Object.assign(Object.create(Math), { random: rng(seed) }),
         Date: FakeDate, performance: { now: () => (ticks += 50) },
@@ -65,7 +69,7 @@ function open(name, seed = 1) {
     scripts.forEach((code, i) => vm.runInContext(code, context, { filename: `${name}.html#${i}` }));
     if (typeof sandbox.onload === 'function') sandbox.onload();
     const env = {
-        name, recorder, random: rng(seed * 7919 + 13),
+        name, recorder, coach, random: rng(seed * 7919 + 13),
         api: expression => vm.runInContext(expression, context),
         step() {
             if (!timers.length) return false;
@@ -286,7 +290,7 @@ const DRIVERS = {
         setup: ({ game }) => { game.soundOn = false; },
         over: game => game.round.over,
         ready: game => game.round.turn === 0 && !game.round.passed[0],
-        hint: game => { game.hint(); return game.hintKey !== ''; },    // no suggestion when nothing can beat the table
+        hint: game => { game.hint(); return game.hintKey !== ''; },
         act({ game, random, pick, api }) {
             const round = game.round, moves = api('BigTwo').legalMoves(round.hands[0], round.lastPlay, round.opening);
             if (!moves.length || (round.lastPlay && random() < 0.3)) return game.pass();
@@ -355,7 +359,7 @@ const DRIVERS = {
         over: game => game.phase === 'end',
         ready: game => !game.autoWin && ((game.phase === 'turn' && game.turn === 0)
             || (game.phase === 'claim' && game.claim && !!game.claim.humanOpt) || game.phase === 'rob'),
-        hint: game => { game.showHint(); return game.hintShown; },    // no suggestion while deciding whether to rob a kong
+        hint: game => { game.showHint(); return game.hintShown; },
         act({ game, random, pick, api, manual }) {
             if (game.phase === 'rob') return game.humanRob(random() < 0.5);
             if (game.phase === 'claim') {

@@ -1,12 +1,9 @@
 'use strict';
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const fs = require('node:fs');
-const path = require('node:path');
 const { compileFunction } = require('node:vm');
 
-const html = fs.readFileSync(path.join(__dirname, '../games/gongzhu.html'), 'utf8');
-const script = html.match(/<script>([\s\S]*?)<\/script>/)[1];
+const script = require('./gongzhu/source.cjs');
 const load = compileFunction(script + '\nreturn { game, ai: GongZhuAI };', ['window', 'Math', 'document']);
 const name = card => card.suit + card.label;
 

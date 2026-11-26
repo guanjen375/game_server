@@ -423,6 +423,17 @@ body.felt-table, .app {
 .info-content [data-optional="tracker"] { display: block; }
 .info-content [data-optional="honors"] { display: none; }
 .table-tool.unavailable { opacity: .55; }
+.table-coach {
+    display: block;
+    flex: 0 0 auto;
+    padding-inline: max(12px, calc((100% - 1320px) / 2));
+    color: var(--ink);
+    background: var(--surface);
+    font: 500 14px/1.5 var(--sans);
+    white-space: pre-line;
+}
+.table-coach:not(:empty) { padding-block: 5px; border-bottom: 1px solid var(--line); }
+.table-coach::first-line { color: var(--accent); font-weight: 750; }
 @media (min-width: 1024px) {
     .felt-table main :is([class~="text-[10px]"], [class~="text-[11px]"]) { font-size: 12px; }
     .felt-table main :is(.area-info, .area-log, #panel-counter, #panel-log) .text-xs { font-size: 14px; }

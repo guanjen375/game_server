@@ -27,10 +27,17 @@
     --card-ink: #17212b;
     --card-red: #d5233f;
 }
-/* 淺色面板用外框區分白底牌，已出的牌用透明底與淡字。 */
+/* 淺色面板用外框區分白底牌。 */
 :root[data-game][data-theme="paper"] { --gz-dim: .87; --trk-live-line: #8f8468; --trk-out: .5; }
 :root[data-game]:is([data-theme="harbor"], [data-theme="sakura"]) { --gz-dim: .87; --trk-live-line: var(--grid); --trk-out: .88; }
 :root[data-game]:is([data-theme="amber"], [data-theme="graphite"]) { --trk-out: .76; }
+:root[data-game="gongzhu"]:is([data-theme="paper"], [data-theme="harbor"], [data-theme="sakura"]) {
+    --trk-out: 1;
+    --trk-out-bg: #b9c3c9;
+    --trk-out-border: 1px dashed #5c6b73;
+    --trk-out-ink: #34414a;
+    --trk-out-red: #792a40;
+}
 body {
     min-height: var(--app-h);
     overflow-x: clip;
@@ -277,7 +284,7 @@ main.gz-layout {
 .gz-tracker .gz-key { grid-area: key; }
 .gz-tracker .gz-deck { grid-area: deck; }
 
-/* 記牌表：白底＝還在別家手上，金底＝在您手上，淡掉＝已經出過。
+/* 記牌表：白底＝還在別家手上，金底＝在您手上，已出牌依主題使用灰底或淡字。
    直式版面是 13 欄（點數）× 4 列（花色），橫式版面和「已出牌紀錄」視窗是 4 欄（花色）× 13 列（點數）。 */
 .gz-deck { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 3px; }
 .gz-deck em { display: none; font-style: normal; }
@@ -294,7 +301,7 @@ main.gz-layout {
     font-variant-numeric: tabular-nums;
 }
 .gz-deck i small { font-size: 12px; font-weight: 400; }
-/* 三種狀態用底色分：別家＝白底的牌（最顯眼，要找的就是它）、您的＝金底、已出＝沒有底、字淡掉 */
+/* 還在手上的白底牌與金底牌都有陰影。 */
 .gz-deck i.is-live, .gz-key i.is-live {
     border-color: var(--trk-live-line);
     background: var(--card-face);
@@ -309,8 +316,13 @@ main.gz-layout {
 }
 .gz-deck i.is-live.red { color: var(--card-red); }
 .gz-deck i.is-mine.red { color: var(--trk-mine-red); }
-.gz-deck i.is-out, .gz-key i.is-out { color: var(--muted); opacity: var(--trk-out); }
-.gz-deck i.is-out.red { color: var(--negative); }
+.gz-deck i.is-out, .gz-key i.is-out {
+    border: var(--trk-out-border, 1px solid transparent);
+    background-color: var(--trk-out-bg, transparent);
+    color: var(--trk-out-ink, var(--muted));
+    opacity: var(--trk-out);
+}
+.gz-deck i.is-out.red { color: var(--trk-out-red, var(--negative)); }
 .gz-deck i.is-out small { opacity: .7; }
 .gz-tracker .gz-deck {
     grid-auto-flow: column;

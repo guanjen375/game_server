@@ -320,7 +320,7 @@
         </div>
         <div class="table-state" aria-label="牌桌狀態"><span id="moveCounter">第 1 回合</span><span>和局計數 <b id="drawCounter">0 / 120</b></span><span>子力 <b id="materialCounter">紅 16 · 黑 16</b></span></div>
         <nav class="table-tools" aria-label="遊戲操作">
-            <button type="button" class="table-tool hint-tool" onclick="game.showHint()" title="走棋提示" aria-label="走棋提示"><i class="ui-icon i-lightbulb" aria-hidden="true"></i><span>提示</span></button>
+            <button type="button" class="table-tool hint-tool" aria-controls="coachAdvice" onclick="game.showHint()" title="專業教練" aria-label="專業教練"><i class="ui-icon i-lightbulb" aria-hidden="true"></i><span>教練</span></button>
             <button type="button" class="table-tool" onclick="game.undo()"><i class="ui-icon i-arrow-counterclockwise" aria-hidden="true"></i><span>悔棋</span></button>
             <details class="table-menu">
                 <summary class="table-tool" aria-label="牌桌選單"><i class="ui-icon i-three-dots" aria-hidden="true"></i><span>選單</span></summary>
@@ -333,6 +333,7 @@
             </details>
         </nav>
     </header>
+    <output id="coachAdvice" class="table-coach" aria-label="教練建議" aria-live="polite" aria-atomic="true"></output>
 
     <!-- 棋桌主要遊戲區 -->
     <main class="xq-layout relative flex-1 min-h-0 w-full max-w-7xl mx-auto p-2 sm:p-4 gap-2 lg:gap-3 overflow-hidden">
@@ -555,7 +556,7 @@
 
                 <div class="bg-slate-800/80 border border-white/10 rounded-xl p-3.5 text-xs text-slate-300">
                     用方向鍵選能走的棋子，按 Enter 選子，再用方向鍵選落點，按 Enter 走棋或吃子。Esc 可取消選子。在最上方可選的一排再按 ↑ 到功能列，← → 選功能，↓ 回棋盤。選單用 ↑ ↓ 選項目、Enter 確認。<br>
-                    💡 <strong>貼心防呆設計：</strong>點選己方棋子後，可走的點會出現金色光點、可吃的敵子亮起紅圈，被將軍時帥（將）會閃紅光；不合規則的點擊會直接說明原因（送將、蹩馬腳、塞象眼…）。點擊上方「走棋提示」可獲得電腦建議，走錯也能「悔棋」。您執黑時棋盤會自動翻轉，讓您的棋子在下方。
+                    💡 <strong>貼心防呆設計：</strong>點選己方棋子後，可走的點會出現金色光點、可吃的敵子亮起紅圈，被將軍時帥（將）會閃紅光；不合規則的點擊會直接說明原因（送將、蹩馬腳、塞象眼…）。點「教練」可查看建議走法及對手如何應對，走錯也能「悔棋」。您執黑時棋盤會自動翻轉，讓您的棋子在下方。
                 </div>
             </div>
             <div class="px-6 py-3.5 bg-slate-950 border-t border-white/10 flex justify-end">
@@ -1257,12 +1258,13 @@
             /**
              * input：{ board, king, side, recent: 近期局面 }；回傳 { from, to }
              */
-            chooseMove(input, levelName) {
+            chooseMove(input, levelName, analysis) {
                 const lv = this.LEVELS[levelName] || this.LEVELS.normal;
                 const side = input.side;
                 const st = { board: input.board.slice(), king: input.king.slice(), hashLo: 0, hashHi: 0 };
                 Engine.computeHash(st, side);
                 const moves = Engine.legalMoves(st, side);
+                if (analysis) analysis.legalCount = moves.length;
                 if (!moves.length) return null;
                 const toAction = m => ({ from: m >> 7, to: m & 127 });
                 if (moves.length === 1) return toAction(moves[0]);
@@ -1308,6 +1310,7 @@
                         best = r.m;
                     }
                 }
+                if (analysis) analysis.depth = ctx.depthReached;
                 return toAction(best);
             },
 
@@ -1737,7 +1740,7 @@
             /**
              * 自動記錄用：這一局到目前為止的紀錄。
              * moves 每一手：color 0 紅、1 黑；from／to 是棋盤上的點（列 × 9 ＋ 行，第 0 列是黑方底線、第 9 列是紅方底線）；
-             * kind 1～7 是帥仕相傌俥炮兵；text 是中文棋譜；玩家按過「提示」才走的那一手標 hint。
+             * kind 1～7 是帥仕相傌俥炮兵；text 是中文棋譜；玩家按過「教練」才走的那一手標 hint。
              * 這一局還沒下完、玩家也還沒走過任何一手時回傳 null（只是打開頁面，不用記）
              */
             getRecord() {
@@ -1772,8 +1775,8 @@
             /**
              * 中文棋譜記法（紅方用一～九、黑方用１～９，路數由各自右手邊數起）
              */
-            notation(from, to) {
-                const b = this.board, p = b[from], color = p >> 4, kind = p & 15;
+            notation(from, to, b = this.board) {
+                const p = b[from], color = p >> 4, kind = p & 15;
                 const name = pieceChar(color, kind);
                 const nums = color === RED ? RED_NUM : BLACK_NUM;
                 const file = c => nums[color === RED ? 8 - c : c];
@@ -1942,16 +1945,34 @@
              */
             showHint() {
                 if (!this.isHumanTurn()) {
-                    this.showCenterBanner(this.gameOver ? '🏁 本局已結束' : '⏳ 請等待輪到您的回合再使用提示', 'bg-slate-800 text-amber-300');
+                    this.showCenterBanner(this.gameOver ? '🏁 本局已結束' : '⏳ 輪到您走棋時可以請教教練', 'bg-slate-800 text-amber-300');
                     return;
                 }
-                const move = XiangqiAI.chooseMove(this.aiInput(), 'hint');
+                const analysis = {};
+                const move = XiangqiAI.chooseMove(this.aiInput(), 'hint', analysis);
                 if (!move) return;
                 this.hint = move;
                 this.selectedSq = -1;
                 this.renderBoardState();
                 this.updateActionHint();
-                this.showCenterBanner(`💡 建議：${this.notation(move.from, move.to)}`, 'bg-sky-500 text-slate-950');
+                const { from, to } = move;
+                const next = { board: this.board.slice(), king: this.king.slice() };
+                const mover = next.board[from], captured = next.board[to], opp = this.turn ^ 1;
+                const facts = [];
+                if (Engine.kingAttacked(next, this.turn)) facts.push('這手可以解將。');
+                next.board[to] = mover;
+                next.board[from] = EMPTY;
+                if ((mover & 15) === KING) next.king[this.turn] = to;
+                if (captured) facts.push(`可以吃掉對方的${pieceChar(opp, captured & 15)}。`);
+                const check = Engine.kingAttacked(next, opp);
+                const replies = Engine.legalMoves(next, opp);
+                const takeBack = replies.find(m => (m & 127) === to);
+                if (!replies.length) facts.push(check ? '這是將死，對方沒有合法應手。' : '對方無子可動，構成困斃。');
+                else if (check) facts.push(`這手將軍，對方有 ${replies.length} 種應將走法。`);
+                else if (takeBack === undefined) facts.push(`此局面對方有 ${replies.length} 種合法走法，無法立即吃掉這枚${pieceChar(this.turn, mover & 15)}。`);
+                if (takeBack !== undefined) facts.push(`留意對方可以走「${this.notation(takeBack >> 7, to, next.board)}」吃回這枚棋。`);
+                const basis = analysis.legalCount === 1 ? '這是唯一合法走法。' : `已比較 ${analysis.legalCount} 種走法，搜尋完成 ${analysis.depth} 層。`;
+                document.getElementById('coachAdvice').textContent = `教練建議　${this.notation(from, to)}\n${facts.join('')}${basis}`;
             }
 
             /**
@@ -2061,6 +2082,7 @@
             }
 
             renderAll() {
+                if (!this.hint || this.gameOver) document.getElementById('coachAdvice').textContent = '';
                 this.renderHeader();
                 this.renderPanels();
                 this.renderBoardState();

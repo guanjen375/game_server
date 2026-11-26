@@ -344,6 +344,7 @@
     <link rel="stylesheet" href="assets/palette.css">
     <link rel="stylesheet" href="assets/tables.css">
     <script src="assets/interface.js"></script>
+    <script src="assets/mahjong-coach.js"></script>
 </head>
 <body class="w-screen flex flex-col justify-between felt-table text-white select-none">
 
@@ -354,7 +355,7 @@
             <div><h1>台灣十六張麻將</h1><p class="table-round"><span id="roundBadge">東風圈 · 東局</span></p></div>
         </div>
         <nav class="table-tools" aria-label="遊戲操作">
-            <button type="button" class="table-tool hint-tool" onclick="game.showHint()" title="出牌提示" aria-label="出牌提示"><i class="ui-icon i-lightbulb" aria-hidden="true"></i><span>提示</span></button>
+            <button type="button" class="table-tool hint-tool" aria-controls="coachAdvice" onclick="game.showHint()" title="專業教練" aria-label="專業教練"><i class="ui-icon i-lightbulb" aria-hidden="true"></i><span>教練</span></button>
             <button type="button" class="table-tool" onclick="game.undo()"><i class="ui-icon i-arrow-counterclockwise" aria-hidden="true"></i><span>悔牌</span></button>
             <details class="table-menu">
                 <summary class="table-tool" aria-label="牌桌選單"><i class="ui-icon i-three-dots" aria-hidden="true"></i><span>選單</span></summary>
@@ -367,6 +368,7 @@
             </details>
         </nav>
     </header>
+    <output id="coachAdvice" class="table-coach" aria-label="教練建議" aria-live="polite" aria-atomic="true"></output>
 
     <!-- 牌桌主要遊戲區 -->
     <main class="mj-layout relative flex-1 min-h-0 w-full max-w-[1680px] mx-auto flex flex-col justify-between p-2 sm:p-3 overflow-hidden">
@@ -514,7 +516,7 @@
                 </div>
 
                 <div class="bg-slate-800/80 border border-white/10 rounded-xl p-3.5 text-xs text-slate-300">
-                    💡 <strong>貼心設計：</strong>輪到您時，點一下手牌會抬起並顯示「打這張會聽哪些牌、還剩幾張」，場上（牌河、明牌）同一種牌也會跟著閃藍光，方便打別人打過的牌；可以吃碰槓胡時下方會跳出按鈕，不想要就按「過」。點擊上方「出牌提示」可得到電腦建議的出牌。<br>
+                    💡 <strong>貼心設計：</strong>輪到您時，點一下手牌會抬起並顯示「打這張會聽哪些牌、還剩幾張」，場上（牌河、明牌）同一種牌也會跟著閃藍光，方便打別人打過的牌；可以吃碰槓胡時下方會跳出按鈕，不想要就按「過」。點「教練」可比較打哪張、向聽數和桌上還沒看到的有效進張。<br>
                     🤖 聽牌後下方會出現「自動胡牌」：按下去就摸什麼打什麼（不吃、不碰、不槓），有人放槍、自摸或可以搶槓時自動胡牌；想自己打就按「取消自動」，每局開始時也會自動關掉。<br>
                     ← → 選手牌或吃、碰、槓、胡，Enter 確認。↑ 到功能列，窄螢幕會先經過「加台牌與聽牌進度」。← → 選功能，↓ 回牌桌。選單用 ↑ ↓ 選項目、Enter 確認。<br>
                     ↩️ 按錯或打錯牌時，按上方的「悔牌」就回到您上一步（出牌、吃、碰、槓、胡、過，或自動胡牌替您打的那一張）之前，可以連續按；一局結算之後就不能悔牌了。悔牌只會把牌局退回去，還沒摸的牌不會重洗。<br>
@@ -1180,7 +1182,7 @@
             },
 
             /** 選擇要打出的牌 */
-            chooseDiscard(game, seat, level) {
+            chooseDiscard(game, seat, level, analysis) {
                 const p = game.players[seat];
                 const need = 5 - p.melds.length;
                 const c = countsOf(p.hand);
@@ -1203,7 +1205,9 @@
                     c[t]++;
                     return { t, sh, ukeire, keep: this.keepValue(game, seat, c, t) };
                 });
+                if (analysis) MahjongCoach.includeSpecialWaits(evals, c, need, visible);
                 evals.sort((a, b) => a.sh - b.sh || b.ukeire - a.ukeire || a.keep - b.keep);
+                if (analysis) analysis.ranked = evals;
 
                 if (level === 'hard') {
                     const threats = this.threats(game, seat);
@@ -1212,6 +1216,7 @@
                         const pool = evals.filter(e => e.sh <= evals[0].sh + 1);
                         const danger = e => Math.max(...threats.map(o => this.tileDanger(game, o, e.t, visible)));
                         pool.sort((a, b) => danger(a) - danger(b) || a.sh - b.sh || b.ukeire - a.ukeire);
+                        if (analysis) Object.assign(analysis, { ranked: pool, defending: true });
                         return pool[0].t;
                     }
                 }
@@ -1358,7 +1363,7 @@
                 this.undoStack = [];      // 悔牌用：每次等您決定（出牌、吃碰槓胡過）時的牌局，每局開始時清空
                 this.actionLog = [];      // 自動記錄用：這一局依序發生的事（摸牌、補花、打牌、吃碰槓、過），每局開始時清空
                 this.dealt = [];          // 自動記錄用：發完牌、還沒補花時四家的手牌
-                this.hintShown = false;   // 自動記錄用：您這次做決定之前按過「提示」
+                this.hintShown = false;   // 自動記錄用：您這次做決定之前按過「教練」
                 this.history = [];
                 this.lastResult = null;
                 this.htmlCache = new Map();
@@ -1413,7 +1418,7 @@
 
             /**
              * 自動記錄用：記下這一局發生的一件事（seat 是誰、action 是什麼動作、tile 是哪張牌，寫法見 getRecord）。
-             * 您的決定（打牌、吃碰槓、過）如果是自動胡牌替您做的標 auto，按過「提示」才做的標 hint
+             * 您的決定（打牌、吃碰槓、過）如果是自動胡牌替您做的標 auto，按過「教練」才做的標 hint
              */
             log(seat, action, tile, more) {
                 const entry = Object.assign({ s: seat, a: action, t: tile }, more);
@@ -1977,7 +1982,7 @@
              *   draw 摸牌（back：從牌尾補的）、flower 亮出花牌、discard 打牌、
              *   chow／pung／kong 吃、碰、槓別人打的牌（from 是誰打的，using 是吃牌時用手上的哪兩張）、
              *   concealedKong 暗槓、addedKong 加槓（robbed：被搶槓，沒槓成）、pass 您按了「過」（rob：可以搶槓但不搶）。
-             *   您的決定如果是自動胡牌替您做的標 auto，按過「提示」才做的標 hint。
+             *   您的決定如果是自動胡牌替您做的標 auto，按過「教練」才做的標 hint。
              * 這一局還沒結束、您也還沒做過任何決定時回傳 null（只是打開頁面，不用記）
              */
             getRecord() {
@@ -2024,6 +2029,7 @@
             /* ===================== 畫面繪製 ===================== */
 
             render() {
+                if (!this.hintShown || this.autoWin || this.phase === 'end') document.getElementById('coachAdvice').textContent = '';
                 this.renderHeader();
                 this.renderCenter();
                 for (let seat = 0; seat < 4; seat++) this.renderPanel(seat);
@@ -2678,34 +2684,8 @@
                 else this.render();
             }
 
-            /** 出牌提示：輪到您出牌時建議打哪張；可以吃碰槓時建議要不要 */
             showHint() {
-                if (this.autoWin && this.phase !== 'end') {
-                    this.showCenterBanner('🤖 自動胡牌中，不用提示；想自己打請按「取消自動」', 'bg-violet-500 text-white');
-                    return;
-                }
-                if (this.phase === 'claim' && this.claim && this.claim.humanOpt) {
-                    const d = MahjongAI.decideClaim(this, 0, this.claim.humanOpt, this.claim.tile, 'hard');
-                    const text = d === 'win' ? '胡！' : d === 'kong' ? '槓' : d === 'pung' ? '碰' : d && d.type === 'chow' ? '吃' : '過（不要）';
-                    this.hintShown = true;
-                    this.showCenterBanner(`💡 建議：${text}`, 'bg-sky-500 text-slate-950');
-                    return;
-                }
-                if (this.phase !== 'turn' || this.turn !== 0) {
-                    this.showCenterBanner('⏳ 輪到您出牌時才能使用提示', 'bg-slate-800 text-amber-300');
-                    return;
-                }
-                this.hintShown = true;
-                if (this.selfOptions(0).win) {
-                    this.showCenterBanner('💡 可以自摸了！按下「自摸」', 'bg-sky-500 text-slate-950');
-                    return;
-                }
-                const t = MahjongAI.chooseDiscard(this, 0, 'hard');
-                this.hintTile = t;
-                this.selectedIndex = this.handDisplayOrder().lastIndexOf(t);
-                this.renderHand();
-                this.renderActions();
-                this.showCenterBanner(`💡 建議打出：${tileName(t)}`, 'bg-sky-500 text-slate-950');
+                MahjongCoach.show(this);
             }
 
             showCenterBanner(text, colorClasses = 'bg-amber-400 text-slate-950') {
